@@ -1779,9 +1779,10 @@ function openFreelaEventModal(eventId){
   };
 }
 
-function openCalEventModal(eventId, prefillDate){
-  const ev=eventId?calEvents[eventId]:{};
+function openCalEventModal(eventId, prefillDate, isFreela=false){
+  const ev=eventId?(calEvents[eventId]||freelaEvents[eventId]||{}):{}; 
   if(!ev&&eventId){toast("Evento não encontrado","error");return;}
+  if(eventId&&!calEvents[eventId]&&freelaEvents[eventId])isFreela=true;
   const orgPersons=Object.values(orgData.nodes||{}).filter(n=>n.name).map(n=>n.name);
   const isEdit=!!eventId;
   openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
