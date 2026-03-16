@@ -235,7 +235,8 @@ function renderSidebar(){
     const addBtn=isAdmin()
       ?`<span class="area-add-sub" data-pid="${a.id}" title="Nova subárea" style="font-size:11px;color:#5a5a6a;cursor:pointer;margin-left:2px;flex-shrink:0;opacity:0;transition:opacity .1s">＋</span>`
       :"";
-    let html=`<div class="nav-item area-row ${isCur?"active":""}" data-nav="area" data-id="${a.id}" style="${isCur?`color:${a.color}`:""};${indent}">`
+    let html=`<div class="nav-item area-row ${isCur?"active":""}" data-nav="area" data-id="${a.id}" draggable="true" style="${isCur?`color:${a.color}`:""};${indent}">`
+      +`<span class="area-drag-handle" data-aid="${a.id}" title="Arrastar para reordenar" style="font-size:11px;color:#3a3a4a;cursor:grab;margin-right:4px;flex-shrink:0;user-select:none">⠿</span>`
       +arrow
       +`<span class="dot" style="background:${a.color};margin-right:6px;flex-shrink:0;width:8px;height:8px;border-radius:50%"></span>`
       +`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc(a.name)}</span>`
@@ -246,17 +247,17 @@ function renderSidebar(){
     if(kids.length&&isExp) html+=kids.map(k=>areaItem(k,depth+1)).join("");
     return html;
   }
-  const rootAreas=allAreas.filter(a=>!a.parentId);
+  const rootAreas=allAreas.filter(a=>!a.parentId).sort((a,b)=>(a.order||0)-(b.order||0));
   const areaTreeHtml=rootAreas.map(a=>areaItem(a,0)).join("");
 
   sn.innerHTML=`
     ${ni("dashboard","⬡","Dashboard")}
+    ${ni("alertas","🔔","Alertas",urgentCount>0?`<span class="nav-alert-count">${urgentCount}</span>`:"")}
+    ${ni("minhas-tarefas","📋","Minhas Tarefas")}
     ${ni("fluxo","⟆","Fluxograma")}
     ${ni("calendario","📅","Calendário")}
     ${ni("organograma","🏢","Organograma")}
-    ${ni("minhas-tarefas","📋","Minhas Tarefas")}
     ${ni("fyi","💡","FYI")}
-    ${ni("alertas","🔔","Alertas",urgentCount>0?`<span class="nav-alert-count">${urgentCount}</span>`:"")}
     ${ni("notas-pessoais","📝","Rascunhos Pessoais")}
     ${(isAdmin()||currentProfile?.manageAreas)?ni("admin","⚙️","Administração",pendingCount>0?`<span class="nav-alert-count">${pendingCount}</span>`:""):""}
     ${ni("historico","🕵️","Histórico")}
@@ -293,6 +294,29 @@ function renderSidebar(){
     });
   });
   document.getElementById("btn-add-area")?.addEventListener("click",()=>openAreaModal(""));
+
+  // ── Sidebar area drag-to-reorder ──
+  let dragSrcAreaId=null;
+  sn.querySelectorAll(".area-row[draggable]").forEach(row=>{
+    row.addEventListener("dragstart",e=>{
+      dragSrcAreaId=row.dataset.id;
+      row.style.opacity="0.5";
+      e.dataTransfer.effectAllowed="move";
+    });
+    row.addEventListener("dragend",e=>{row.style.opacity="1";dragSrcAreaId=null;});
+    row.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="move";row.style.background="#1e1e2a";});
+    row.addEventListener("dragleave",e=>{row.style.background="";});
+    row.addEventListener("drop",async e=>{
+      e.preventDefault();row.style.background="";
+      const targetId=row.dataset.id;
+      if(!dragSrcAreaId||dragSrcAreaId===targetId)return;
+      const rootIds=Object.entries(areas).filter(([id,a])=>!a.parentId).sort((a,b)=>(a[1].order||0)-(b[1].order||0)).map(([id])=>id);
+      const si=rootIds.indexOf(dragSrcAreaId), ti=rootIds.indexOf(targetId);
+      if(si<0||ti<0)return;
+      rootIds.splice(si,1); rootIds.splice(ti,0,dragSrcAreaId);
+      for(let i=0;i<rootIds.length;i++) await dbSet(`areas/${rootIds[i]}/order`,i);
+    });
+  });
 }
 
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
@@ -632,7 +656,7 @@ function renderFYIPage(){
   const noteCards=notes.map(n=>{
     const color=n.color||"#c8f04e";
     const syncBadge=n.syncCal?`<span style="font-size:10px;background:#7c6eff22;color:#9d93ff;border:1px solid #7c6eff44;border-radius:10px;padding:1px 7px">📅 no calendário</span>`:"";
-    return`<div class="fyi-card" style="background:${color}10;border:1.5px solid ${color}33;border-radius:10px;padding:14px 16px;margin-bottom:12px;position:relative">
+    return`<div class="fyi-card" style="background:${color}10;border:1.5px solid ${color}33;border-radius:10px;padding:14px 16px;margin-bottom:12px;position:relative;cursor:pointer" data-fyi-open="${n.id}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
         <div style="font-size:14px;font-weight:700;color:#f0eff5;font-family:'Syne',sans-serif">${esc(n.title||"")}</div>
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -653,8 +677,22 @@ function renderFYIPage(){
   ${notes.length===0?`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">💡</div><div class="empty-title">Nenhuma nota FYI</div><div class="empty-sub">Use para registrar informações importantes sem criar uma tarefa</div></div>`:noteCards}`;
 }
 
-function openFYIModal(noteId){
+function openFYIModal(noteId, readOnly=false){
   const n=noteId?fyiNotes[noteId]:{};
+  if(readOnly&&noteId){
+    const color=n.color||"#c8f04e";
+    openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
+      <div class="modal-header"><div class="modal-title" style="color:${color}">${esc(n.title||"Nota FYI")}</div><button class="icon-btn" id="m-x">✕</button></div>
+      <div class="modal-body">
+        ${n.body?`<div style="font-size:14px;color:#c0c0d0;line-height:1.7;white-space:pre-wrap">${esc(n.body)}</div>`:"<div style='color:#5a5a6a;font-size:13px'>Sem conteúdo.</div>"}
+        ${n.syncCal&&n.date?`<div style="margin-top:14px;font-size:12px;color:#7c6eff">📅 Calendário: ${fmtDate(n.date)}</div>`:""}
+        <div style="margin-top:14px;font-size:11px;color:#5a5a6a">Por: ${esc(n.authorName||"—")}</div>
+      </div>
+      <div class="modal-footer"><button class="btn-ghost" id="m-cancel">Fechar</button></div>
+    </div></div>`);
+    document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
+    overlayClose("ov"); return;
+  }
   openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
     <div class="modal-header"><div class="modal-title">${noteId?"Editar":"Nova"} nota FYI</div><button class="icon-btn" id="m-x">✕</button></div>
     <div class="modal-body">
@@ -737,7 +775,7 @@ function renderHistoricoPage(){
 function renderAdminPage(){
   if(!isAdmin()&&!currentProfile?.manageAreas)return"";
   const userList=Object.entries(users).map(([id,u])=>({id,...u}));
-  const areaList=Object.entries(areas).map(([id,a])=>({id,...a}));
+  const areaList=Object.entries(areas).map(([id,a])=>({id,...a})).filter(a=>!a.parentId).sort((a,b)=>(a.order||0)-(b.order||0));
   const pendList=Object.entries(pendingUsers).map(([id,p])=>({id,...p})).filter(p=>p.status==="pending");
 
   const usageBar=(cur,max,color)=>{const pct=Math.min(100,Math.round(cur/max*100));return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><div style="flex:1;height:6px;background:#1e1e28;border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct>85?"#ff6b6b":pct>60?"#f0a832":color};border-radius:3px;transition:width .3s"></div></div><span style="font-size:11px;color:#7a7a8a;min-width:60px">${cur}/${max}</span></div>`;};
@@ -901,6 +939,13 @@ function attachContentEvents(){
 
   // FYI page handlers
   document.getElementById("btn-add-fyi")?.addEventListener("click",()=>openFYIModal(null));
+  document.querySelectorAll(".fyi-card[data-fyi-open]").forEach(card=>{
+    card.addEventListener("click",e=>{
+      if(e.target.classList.contains("btn-fyi-edit")||e.target.classList.contains("btn-fyi-del"))return;
+      const canEdit=fyiNotes[card.dataset.fyiOpen]?.authorId===currentUser?.uid||isAdmin1;
+      openFYIModal(card.dataset.fyiOpen, !canEdit);
+    });
+  });
   document.querySelectorAll(".btn-fyi-edit").forEach(b=>b.addEventListener("click",()=>openFYIModal(b.dataset.id)));
   document.querySelectorAll(".btn-fyi-del").forEach(b=>b.addEventListener("click",async()=>{
     if(!confirm("Excluir nota FYI?"))return;
@@ -2628,6 +2673,14 @@ function openTaskModal(init={}){
       <div class="field"><label>Prazo</label><input type="date" id="m-date" value="${init.date||""}"/></div>
     </div>
     ${init.creatorName?`<div style="font-size:11px;color:#5a5a6a;margin-top:4px">\u270f Criada por: ${esc(init.creatorName)}</div>`:""}
+    <div class="field" style="margin-top:8px">
+      <label>Também aparece em <span style="color:#7a7a8a;font-size:11px">(opcional — a tarefa será visível nessas áreas também)</span></label>
+      <div id="extra-areas-chips" style="display:flex;gap:6px;flex-wrap:wrap;min-height:24px;margin-bottom:6px"></div>
+      <select id="m-extra-area-sel" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
+        <option value="">+ Adicionar outra área…</option>
+        ${Object.entries(areas).map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join("")}
+      </select>
+    </div>
     <div class="field" style="display:flex;align-items:center;gap:10px;margin-top:8px">
       <input type="checkbox" id="m-allusers" style="width:16px;height:16px;accent-color:#c8f04e" ${init.allUsers?"checked":""}/>
       <label for="m-allusers" style="font-size:13px;color:#a0a0b0;cursor:pointer">Tarefa coletiva — todos os usuários devem marcar como concluída</label>
@@ -2641,6 +2694,25 @@ function openTaskModal(init={}){
     if(isCreator) el.querySelectorAll("[data-r]").forEach(ch=>ch.addEventListener("click",()=>{selResps=selResps.filter(r=>r!==ch.dataset.r);refreshRespChips();}));
   }
   refreshRespChips();
+
+  // Extra areas chips
+  let extraAreaIds=Array.isArray(init.extraAreaIds)?[...init.extraAreaIds]:[];
+  function refreshExtraAreaChips(){
+    const el=document.getElementById("extra-areas-chips");if(!el)return;
+    el.innerHTML=extraAreaIds.map(aid=>{
+      const a=areas[aid];if(!a)return"";
+      return`<span style="background:${a.color}18;color:${a.color};border:1px solid ${a.color}44;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer" data-eid="${aid}">✕ ${esc(a.name)}</span>`;
+    }).join("")||`<span style="font-size:12px;color:#5a5a6a">Nenhuma área extra</span>`;
+    el.querySelectorAll("[data-eid]").forEach(ch=>ch.addEventListener("click",()=>{extraAreaIds=extraAreaIds.filter(id=>id!==ch.dataset.eid);refreshExtraAreaChips();}));
+  }
+  refreshExtraAreaChips();
+  document.getElementById("m-extra-area-sel")?.addEventListener("change",e=>{
+    const val=e.target.value;
+    const mainArea=document.getElementById("m-area")?.value;
+    if(val&&val!==mainArea&&!extraAreaIds.includes(val)){extraAreaIds.push(val);refreshExtraAreaChips();}
+    e.target.value="";
+  });
+
   if(isCreator){
     document.getElementById("m-resp-add")?.addEventListener("click",()=>{
       const sel=document.getElementById("m-resp-sel")?.value;
@@ -2651,6 +2723,11 @@ function openTaskModal(init={}){
       if(document.getElementById("m-resp-sel"))document.getElementById("m-resp-sel").value="";
     });
     document.getElementById("m-resp-manual")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();document.getElementById("m-resp-add").click();}});
+    document.getElementById("m-resp-all")?.addEventListener("click",()=>{
+      const allNames=Object.values(users).filter(u=>u.name&&u.role!=="admin1").map(u=>u.name);
+      allNames.forEach(name=>{if(!selResps.includes(name))selResps.push(name);});
+      refreshRespChips();
+    });
   }
   document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
   document.getElementById("m-save").onclick=async()=>{
@@ -2668,6 +2745,7 @@ function openTaskModal(init={}){
       date:document.getElementById("m-date").value,
       pinned:init.pinned||false,
       allUsers:document.getElementById("m-allusers")?.checked||false,
+      extraAreaIds:extraAreaIds.length?extraAreaIds:null,
       creatorId:init.creatorId||currentUser.uid,
       creatorName:init.creatorName||currentProfile.name,
       createdAt:init.createdAt||new Date().toISOString()
@@ -2687,7 +2765,8 @@ function openDetailModal(taskId){
   const canPin=isAdmin();
   const canDelete=isAdmin()||(t.creatorId===currentUser?.uid);
   const priorityChip=t.priority?'<span class="chip" style="background:'+PRIORITY[t.priority].color+'18;color:'+PRIORITY[t.priority].color+';border:1px solid '+PRIORITY[t.priority].color+'30;padding:4px 12px;text-transform:capitalize">'+t.priority+'</span>':"";
-  const areaChip=area?'<span class="chip" style="background:'+area.color+'18;color:'+area.color+';border:1px solid '+area.color+'30;padding:4px 12px">'+esc(area.name)+'</span>':"";
+  const areaChip=(area?'<span class="chip" style="background:'+area.color+'18;color:'+area.color+';border:1px solid '+area.color+'30;padding:4px 12px">'+esc(area.name)+'</span>':"")
+    +(Array.isArray(t.extraAreaIds)?t.extraAreaIds.map(eid=>{const ea=areas[eid];return ea?'<span class="chip" style="background:'+ea.color+'18;color:'+ea.color+';border:1px solid '+ea.color+'30;padding:4px 12px">'+esc(ea.name)+'</span>':"";}).join(""):"");
   const descBlock=t.desc?'<div style="font-size:13px;color:#a0a0b0;line-height:1.6;background:#18181c;padding:12px;border-radius:8px;margin-bottom:14px">'+esc(t.desc)+'</div>':"";
   const respBlock=resps.length?'<div style="margin-bottom:12px"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Responsaveis</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+resps.map(r=>'<span style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30;padding:4px 12px;border-radius:20px;font-size:12px">'+esc(r)+'</span>').join("")+'</div></div>':"";
   const dateBlock=t.date?'<div><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Prazo</div><div>'+fmtDate(t.date)+'</div></div>':"";
