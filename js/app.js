@@ -30,10 +30,30 @@ const LIMITS = {
   MAX_ORG_NODES:        60,  // max blocos no organograma
 };
 
+// ── SECURITY — Rate limiting (prevent abuse / accidental overuse) ─────────────
+const _writeCounts={};
+function checkRateLimit(key, maxPerMin=60){
+  const now=Date.now(), windowMs=60000;
+  if(!_writeCounts[key]||now-_writeCounts[key].t>windowMs){
+    _writeCounts[key]={t:now,n:0};
+  }
+  _writeCounts[key].n++;
+  if(_writeCounts[key].n>maxPerMin){
+    console.warn(`Rate limit hit: ${key} (${_writeCounts[key].n}/${maxPerMin} per min)`);
+    toast("Muitas ações em pouco tempo. Aguarde um momento.","error");
+    return false;
+  }
+  return true;
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function fmtDate(d){if(!d)return"—";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;}
 function fmtTs(ts){if(!ts)return"";const d=new Date(ts);return`${d.toLocaleDateString("pt-BR")} ${d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`;}
 function initials(n){return(n||"?").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);}
+function linkify(text){
+  if(!text)return"";
+  const escaped=esc(text);
+  return escaped.replace(/(https?:\/\/[^\s<>"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:#4ac8e8;text-decoration:underline;word-break:break-all" onclick="event.stopPropagation()">$1</a>');
+}
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
 function deadlineClass(d){if(!d)return null;const diff=new Date(d+"T23:59:59")-new Date();if(diff<=0)return null;if(diff<=10800000)return"warn-now";if(diff<=86400000)return"warn-1";if(diff<=172800000)return"warn-2";if(diff<=259200000)return"warn-3";return null;}
@@ -45,7 +65,7 @@ let page="dashboard", activeAreaId=null, dropdownOpen=false;
 let areas={}, tasks={}, notes={}, users={}, flowData={nodes:{},edges:{}}, orgData={nodes:{},edges:{}}, calEvents={};
 let auditLog={}, personalNotes={}, pendingUsers={}, areaNotes={};
 let dragging=null, connecting=null, selEdge=null, mousePos={x:0,y:0};
-let selectedNodes=new Set(), groupDragging=null, selBox=null;
+let selectedNodes=new Set(), groupDragging=null, selBox=null, flowResizing=null;
 let flowSelecting=false, flowSelStart={x:0,y:0}; // drag-to-select state
 let expandedAreas=new Set(); // sidebar subarea toggle
 let areaNotesListeners={};
@@ -53,9 +73,9 @@ let alertsSent={}, calAlertsSent={};
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
 const dbRef=p=>ref(db,p);
-function dbSet(p,v){return set(dbRef(p),v);}
+function dbSet(p,v){if(!checkRateLimit("write",300))return Promise.resolve();return set(dbRef(p),v);}
 function dbPush(p,v){return push(dbRef(p),v);}
-function dbRemove(p){return remove(dbRef(p));}
+function dbRemove(p){if(!checkRateLimit("write",300))return Promise.resolve();return remove(dbRef(p));}
 function dbListen(p,cb){onValue(dbRef(p),s=>cb(s.val()||{}));}
 
 // ── AUDIT ─────────────────────────────────────────────────────────────────────
@@ -121,6 +141,9 @@ function initListeners(){
 }
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
+// ── SECURITY GUARDS ──────────────────────────────────────────────────────────
+// Rate limit: track write attempts per minute to avoid runaway loops
+const writeTracker={count:0, resetAt:Date.now()+60000};
 onAuthStateChanged(auth, async user=>{
   if(user){
     currentUser=user;
@@ -476,27 +499,43 @@ function renderFlowPage(){
     return`<path d="M${sx},${sy} L${mousePos.x},${mousePos.y}" fill="none" stroke="#c8f04e" stroke-width="1.8" stroke-dasharray="6,3"/>`;
   })();
 
+  // Build defs for multi-area gradients
+  const flowGradDefs=nodes.filter(n=>Array.isArray(n.areaIds)&&n.areaIds.length>1).map(n=>{
+    const colors=n.areaIds.map(aid=>areas[aid]?.color||"#7a7a8a");
+    const stops=colors.map((c,i)=>{
+      const p1=Math.round(i/colors.length*100), p2=Math.round((i+1)/colors.length*100);
+      return`<stop offset="${p1}%" stop-color="${c}"/><stop offset="${p2}%" stop-color="${c}"/>`;
+    }).join("");
+    return`<linearGradient id="grad-${n.id}" x1="0%" y1="0%" x2="100%" y2="0%">${stops}</linearGradient>`;
+  }).join("");
+
   // SVG nodes
   const svgNodes=nodes.map(n=>{
     const W=n.w||150, H=n.h||48;
     const fsize=n.fontSize||18, ffam="Syne";
-    const hasArea=n.areaId&&areas[n.areaId];
-    const bc=hasArea?areas[n.areaId].color:(n.color||"#c8f04e");
+    // Multi-area support
+    const areaIdList=Array.isArray(n.areaIds)&&n.areaIds.length>0?n.areaIds:(n.areaId?[n.areaId]:[]);
+    const hasArea=areaIdList.length>0&&areas[areaIdList[0]];
+    const isMulti=areaIdList.length>1;
+    const bc=hasArea?areas[areaIdList[0]].color:(n.color||"#c8f04e");
+    const fillColor=isMulti?`url(#grad-${n.id})`:`${bc}20`;
+    const strokeColor=isMulti?`url(#grad-${n.id})`:bc;
     const isSel=selectedNodes.has(n.id);
     const lblFull=n.label||"";
     const lbl=lblFull.length>28?lblFull.slice(0,26)+"…":lblFull;
     const detail=n.detail||"";
+    const areaLabel=areaIdList.filter(id=>areas[id]).map(id=>areas[id].name.slice(0,10)).join(" · ");
     const shape=n.shape==="diamond"
-      ?`<polygon points="${W/2},0 ${W},${H/2} ${W/2},${H} 0,${H/2}" fill="${bc}20" stroke="${isSel?"#c8f04e":bc}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`
+      ?`<polygon points="${W/2},0 ${W},${H/2} ${W/2},${H} 0,${H/2}" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`
       :n.shape==="pill"
-      ?`<rect x="0" y="0" width="${W}" height="${H}" rx="${H/2}" fill="${bc}20" stroke="${isSel?"#c8f04e":bc}" stroke-width="${isSel?3:1.5}"/>`
-      :`<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="${bc}20" stroke="${isSel?"#c8f04e":bc}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`;
-    const textY=detail?(hasArea?H/2-14:H/2-8):( hasArea?H/2-9:H/2 );
-    return`<g class="flow-node" data-node-id="${n.id}" data-area-id="${n.areaId||""}" transform="translate(${n.x},${n.y})" style="cursor:${hasArea&&!connecting?"pointer":"grab"}">
+      ?`<rect x="0" y="0" width="${W}" height="${H}" rx="${H/2}" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:1.5}"/>`
+      :`<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`;
+    const textY=detail?(hasArea?H/2-14:H/2-8):(hasArea?H/2-9:H/2);
+    return`<g class="flow-node" data-node-id="${n.id}" data-area-id="${areaIdList[0]||""}" transform="translate(${n.x},${n.y})" style="cursor:${hasArea&&!connecting?"pointer":"grab"}">
       ${shape}
       <text x="${W/2}" y="${textY}" text-anchor="middle" dominant-baseline="middle" fill="#f0eff5" font-size="${fsize}" font-weight="700" font-family="${ffam},sans-serif" style="pointer-events:none;user-select:none">${esc(lbl)}</text>
       ${detail?`<text x="${W/2}" y="${textY+fsize+4}" text-anchor="middle" dominant-baseline="middle" fill="${bc}" font-size="${Math.max(9,fsize-4)}" font-weight="400" font-family="DM Sans,sans-serif" style="pointer-events:none;opacity:.85">${esc(detail.slice(0,28)+(detail.length>28?"…":""))}</text>`:""}
-      ${hasArea?`<text x="${W/2}" y="${H-6}" text-anchor="middle" dominant-baseline="middle" fill="${bc}" font-size="9" font-weight="400" style="pointer-events:none;opacity:.7">↗ ${esc(areas[n.areaId].name.slice(0,18))}</text>`:""}
+      ${hasArea?`<text x="${W/2}" y="${H-6}" text-anchor="middle" dominant-baseline="middle" fill="#f0eff5" font-size="9" font-weight="400" style="pointer-events:none;opacity:.7">↗ ${esc(areaLabel)}</text>`:""}
       <!-- 4-side connection handles -->
       <circle cx="${W/2}" cy="0" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="top" style="cursor:crosshair"/>
       <circle cx="${W}" cy="${H/2}" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="right" style="cursor:crosshair"/>
@@ -504,6 +543,7 @@ function renderFlowPage(){
       <circle cx="0" cy="${H/2}" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="left" style="cursor:crosshair"/>
       ${isAdmin1?`<circle cx="${W+4}" cy="-4" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2" class="del-node" data-node-id="${n.id}" style="cursor:pointer"/><text x="${W+4}" y="-4" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text>`:""}
       ${isAdmin1?`<circle cx="-4" cy="${H+4}" r="8" fill="#7c6eff1a" stroke="#7c6eff" stroke-width="1.2" class="edit-flow-node" data-node-id="${n.id}" style="cursor:pointer"/><text x="-4" y="${H+4}" text-anchor="middle" dominant-baseline="middle" fill="#9d93ff" font-size="10" style="pointer-events:none">✏</text>`:""}
+      <rect x="${W-6}" y="${H-6}" width="10" height="10" rx="2" fill="${bc}44" stroke="${bc}" stroke-width="1" class="flow-resize-handle" data-node-id="${n.id}" style="cursor:se-resize"/>
     </g>`;}).join("");
 
   const areaButtons=myAreas.map(a=>`<button class="btn-small btn-add-area-node" data-area-id="${a.id}" style="background:${a.color}22;color:${a.color};border:1px solid ${a.color}44;white-space:nowrap">+ ${esc(a.name)}</button>`).join("");
@@ -533,7 +573,8 @@ function renderFlowPage(){
       <div id="stickies-layer" style="position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden"></div>
       <svg id="flow-svg" width="100%" height="560" style="display:block;cursor:${connecting?"crosshair":"default"}">
         <defs>
-          <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+          ${flowGradDefs}
+        <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
             <path d="M28 0 L0 0 0 28" fill="none" stroke="#18182a" stroke-width="1"/>
           </pattern>
           <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
@@ -652,11 +693,12 @@ function renderPersonalNotesEditor(){
 // ── FYI PAGE ──────────────────────────────────────────────────────────────────
 function renderFYIPage(){
   const notes=Object.entries(fyiNotes).map(([id,n])=>({id,...n}))
-    .sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+    .filter(n=>!n.areaId) // global FYI only (area FYIs have areaId)
+    .sort((a,b)=>(a.order||0)-(b.order||0)||(new Date(b.createdAt)-new Date(a.createdAt)));
   const noteCards=notes.map(n=>{
     const color=n.color||"#c8f04e";
     const syncBadge=n.syncCal?`<span style="font-size:10px;background:#7c6eff22;color:#9d93ff;border:1px solid #7c6eff44;border-radius:10px;padding:1px 7px">📅 no calendário</span>`:"";
-    return`<div class="fyi-card" style="background:${color}10;border:1.5px solid ${color}33;border-radius:10px;padding:14px 16px;margin-bottom:12px;position:relative;cursor:pointer" data-fyi-open="${n.id}">
+    return`<div class="fyi-card" draggable="true" data-fyi-id="${n.id}" style="background:${color}10;border:1.5px solid ${color}33;border-radius:10px;padding:14px 16px;margin-bottom:12px;position:relative;cursor:grab" data-fyi-open="${n.id}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
         <div style="font-size:14px;font-weight:700;color:#f0eff5;font-family:'Syne',sans-serif">${esc(n.title||"")}</div>
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -684,7 +726,7 @@ function openFYIModal(noteId, readOnly=false){
     openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
       <div class="modal-header"><div class="modal-title" style="color:${color}">${esc(n.title||"Nota FYI")}</div><button class="icon-btn" id="m-x">✕</button></div>
       <div class="modal-body">
-        ${n.body?`<div style="font-size:14px;color:#c0c0d0;line-height:1.7;white-space:pre-wrap">${esc(n.body)}</div>`:"<div style='color:#5a5a6a;font-size:13px'>Sem conteúdo.</div>"}
+        ${n.body?`<div style="font-size:14px;color:#c0c0d0;line-height:1.7;white-space:pre-wrap">${linkify(n.body)}</div>`:"<div style='color:#5a5a6a;font-size:13px'>Sem conteúdo.</div>"}
         ${n.syncCal&&n.date?`<div style="margin-top:14px;font-size:12px;color:#7c6eff">📅 Calendário: ${fmtDate(n.date)}</div>`:""}
         <div style="margin-top:14px;font-size:11px;color:#5a5a6a">Por: ${esc(n.authorName||"—")}</div>
       </div>
@@ -749,6 +791,79 @@ function openFYIModal(noteId, readOnly=false){
   };
   overlayClose("ov");
 }
+
+function openAreaFYIModal(noteId, areaId, readOnly=false){
+  const n=noteId?fyiNotes[noteId]:{};
+  if(readOnly&&noteId){
+    const color=n.color||"#c8f04e";
+    openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
+      <div class="modal-header"><div class="modal-title" style="color:${color}">${esc(n.title||"Nota FYI")}</div><button class="icon-btn" id="m-x">✕</button></div>
+      <div class="modal-body">
+        ${n.body?`<div style="font-size:14px;color:#c0c0d0;line-height:1.7;white-space:pre-wrap">${linkify(n.body)}</div>`:"<div style='color:#5a5a6a;font-size:13px'>Sem conteúdo.</div>"}
+        ${n.syncCal&&n.date?`<div style="margin-top:14px;font-size:12px;color:#7c6eff">📅 ${fmtDate(n.date)}</div>`:""}
+        <div style="margin-top:14px;font-size:11px;color:#5a5a6a">Por: ${esc(n.authorName||"—")}</div>
+      </div>
+      <div class="modal-footer"><button class="btn-ghost" id="m-cancel">Fechar</button></div>
+    </div></div>`);
+    document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
+    overlayClose("ov"); return;
+  }
+  openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
+    <div class="modal-header"><div class="modal-title">${noteId?"Editar":"Nova"} nota FYI</div><button class="icon-btn" id="m-x">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Título *</label><input id="m-ftitle" value="${esc(n.title||"")}" placeholder="Assunto da nota…" autofocus/></div>
+      <div class="field"><label>Conteúdo</label><textarea id="m-fbody" rows="5" placeholder="Detalhes, links, referências…">${esc(n.body||"")}</textarea></div>
+      <div class="field-row">
+        <div class="field"><label>Cor</label><input type="color" id="m-fcolor" value="${n.color||"#c8f04e"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
+        <div class="field" style="display:flex;align-items:flex-end;gap:10px;padding-bottom:6px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="m-fsynccal" ${n.syncCal?"checked":""} style="width:15px;height:15px;accent-color:#7c6eff"/>
+            <span style="font-size:13px;color:#d0d0e0">Sincronizar com Calendário</span>
+          </label>
+        </div>
+      </div>
+      <div id="m-fdate-wrap" style="display:${n.syncCal?"block":"none"}">
+        <div class="field"><label>Data no calendário</label><input type="date" id="m-fdate" value="${n.date||""}"/></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      ${noteId?`<button class="btn-danger" id="m-fdel">Excluir</button>`:""}
+      <button class="btn-ghost" id="m-cancel">Cancelar</button>
+      <button class="btn-primary" id="m-save">Salvar</button>
+    </div>
+  </div></div>`);
+  document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
+  document.getElementById("m-fsynccal")?.addEventListener("change",e=>{
+    document.getElementById("m-fdate-wrap").style.display=e.target.checked?"block":"none";
+  });
+  document.getElementById("m-fdel")?.addEventListener("click",async()=>{
+    if(confirm("Excluir nota FYI?")){
+      await dbRemove(`fyi_notes/${noteId}`);
+      if(n.calEventId)await dbRemove(`cal_events/${n.calEventId}`);
+      closeModal(); toast("Nota removida","warning");
+    }
+  });
+  document.getElementById("m-save").onclick=async()=>{
+    const title=document.getElementById("m-ftitle").value.trim(); if(!title){toast("Digite um título","error");return;}
+    const syncCal=document.getElementById("m-fsynccal").checked;
+    const date=document.getElementById("m-fdate")?.value||"";
+    const body=document.getElementById("m-fbody").value.trim();
+    const color=document.getElementById("m-fcolor").value;
+    let calEventId=n.calEventId||null;
+    if(syncCal&&date){
+      const calData={title:"[FYI] "+title,dateStart:date,priority:null,note:body||null,creatorId:currentUser.uid,creatorName:currentProfile.name,createdAt:n.calEventCreatedAt||new Date().toISOString()};
+      calEventId=calEventId||uid();
+      await dbSet(`cal_events/${calEventId}`,calData);
+    } else if(!syncCal&&calEventId){
+      await dbRemove(`cal_events/${calEventId}`); calEventId=null;
+    }
+    const data={title,body,color,syncCal,date:date||null,calEventId,areaId:areaId||null,authorId:currentUser.uid,authorName:currentProfile.name,createdAt:n.createdAt||new Date().toISOString()};
+    await dbSet(`fyi_notes/${noteId||uid()}`,data);
+    toast(noteId?"Nota atualizada!":"Nota criada!","success"); closeModal();
+  };
+  overlayClose("ov");
+}
+
 
 function renderAlertsPage(){
   const myAreas=visibleAreas().map(a=>a.id);
@@ -945,6 +1060,21 @@ function attachContentEvents(){
       const canEdit=fyiNotes[card.dataset.fyiOpen]?.authorId===currentUser?.uid||isAdmin1;
       openFYIModal(card.dataset.fyiOpen, !canEdit);
     });
+    // Drag to reorder
+    card.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",card.dataset.fyiId);card.style.opacity="0.5";});
+    card.addEventListener("dragend",()=>card.style.opacity="1");
+    card.addEventListener("dragover",e=>{e.preventDefault();card.style.outline="2px solid #c8f04e44";});
+    card.addEventListener("dragleave",()=>card.style.outline="");
+    card.addEventListener("drop",async e=>{
+      e.preventDefault();card.style.outline="";
+      const srcId=e.dataTransfer.getData("text/plain");
+      if(!srcId||srcId===card.dataset.fyiId)return;
+      const list=Object.values(fyiNotes).filter(n=>!n.areaId).sort((a,b)=>(a.order||0)-(b.order||0));
+      const si=list.findIndex(n=>n.id===srcId), ti=list.findIndex(n=>n.id===card.dataset.fyiId);
+      if(si<0||ti<0)return;
+      const [moved]=list.splice(si,1); list.splice(ti,0,moved);
+      for(let i=0;i<list.length;i++) await dbSet(`fyi_notes/${list[i].id}/order`,i);
+    });
   });
   document.querySelectorAll(".btn-fyi-edit").forEach(b=>b.addEventListener("click",()=>openFYIModal(b.dataset.id)));
   document.querySelectorAll(".btn-fyi-del").forEach(b=>b.addEventListener("click",async()=>{
@@ -1029,6 +1159,7 @@ function attachFlowEvents(){
     el.addEventListener("mousedown",e=>{
       // If clicking a conn-handle, del-node or edit button — let those handlers run, don't intercept
       if(e.target.classList.contains("conn-handle")||e.target.classList.contains("del-node")||e.target.classList.contains("edit-flow-node"))return;
+      if(e.target.classList.contains("flow-resize-handle"))return; // handled by svg mousedown
       e.stopPropagation(); // prevent SVG background selBox from starting
       const nid=el.dataset.nodeId;
       if(connecting){const toId=nid;if(connecting.fromId!==toId)dbSet(`flow/edges/${uid()}`,{from:connecting.fromId,to:toId,fromSide:connecting.side||"right",toSide:"left",label:"",detail:""});connecting=null;render();return;}
@@ -1054,6 +1185,29 @@ function attachFlowEvents(){
     const cy=(e.clientY-r.top-flowPan.y)/flowZoom;
     mousePos={x:cx,y:cy};
     if(connecting){render();return;}
+    if(flowResizing){
+      const dx=(e.clientX-flowResizing.startX)/flowZoom;
+      const dy=(e.clientY-flowResizing.startY)/flowZoom;
+      const newW=Math.max(60,Math.round(flowResizing.startW+dx));
+      const newH=Math.max(30,Math.round(flowResizing.startH+dy));
+      dbSet(`flow/nodes/${flowResizing.id}/w`,newW);
+      dbSet(`flow/nodes/${flowResizing.id}/h`,newH);
+      return;
+    }
+    if(flowResizing){
+      const dx=(e.clientX-flowResizing.startX)/flowZoom;
+      const dy=(e.clientY-flowResizing.startY)/flowZoom;
+      dbSet(`flow/nodes/${flowResizing.id}/w`,Math.max(80,Math.round(flowResizing.startW+dx)));
+      dbSet(`flow/nodes/${flowResizing.id}/h`,Math.max(32,Math.round(flowResizing.startH+dy)));
+      return;
+    }
+    if(flowResizing){
+      const dx=(e.clientX-flowResizing.startX)/flowZoom;
+      const dy=(e.clientY-flowResizing.startY)/flowZoom;
+      dbSet(`flow/nodes/${flowResizing.id}/w`,Math.max(80,Math.round(flowResizing.startW+dx)));
+      dbSet(`flow/nodes/${flowResizing.id}/h`,Math.max(32,Math.round(flowResizing.startH+dy)));
+      return;
+    }
     if(flowSelecting&&selBox){
       selBox.x2=cx; selBox.y2=cy;
       render(); return;
@@ -1088,10 +1242,19 @@ function attachFlowEvents(){
       render(); return;
     }
     selBox=null; flowSelecting=false;
-    dragging=null; groupDragging=null;
+    dragging=null; groupDragging=null; flowResizing=null;
   });
   svg.addEventListener("click",e=>{if(connecting&&e.target===svg){connecting=null;render();return;}});
   svg.addEventListener("mousedown",e=>{
+    // Resize handle
+    if(e.target.classList.contains("flow-resize-handle")){
+      e.stopPropagation();
+      const nid=e.target.dataset.nodeId;
+      const n=flowData.nodes?.[nid]; if(!n)return;
+      const r=svg.getBoundingClientRect();
+      flowResizing={id:nid,startX:e.clientX,startY:e.clientY,startW:n.w||150,startH:n.h||48};
+      return;
+    }
     // Only start selBox on direct SVG background click (not on nodes/edges)
     if(e.target!==svg&&e.target.getAttribute("fill")!=="url(#grid)")return;
     if(connecting)return;
@@ -1262,11 +1425,7 @@ function openFlowNodeEditModal(nodeId){
         </div>
         <div class="field"><label>Cor</label><input type="color" id="m-ncolor" value="${n.color||"#c8f04e"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>Largura (px)</label><input type="number" id="m-nw" value="${n.w||150}" min="80" max="400" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/></div>
-        <div class="field"><label>Altura (px)</label><input type="number" id="m-nh" value="${n.h||48}" min="32" max="200" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/></div>
-        <div class="field"><label>Tamanho fonte</label><input type="number" id="m-nfsize" value="${n.fsize||14}" min="8" max="32" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/></div>
-      </div>
+      <div style="font-size:11px;color:#4a4a5a;background:#13131a;border:1px solid #2e2e3a;border-radius:6px;padding:7px 10px;margin-bottom:4px">💡 Redimensione o bloco arrastando o canto inferior direito diretamente no canvas.</div>
       <div class="field">
         <label>Fonte</label>
         <select id="m-nffam" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
@@ -1274,9 +1433,10 @@ function openFlowNodeEditModal(nodeId){
         </select>
       </div>
       <div class="field">
-        <label>Vincular a área existente <span style="color:#7a7a8a;font-size:10px">(ou criar nova abaixo)</span></label>
+        <label>Áreas vinculadas <span style="color:#7a7a8a;font-size:10px">(cor do bloco será dividida entre as áreas)</span></label>
+        <div id="m-area-chips" style="display:flex;gap:6px;flex-wrap:wrap;min-height:24px;margin-bottom:6px"></div>
         <select id="m-narea" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
-          <option value="">Nenhuma</option>
+          <option value="">+ Adicionar área…</option>
           ${areaOptions}
         </select>
       </div>
@@ -1294,15 +1454,32 @@ function openFlowNodeEditModal(nodeId){
     </div>
   </div></div>`);
   document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
+
+  // Multi-area chips
+  let selAreaIds=Array.isArray(n.areaIds)?[...n.areaIds]:(n.areaId?[n.areaId]:[]);
+  function refreshAreaChips(){
+    const el=document.getElementById("m-area-chips");if(!el)return;
+    el.innerHTML=selAreaIds.map(aid=>{
+      const a=areas[aid];if(!a)return"";
+      return`<span style="background:${a.color}22;color:${a.color};border:1px solid ${a.color}55;padding:3px 10px;border-radius:20px;font-size:12px;cursor:pointer" data-aid="${aid}">✕ ${esc(a.name)}</span>`;
+    }).join("")||`<span style="font-size:12px;color:#5a5a6a">Nenhuma área</span>`;
+    el.querySelectorAll("[data-aid]").forEach(ch=>ch.addEventListener("click",()=>{selAreaIds=selAreaIds.filter(id=>id!==ch.dataset.aid);refreshAreaChips();}));
+  }
+  refreshAreaChips();
+  document.getElementById("m-narea")?.addEventListener("change",e=>{
+    const val=e.target.value;
+    if(val&&!selAreaIds.includes(val)){selAreaIds.push(val);refreshAreaChips();}
+    e.target.value="";
+  });
+
   document.getElementById("m-save").onclick=async()=>{
     const label=document.getElementById("m-nlabel").value.trim(); if(!label){toast("Rótulo obrigatório","error");return;}
-    let areaId=document.getElementById("m-narea").value||null;
     const newAreaName=document.getElementById("m-nnewarea").value.trim();
     if(newAreaName){
       const newColor=document.getElementById("m-nnewareacolor").value||"#c8f04e";
       const newAid=uid();
       await dbSet(`areas/${newAid}`,{name:newAreaName,color:newColor,createdAt:new Date().toISOString()});
-      areaId=newAid;
+      selAreaIds.push(newAid);
       toast(`Área "${newAreaName}" criada!`,"success");
     }
     const updated={...n,
@@ -1310,11 +1487,12 @@ function openFlowNodeEditModal(nodeId){
       detail:document.getElementById("m-ndetail").value.trim()||"",
       shape:document.getElementById("m-nshape").value,
       color:document.getElementById("m-ncolor").value,
-      w:parseInt(document.getElementById("m-nw").value)||150,
-      h:parseInt(document.getElementById("m-nh").value)||48,
-      fsize:parseInt(document.getElementById("m-nfsize").value)||14,
+      w:n.w||150,
+      h:n.h||48,
+      fsize:n.fsize||14,
       ffam:document.getElementById("m-nffam").value||"Syne",
-      areaId:areaId||null
+      areaIds:selAreaIds.length?selAreaIds:null,
+      areaId:selAreaIds[0]||null // backward compat
     };
     await dbSet(`flow/nodes/${nodeId}`,updated);
     toast("Bloco atualizado!","success"); closeModal();
@@ -2085,8 +2263,23 @@ function renderOrgPage(){
   }).join("");
 
   // Nodes
+  // Build gradient defs for multi-area org nodes
+  const orgGradDefs=nodes.filter(n=>Array.isArray(n.areaIds)&&n.areaIds.length>1).map(n=>{
+    const colors=n.areaIds.map(id=>areas[id]?.color||"#7c6eff");
+    const stops=colors.map((c,i)=>{
+      const pct=Math.round(i/(colors.length)*100);
+      const pct2=Math.round((i+1)/(colors.length)*100);
+      return`<stop offset="${pct}%" stop-color="${c}"/><stop offset="${pct2}%" stop-color="${c}"/>`;
+    }).join("");
+    return`<linearGradient id="org-grad-${n.id}" x1="0%" y1="0%" x2="100%" y2="0%">${stops}</linearGradient>`;
+  }).join("");
+
   const svgNodes=nodes.map(n=>{
-    const aColor=n.areaName&&areaColors[n.areaName]?areaColors[n.areaName]:n.color||"#7c6eff";
+    const areaIdList=Array.isArray(n.areaIds)&&n.areaIds.length>0?n.areaIds:(n.areaName?Object.entries(areas).filter(([,a])=>a.name===n.areaName).map(([id])=>id):[]);
+    const isMultiOrg=areaIdList.length>1;
+    const aColor=isMultiOrg?areas[areaIdList[0]]?.color||"#7c6eff":(n.areaName&&areaColors[n.areaName]?areaColors[n.areaName]:n.color||"#7c6eff");
+    const orgFill=isMultiOrg?`url(#org-grad-${n.id})`:`${aColor}18`;
+    const orgStroke=isMultiOrg?`url(#org-grad-${n.id})`:aColor;
     const hasChildren=childCount(n.id)>0;
     const isExp=!!orgExpanded[n.id];
     const cc=childCount(n.id);
@@ -2109,7 +2302,7 @@ function renderOrgPage(){
     const parentBadge=n.parentId?`<rect x="0" y="0" width="${W}" height="4" rx="2" fill="${aColor}60" style="pointer-events:none"/>`:"";
     const nW=n.w||W, nH=n.h||H, nFs=n.fsize||12;
     return`<g class="org-node" data-nid="${n.id}" transform="translate(${n.x},${n.y})" style="cursor:grab">
-      <rect x="0" y="0" width="${nW}" height="${nH}" rx="10" fill="${aColor}18" stroke="${aColor}" stroke-width="${n.parentId?"1.2":"1.8"}"/>
+      ${orgGradDef}<rect x="0" y="0" width="${nW}" height="${nH}" rx="10" fill="${orgFill}" stroke="${orgStroke}" stroke-width="${n.parentId?"1.2":"1.8"}"/>
       <rect x="0" y="0" width="6" height="${H}" rx="3" fill="${aColor}"/>
       ${parentBadge}
       ${nameTxt?`<text x="16" y="22" fill="#f0eff5" font-size="${n.parentId?"11":"12"}" font-weight="700" font-family="Syne,sans-serif" style="pointer-events:none">${esc(nameTxt)}</text>`:""}
@@ -2123,6 +2316,7 @@ function renderOrgPage(){
       <circle cx="0" cy="${H/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="left" style="cursor:crosshair"/>
       ${isAdmin1?`<g class="org-edit-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="${W-10}" cy="10" r="9" fill="#1e1e28" stroke="${aColor}" stroke-width="1"/><text x="${W-10}" y="10" text-anchor="middle" dominant-baseline="middle" fill="${aColor}" font-size="10" style="pointer-events:none">✏</text></g>`:""}
       ${isAdmin1?`<g class="org-del-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="-8" cy="-8" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2"/><text x="-8" y="-8" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text></g>`:""}
+      <rect x="${nW-6}" y="${nH-6}" width="10" height="10" rx="2" fill="${aColor}44" stroke="${aColor}" stroke-width="1" class="org-resize-handle" data-nid="${n.id}" style="cursor:se-resize"/>
     </g>`;}).join("");
 
   const nodeCount=allNodes.length;
@@ -2151,6 +2345,7 @@ function renderOrgPage(){
     <div id="org-stickies-layer" style="position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden"></div>
     <svg id="org-svg" width="100%" height="650" style="display:block;cursor:${orgConnecting?"crosshair":"default"}">
       <defs>
+        ${orgGradDefs}
         <pattern id="org-grid" width="28" height="28" patternUnits="userSpaceOnUse">
           <path d="M28 0 L0 0 0 28" fill="none" stroke="#18182a" stroke-width="1"/>
         </pattern>
@@ -2271,7 +2466,7 @@ function attachOrgEvents(){
   const visNodes=allNodes.filter(n=>isVisible(n));
   document.querySelectorAll(".org-node").forEach(el=>{
     el.addEventListener("mousedown",e=>{
-      if(["org-conn-handle","org-conn-top","org-conn-right","org-del-node","org-edit-node","org-toggle","org-add-child"].some(c=>e.target.classList.contains(c)))return;
+      if(["org-conn-handle","org-conn-top","org-conn-right","org-del-node","org-edit-node","org-toggle","org-add-child","org-resize-handle"].some(c=>e.target.classList.contains(c)))return;
       e.stopPropagation();
       if(orgConnecting){
         const toId=el.dataset.nid;
@@ -2291,6 +2486,13 @@ function attachOrgEvents(){
   svg.addEventListener("mousemove",e=>{
     const r=svg.getBoundingClientRect();
     orgMousePos={x:(e.clientX-r.left-orgPan.x)/orgZoom,y:(e.clientY-r.top-orgPan.y)/orgZoom};
+    if(orgResizing){
+      const dx=(e.clientX-orgResizing.startX)/orgZoom;
+      const dy=(e.clientY-orgResizing.startY)/orgZoom;
+      dbSet(`org/nodes/${orgResizing.id}/w`,Math.max(60,Math.round(orgResizing.startW+dx)));
+      dbSet(`org/nodes/${orgResizing.id}/h`,Math.max(40,Math.round(orgResizing.startH+dy)));
+      return;
+    }
     if(orgGroupDragging){
       const dx=(e.clientX-orgGroupDragging.startClientX)/orgZoom;
       const dy=(e.clientY-orgGroupDragging.startClientY)/orgZoom;
@@ -2323,9 +2525,18 @@ function attachOrgEvents(){
       }
       orgSelBox=null; render(); return;
     }
-    orgDragging=null; orgGroupDragging=null;
+    orgDragging=null; orgGroupDragging=null; orgResizing=null;
   });
+  let orgResizing=null;
   svg.addEventListener("mousedown",e=>{
+    if(e.target.classList.contains("org-resize-handle")){
+      e.stopPropagation();
+      const nid=e.target.dataset.nid;
+      const n=orgData.nodes?.[nid]; if(!n)return;
+      const W=170, H=68;
+      orgResizing={id:nid,startX:e.clientX,startY:e.clientY,startW:n.w||W,startH:n.h||H};
+      return;
+    }
     if(e.target!==svg&&e.target.getAttribute("fill")!=="url(#org-grid)")return;
     if(orgConnecting)return;
     if(!e.shiftKey) orgSelectedNodes.clear();
@@ -2471,11 +2682,7 @@ function openOrgNodeModal(nodeId, parentId=null){
   openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:440px"><div class="modal-header"><div class="modal-title">${nodeId?"Editar":"Novo"} Bloco${parentLabel?" em "+esc(parentLabel):""}</div><button class="icon-btn" id="m-x">✕</button></div><div class="modal-body">
     ${parentLabel?`<div style="font-size:11px;color:#7a7a8a;background:#1a1a22;border:1px solid #2e2e3a;padding:7px 10px;border-radius:7px;margin-bottom:12px">Será adicionado como membro de: <strong style="color:#c8f04e">${esc(parentLabel)}</strong></div>`:""}
     <div class="field"><label>Nome</label><input id="m-oname" value="${esc(n.name||"")}" placeholder="Nome do colaborador…" autofocus/></div>
-    <div class="field-row">
-      <div class="field"><label>Largura</label><input type="number" id="m-ow" value="${n.w||170}" min="80" max="400" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/></div>
-      <div class="field"><label>Altura</label><input type="number" id="m-oh" value="${n.h||68}" min="32" max="200" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/></div>
-      <div class="field"><label>Fonte (px)</label><input type="number" id="m-ofsize" value="${n.fsize||12}" min="8" max="28" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/></div>
-    </div>
+    <div style="font-size:11px;color:#4a4a5a;background:#13131a;border:1px solid #2e2e3a;border-radius:6px;padding:7px 10px;margin-bottom:12px">💡 Redimensione o bloco arrastando o canto inferior direito diretamente no canvas.</div>
     <div class="field">
       <label>Criar nova área e vincular <span style="color:#7a7a8a;font-size:10px">(opcional)</span></label>
       <div style="display:flex;gap:8px">
@@ -2484,10 +2691,12 @@ function openOrgNodeModal(nodeId, parentId=null){
       </div>
     </div>
     <div class="field"><label>Cargo / Função</label><input id="m-orole" value="${esc(n.role||"")}" placeholder="Ex: Gerente Comercial, Designer…"/></div>
-    <div class="field"><label>Área / Departamento</label>
+    <div class="field">
+      <label>Áreas / Departamentos <span style="color:#7a7a8a;font-size:10px">(cor dividida verticalmente)</span></label>
+      <div id="m-org-area-chips" style="display:flex;gap:6px;flex-wrap:wrap;min-height:24px;margin-bottom:6px"></div>
       <select id="m-oarea" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
-        <option value="">Sem área</option>
-        ${Object.values(areas).map(a=>`<option value="${esc(a.name)}" ${n.areaName===a.name?"selected":""}>${esc(a.name)}</option>`).join("")}
+        <option value="">+ Adicionar área…</option>
+        ${Object.values(areas).map(a=>`<option value="${a.id||esc(a.name)}">${esc(a.name)}</option>`).join("")}
       </select>
     </div>
     <div class="field"><label>Cor personalizada <span style="color:#7a7a8a;font-size:11px">(usado quando sem área)</span></label>
@@ -2495,17 +2704,42 @@ function openOrgNodeModal(nodeId, parentId=null){
     </div>
   </div><div class="modal-footer"><button class="btn-ghost" id="m-cancel">Cancelar</button><button class="btn-primary" id="m-save">Salvar</button></div></div></div>`);
   document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
+
+  // Multi-area chips for org
+  const areaById=Object.entries(areas).reduce((acc,[id,a])=>{acc[id]=a;return acc;},{});
+  let selOrgAreaIds=Array.isArray(n.areaIds)?[...n.areaIds]:(n.areaId?[n.areaId]:[]);
+  function refreshOrgAreaChips(){
+    const el=document.getElementById("m-org-area-chips");if(!el)return;
+    el.innerHTML=selOrgAreaIds.map(aid=>{
+      const a=areaById[aid];if(!a)return"";
+      return`<span style="background:${a.color}22;color:${a.color};border:1px solid ${a.color}55;padding:3px 10px;border-radius:20px;font-size:12px;cursor:pointer" data-oid="${aid}">✕ ${esc(a.name)}</span>`;
+    }).join("")||`<span style="font-size:12px;color:#5a5a6a">Nenhuma área</span>`;
+    el.querySelectorAll("[data-oid]").forEach(ch=>ch.addEventListener("click",()=>{selOrgAreaIds=selOrgAreaIds.filter(id=>id!==ch.dataset.oid);refreshOrgAreaChips();}));
+  }
+  refreshOrgAreaChips();
+  document.getElementById("m-oarea")?.addEventListener("change",e=>{
+    const val=e.target.value;
+    if(val&&!selOrgAreaIds.includes(val)){selOrgAreaIds.push(val);refreshOrgAreaChips();}
+    e.target.value="";
+  });
+
   document.getElementById("m-save").onclick=async()=>{
     const name=document.getElementById("m-oname").value.trim();
     const role=document.getElementById("m-orole").value.trim();
-    const areaName=document.getElementById("m-oarea").value;
+    const areaName=selOrgAreaIds.length?Object.values(areas).find(a=>Object.keys(areas).find(k=>k===selOrgAreaIds[0]))?.name||"":"";
     const color=document.getElementById("m-ocolor").value;
+    const fsize=12; // fixed font size — resize via drag
     if(!name&&!role){toast("Preencha nome ou cargo","error");return;}
     // Position child near parent
     const px=parentNode?parentNode.x:null, py=parentNode?parentNode.y:null;
     const defaultX=px!=null?px+(Object.values(orgData.nodes||{}).filter(c=>c.parentId===parentId).length*190):80+Math.random()*400;
     const defaultY=py!=null?py+110:60+Math.random()*300;
-    const data={...(nodeId?orgData.nodes[nodeId]:{}),name,role,areaName,color,
+    const existingNode=nodeId?orgData.nodes[nodeId]:{};
+    const areaNameFirst=selOrgAreaIds.length?(Object.entries(areas).find(([id])=>id===selOrgAreaIds[0])?.[1]?.name||""):"";
+    const data={...existingNode,name,role,areaName:areaNameFirst||areaName,color,
+      areaIds:selOrgAreaIds.length?selOrgAreaIds:null,
+      areaId:selOrgAreaIds[0]||null,
+      w:existingNode.w,h:existingNode.h,
       parentId:nodeId?(n.parentId||null):parentId,
       x:n.x||defaultX,y:n.y||defaultY};
     await dbSet(`org/nodes/${nodeId||uid()}`,data);
@@ -2727,6 +2961,14 @@ function openTaskModal(init={}){
       const allNames=Object.values(users).filter(u=>u.name&&u.role!=="admin1").map(u=>u.name);
       allNames.forEach(name=>{if(!selResps.includes(name))selResps.push(name);});
       refreshRespChips();
+    });
+    document.getElementById("m-resp-org")?.addEventListener("click",()=>{
+      // All users including admin1 — full org broadcast
+      const allNames=Object.values(users).filter(u=>u.name).map(u=>u.name);
+      selResps=[];
+      allNames.forEach(name=>selResps.push(name));
+      refreshRespChips();
+      toast("Toda a organização adicionada — remova quem não deve receber","success");
     });
   }
   document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
@@ -3053,6 +3295,29 @@ function listenUserNotifs(){
 // Replaces the old note card system with an inline block editor per area
 // Each "note" is now a doc with an array of blocks: {id, type:'text'|'toggle', text, done?, color?}
 
+function renderAreaFYI(areaId){
+  const aFyi=Object.values(fyiNotes).filter(n=>n.areaId===areaId).sort((a,b)=>(a.order||0)-(b.order||0));
+  const color_=n=>n.color||"#c8f04e";
+  const cards=aFyi.map(n=>`<div class="fyi-card area-fyi-card" data-fyi-open="${n.id}" draggable="true" data-fyi-id="${n.id}" data-area-id="${areaId}"
+    style="background:${color_(n)}10;border:1.5px solid ${color_(n)}33;border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer;position:relative">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div style="font-size:14px;font-weight:700;color:${color_(n)}">${esc(n.title||"")}</div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${n.authorId===currentUser?.uid||isAdmin1?`<button class="btn-area-fyi-edit" data-id="${n.id}" style="background:none;border:none;color:#7a7a8a;cursor:pointer;font-size:13px">✏</button><button class="btn-area-fyi-del" data-id="${n.id}" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:13px">✕</button>`:""}
+      </div>
+    </div>
+    ${n.body?`<div style="font-size:13px;color:#a0a0b0;margin-top:6px;line-height:1.6;white-space:pre-wrap">${linkify(n.body)}</div>`:""}
+    ${n.syncCal&&n.date?`<div style="margin-top:8px;font-size:11px;color:#7c6eff">📅 ${fmtDate(n.date)}</div>`:""}
+  </div>`).join("");
+  return`<div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:12px;color:#5a5a6a">${aFyi.length} nota${aFyi.length!==1?"s":""} nesta área</div>
+      <button class="btn-primary btn-add-area-fyi" data-area-id="${areaId}" style="font-size:12px;padding:6px 14px">+ Nova nota FYI</button>
+    </div>
+    <div id="area-fyi-list">${cards||'<div style="font-size:13px;color:#3a3a4a;padding:20px 0">Nenhuma nota FYI nesta área ainda.</div>'}</div>
+  </div>`;
+}
+
 function renderAreaNotesEditor(areaId){
   // Find the block-doc (has a blocks array). Ignore legacy title/body notes.
   const allDocs=Object.values(areaNotes[areaId]||{});
@@ -3073,14 +3338,41 @@ function renderAreaNotesEditor(areaId){
       </div>`;
     }
     if(b.type==="toggle"){
-      const isOpen=b.open!==false; // default open
+      const isOpen=b.open!==false;
       const children=(b.children||[]);
-      const childrenHtml=children.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:3px 0;margin-left:28px">
-        <span contenteditable="true" data-bid="${b.id}" data-cid="${c.id}" class="toggle-child-text" spellcheck="false" style="flex:1;font-size:13px;color:${c.color||"#a0a0b0"};outline:none;word-break:break-word;line-height:1.6;min-height:16px">${esc(c.text||"")}</span>
-        <button class="toggle-child-del" data-bid="${b.id}" data-cid="${c.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:13px;padding:0;transition:opacity .15s" title="Remover">✕</button>
-      </div>`).join("");
-      const childInput=isOpen?`<div style="margin-left:28px;margin-top:4px">
-        <input class="toggle-add-child" data-bid="${b.id}" placeholder="Adicionar item…" style="width:100%;box-sizing:border-box;background:transparent;border:none;border-bottom:1px dashed #2e2e3a;color:#7a7a8a;font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 2px;outline:none"/>
+      // Render children recursively — each child can be text or nested toggle
+      function renderChild(c, parentBid, depth=1){
+        const ccolor=c.color||"#a0a0b0";
+        const indent=depth*20;
+        if(c.type==="toggle"){
+          const cOpen=c.open!==false;
+          const grandChildren=(c.children||[]).map(gc=>renderChild(gc,c.id,depth+1)).join("");
+          const gcInput=cOpen?`<div style="margin-left:${indent+20}px;margin-top:2px">
+            <input class="toggle-add-child" data-bid="${c.id}" data-parentbid="${parentBid}" placeholder="Adicionar item…" style="width:100%;box-sizing:border-box;background:transparent;border:none;border-bottom:1px dashed #2e2e3a;color:#7a7a8a;font-family:'DM Sans',sans-serif;font-size:12px;padding:3px 2px;outline:none"/>
+          </div>`:"";
+          return`<div class="toggle-child-row" data-bid="${parentBid}" data-cid="${c.id}" style="padding:2px 0;margin-left:${indent}px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="nested-toggle-arrow" data-bid="${c.id}" data-parentbid="${parentBid}" style="font-size:10px;color:#7a7a8a;cursor:pointer;user-select:none;display:inline-block;transform:${cOpen?"rotate(90deg)":"rotate(0deg)"};width:14px;text-align:center">▶</span>
+              <span contenteditable="true" data-bid="${parentBid}" data-cid="${c.id}" class="toggle-child-text" spellcheck="false" style="flex:1;font-size:13px;font-weight:600;color:${ccolor};outline:none;word-break:break-word;line-height:1.6;min-height:16px">${esc(c.text||"")}</span>
+              <button class="toggle-child-add-nested" data-bid="${c.id}" data-parentbid="${parentBid}" title="Adicionar subtoggle" style="opacity:0;background:none;border:none;color:#7c6eff;cursor:pointer;font-size:12px;padding:0 3px;transition:opacity .15s">▶+</button>
+              <button class="toggle-child-del" data-bid="${parentBid}" data-cid="${c.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:13px;padding:0;transition:opacity .15s">✕</button>
+            </div>
+            <div class="nested-toggle-body" data-bid="${c.id}" style="display:${cOpen?"block":"none"};border-left:2px solid ${ccolor}33;padding-left:4px">
+              ${grandChildren}
+              ${gcInput}
+            </div>
+          </div>`;
+        }
+        return`<div class="toggle-child-row" data-bid="${parentBid}" data-cid="${c.id}" style="display:flex;align-items:center;gap:8px;padding:3px 0;margin-left:${indent}px">
+          <span contenteditable="true" data-bid="${parentBid}" data-cid="${c.id}" class="toggle-child-text" spellcheck="false" style="flex:1;font-size:13px;color:${ccolor};outline:none;word-break:break-word;line-height:1.6;min-height:16px">${esc(c.text||"")}</span>
+          <button class="toggle-child-add-nested" data-bid="${c.id}" data-parentbid="${parentBid}" title="Converter em toggle" style="opacity:0;background:none;border:none;color:#7c6eff;cursor:pointer;font-size:12px;padding:0 3px;transition:opacity .15s">▶+</button>
+          <button class="toggle-child-del" data-bid="${parentBid}" data-cid="${c.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:13px;padding:0;transition:opacity .15s">✕</button>
+        </div>`;
+      }
+      const childrenHtml=children.map(c=>renderChild(c,b.id,1)).join("");
+      const childInput=isOpen?`<div style="margin-left:20px;margin-top:4px;display:flex;gap:6px">
+        <input class="toggle-add-child" data-bid="${b.id}" placeholder="Adicionar item… (Enter)" style="flex:1;box-sizing:border-box;background:transparent;border:none;border-bottom:1px dashed #2e2e3a;color:#7a7a8a;font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 2px;outline:none"/>
+        <button class="toggle-add-subtoggle" data-bid="${b.id}" title="Adicionar subtoggle" style="background:none;border:1px solid #7c6eff44;color:#9d93ff;cursor:pointer;font-size:11px;padding:2px 7px;border-radius:4px;white-space:nowrap">▶ Toggle</button>
       </div>`:"";
       return`<div class="note-block" data-bid="${b.id}" style="padding:4px 0;border-radius:6px">
         <div style="display:flex;align-items:center;gap:6px">
@@ -3098,7 +3390,7 @@ function renderAreaNotesEditor(areaId){
     // default: text
     return`<div class="note-block" data-bid="${b.id}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-radius:6px">
       <div class="block-handle" data-bid="${b.id}" style="width:20px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:#3a3a4a;font-size:15px">⋮</div>
-      <span contenteditable="true" data-bid="${b.id}" class="block-text" spellcheck="false" style="flex:1;font-size:13px;color:${color};outline:none;word-break:break-word;line-height:1.7;min-height:18px">${esc(b.text||"")}</span>
+      <span contenteditable="true" data-bid="${b.id}" class="block-text" spellcheck="false" style="flex:1;font-size:13px;color:${color};outline:none;word-break:break-word;line-height:1.7;min-height:18px">${linkify(b.text||"")}</span>
       <button class="block-del" data-bid="${b.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:15px;padding:0;transition:opacity .15s">✕</button>
     </div>`;
   }
@@ -3208,14 +3500,70 @@ function attachAreaNotesEditorEvents(areaId){
     });
   });
 
-  // Add child to toggle via Enter on the add-child input
+  // Helper: deep update child in tree (handles nested toggles)
+  function deepUpdateChild(children, cid, updater){
+    return children.map(c=>{
+      if(c.id===cid)return updater(c);
+      if(c.children)return{...c,children:deepUpdateChild(c.children,cid,updater)};
+      return c;
+    });
+  }
+  function deepDeleteChild(children, cid){
+    return children.filter(c=>c.id!==cid).map(c=>c.children?{...c,children:deepDeleteChild(c.children,cid)}:c);
+  }
+  function deepAddChild(children, parentCid, newChild){
+    return children.map(c=>{
+      if(c.id===parentCid)return{...c,children:[...(c.children||[]),newChild]};
+      if(c.children)return{...c,children:deepAddChild(c.children,parentCid,newChild)};
+      return c;
+    });
+  }
+
+  // Add child to toggle (first level or nested)
   document.querySelectorAll(".toggle-add-child").forEach(inp2=>{
     inp2.addEventListener("keydown",async e=>{
       if(e.key!=="Enter")return;
       e.preventDefault();
       const text=inp2.value.trim(); if(!text)return;
-      const bid=inp2.dataset.bid;
-      blocks=blocks.map(b=>b.id===bid?{...b,children:[...(b.children||[]),{id:uid(),text,color:"#a0a0b0"}]}:b);
+      const bid=inp2.dataset.bid; // direct parent block id
+      const parentBid=inp2.dataset.parentbid; // if nested, the top-level block id
+      if(parentBid){
+        // nested — add child to cid=bid within parentBid's tree
+        blocks=blocks.map(b=>b.id===parentBid?{...b,children:deepAddChild(b.children||[],bid,{id:uid(),type:"text",text,color:"#a0a0b0"})}:b);
+      } else {
+        blocks=blocks.map(b=>b.id===bid?{...b,children:[...(b.children||[]),{id:uid(),type:"text",text,color:"#a0a0b0"}]}:b);
+      }
+      await saveBlocks();
+    });
+  });
+
+  // Add subtoggle button
+  document.querySelectorAll(".toggle-add-subtoggle").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      const bid=btn.dataset.bid;
+      blocks=blocks.map(b=>b.id===bid?{...b,children:[...(b.children||[]),{id:uid(),type:"toggle",text:"Novo grupo",open:true,color:"#9d93ff",children:[]}]}:b);
+      await saveBlocks();
+    });
+  });
+
+  // Convert child to nested toggle (▶+ button)
+  document.querySelectorAll(".toggle-child-add-nested").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      const cid=btn.dataset.bid; // the child to convert
+      const parentBid=btn.dataset.parentbid;
+      if(!parentBid)return;
+      blocks=blocks.map(b=>b.id===parentBid?{...b,children:deepUpdateChild(b.children||[],cid,c=>({...c,type:"toggle",open:true,children:c.children||[]}))}:b);
+      await saveBlocks();
+    });
+  });
+
+  // Nested toggle arrow
+  document.querySelectorAll(".nested-toggle-arrow").forEach(arrow=>{
+    arrow.addEventListener("click",async()=>{
+      const cid=arrow.dataset.bid;
+      const parentBid=arrow.dataset.parentbid;
+      if(!parentBid)return;
+      blocks=blocks.map(b=>b.id===parentBid?{...b,children:deepUpdateChild(b.children||[],cid,c=>({...c,open:c.open===false}))}:b);
       await saveBlocks();
     });
   });
@@ -3225,26 +3573,27 @@ function attachAreaNotesEditorEvents(areaId){
     el.addEventListener("blur",async()=>{
       const bid=el.dataset.bid, cid=el.dataset.cid;
       const newText=el.innerText.trim();
-      blocks=blocks.map(b=>b.id===bid?{...b,children:(b.children||[]).map(c=>c.id===cid?{...c,text:newText}:c)}:b);
+      blocks=blocks.map(b=>b.id===bid?{...b,children:deepUpdateChild(b.children||[],cid,c=>({...c,text:newText}))}:b);
       await saveBlocks();
     });
     el.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();el.blur();}});
   });
 
-  // Delete child
+  // Delete child (any depth)
   document.querySelectorAll(".toggle-child-del").forEach(btn=>{
     btn.addEventListener("click",async()=>{
       const bid=btn.dataset.bid, cid=btn.dataset.cid;
-      blocks=blocks.map(b=>b.id===bid?{...b,children:(b.children||[]).filter(c=>c.id!==cid)}:b);
+      blocks=blocks.map(b=>b.id===bid?{...b,children:deepDeleteChild(b.children||[],cid)}:b);
       await saveBlocks();
     });
   });
 
-  // Hover on child rows
-  document.querySelectorAll(".toggle-child-del").forEach(btn=>{
-    const row=btn.parentElement;
-    row?.addEventListener("mouseenter",()=>btn.style.opacity="1");
-    row?.addEventListener("mouseleave",()=>btn.style.opacity="0");
+  // Hover on child rows — show del + nested buttons
+  document.querySelectorAll(".toggle-child-row").forEach(row=>{
+    const del=row.querySelector(".toggle-child-del");
+    const nested=row.querySelector(".toggle-child-add-nested");
+    row.addEventListener("mouseenter",()=>{if(del)del.style.opacity="1";if(nested)nested.style.opacity="1";});
+    row.addEventListener("mouseleave",()=>{if(del)del.style.opacity="0";if(nested)nested.style.opacity="0";});
   });
 
   // Inline text editing — save on blur
@@ -3299,6 +3648,54 @@ function attachAreaNotesEditorEvents(areaId){
         "---",
         {action:"del",icon:"🗑",label:"Excluir linha",fn:async()=>{blocks=blocks.filter(b=>b.id!==bid);await saveBlocks();}},
       ].filter(Boolean));
+    });
+  });
+
+  // ── Tab switching ──
+  document.getElementById("tab-blocks")?.addEventListener("click",()=>{
+    document.getElementById("area-tab-blocks").style.display="";
+    document.getElementById("area-tab-fyi").style.display="none";
+    document.getElementById("tab-blocks").style.borderBottomColor="#c8f04e";document.getElementById("tab-blocks").style.color="#c8f04e";
+    document.getElementById("tab-fyi").style.borderBottomColor="transparent";document.getElementById("tab-fyi").style.color="#7a7a8a";
+  });
+  document.getElementById("tab-fyi")?.addEventListener("click",()=>{
+    document.getElementById("area-tab-blocks").style.display="none";
+    document.getElementById("area-tab-fyi").style.display="";
+    document.getElementById("tab-fyi").style.borderBottomColor="#c8f04e";document.getElementById("tab-fyi").style.color="#c8f04e";
+    document.getElementById("tab-blocks").style.borderBottomColor="transparent";document.getElementById("tab-blocks").style.color="#7a7a8a";
+  });
+
+  // ── Area FYI events ──
+  document.querySelector(".btn-add-area-fyi")?.addEventListener("click",()=>openAreaFYIModal(null,areaId));
+  document.querySelectorAll(".btn-area-fyi-edit").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();openAreaFYIModal(b.dataset.id,areaId);}));
+  document.querySelectorAll(".btn-area-fyi-del").forEach(b=>b.addEventListener("click",async e=>{
+    e.stopPropagation();
+    if(!confirm("Excluir esta nota FYI?"))return;
+    const n=fyiNotes[b.dataset.id];
+    await dbRemove(`fyi_notes/${b.dataset.id}`);
+    if(n?.calEventId)await dbRemove(`cal_events/${n.calEventId}`);
+    toast("Nota removida","warning");
+  }));
+  document.querySelectorAll(".area-fyi-card").forEach(card=>{
+    card.addEventListener("click",e=>{
+      if(e.target.classList.contains("btn-area-fyi-edit")||e.target.classList.contains("btn-area-fyi-del"))return;
+      const canEdit=fyiNotes[card.dataset.fyiOpen]?.authorId===currentUser?.uid||isAdmin1;
+      openAreaFYIModal(card.dataset.fyiOpen, areaId, !canEdit);
+    });
+    // Drag to reorder
+    card.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",card.dataset.fyiId);card.style.opacity="0.5";});
+    card.addEventListener("dragend",()=>card.style.opacity="1");
+    card.addEventListener("dragover",e=>{e.preventDefault();card.style.background=fyiNotes[card.dataset.fyiOpen]?.color+"18"||"#1e1e28";});
+    card.addEventListener("dragleave",()=>card.style.background="");
+    card.addEventListener("drop",async e=>{
+      e.preventDefault();card.style.background="";
+      const srcId=e.dataTransfer.getData("text/plain");
+      if(!srcId||srcId===card.dataset.fyiId)return;
+      const list=Object.values(fyiNotes).filter(n=>n.areaId===areaId).sort((a,b)=>(a.order||0)-(b.order||0));
+      const si=list.findIndex(n=>n.id===srcId), ti=list.findIndex(n=>n.id===card.dataset.fyiId);
+      if(si<0||ti<0)return;
+      const [moved]=list.splice(si,1); list.splice(ti,0,moved);
+      for(let i=0;i<list.length;i++)await dbSet(`fyi_notes/${list[i].id}/order`,i);
     });
   });
 }
