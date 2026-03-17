@@ -40,7 +40,6 @@ function checkRateLimit(key, maxPerMin=60){
   _writeCounts[key].n++;
   if(_writeCounts[key].n>maxPerMin){
     console.warn(`Rate limit hit: ${key} (${_writeCounts[key].n}/${maxPerMin} per min)`);
-    toast("Muitas ações em pouco tempo. Aguarde um momento.","error");
     return false;
   }
   return true;
@@ -80,7 +79,7 @@ function dbSet(p,v){
   return set(dbRef(p),v);
 }
 function dbPush(p,v){return push(dbRef(p),v);}
-function dbRemove(p){if(!checkRateLimit("write",300))return Promise.resolve();return remove(dbRef(p));}
+function dbRemove(p){if(!checkRateLimit("write",600))return Promise.resolve();return remove(dbRef(p));}
 function dbListen(p,cb){onValue(dbRef(p),s=>cb(s.val()||{}));}
 
 // ── AUDIT ─────────────────────────────────────────────────────────────────────
@@ -148,7 +147,6 @@ function initListeners(){
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 // ── SECURITY GUARDS ──────────────────────────────────────────────────────────
 // Rate limit: track write attempts per minute to avoid runaway loops
-const writeTracker={count:0, resetAt:Date.now()+60000};
 onAuthStateChanged(auth, async user=>{
   if(user){
     currentUser=user;
@@ -355,13 +353,105 @@ function renderTopbar(){
   const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",admin:"Administração",historico:"Histórico de Ações"};
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
   tb.innerHTML=`<div class="topbar-title">${esc(label)}</div>
+    <div id="global-search-wrap" style="flex:1;max-width:320px;position:relative">
+      <input id="global-search" placeholder="🔍 Buscar tarefas, áreas, responsáveis…" autocomplete="off"
+        style="width:100%;box-sizing:border-box;background:#13131a;border:1px solid #2e2e3a;border-radius:20px;padding:7px 14px;color:#d0d0e0;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;transition:border-color .15s"/>
+      <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+    </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">X</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
+    </div>
     </div>`;
   document.getElementById("user-btn").addEventListener("click",e=>{e.stopPropagation();dropdownOpen=!dropdownOpen;render();});
   document.getElementById("dd-logout")?.addEventListener("click",()=>signOut(auth));
   document.getElementById("dd-profile")?.addEventListener("click",()=>{dropdownOpen=false;openProfileModal();});
+
+  // ── Global search ──
+  const searchInput=document.getElementById("global-search");
+  const searchResults=document.getElementById("search-results");
+  if(searchInput&&searchResults){
+    searchInput.addEventListener("focus",()=>{if(searchInput.value.trim())searchResults.style.display="block";});
+    searchInput.addEventListener("input",()=>{
+      const q=searchInput.value.trim().toLowerCase();
+      if(!q){searchResults.style.display="none";searchResults.innerHTML="";return;}
+      const myAreaIds=visibleAreas().map(a=>a.id);
+      const results=[];
+      // Search tasks
+      Object.entries(tasks).forEach(([id,t])=>{
+        if(!myAreaIds.includes(t.areaId)&&!(Array.isArray(t.extraAreaIds)&&t.extraAreaIds.some(eid=>myAreaIds.includes(eid))))return;
+        const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
+        const area=areas[t.areaId];
+        const match=(t.title||"").toLowerCase().includes(q)
+          ||(t.desc||"").toLowerCase().includes(q)
+          ||resps.some(r=>r.toLowerCase().includes(q))
+          ||(area?.name||"").toLowerCase().includes(q);
+        if(match)results.push({type:"task",id,t,area,resps});
+      });
+      // Search areas
+      Object.entries(areas).forEach(([id,a])=>{
+        if(!myAreaIds.includes(id))return;
+        if((a.name||"").toLowerCase().includes(q))results.push({type:"area",id,a});
+      });
+      // Search FYI notes
+      Object.entries(fyiNotes).forEach(([id,n])=>{
+        if((n.title||"").toLowerCase().includes(q)||(n.body||"").toLowerCase().includes(q))
+          results.push({type:"fyi",id,n});
+      });
+      if(!results.length){
+        searchResults.innerHTML='<div style="padding:14px 16px;font-size:12px;color:#5a5a6a">Nenhum resultado para "'+esc(q)+'"</div>';
+        searchResults.style.display="block"; return;
+      }
+      searchResults.innerHTML=results.slice(0,12).map(r=>{
+        if(r.type==="task"){
+          const st=STATUS[r.t.status],ar=r.area;
+          return`<div class="search-result-item" data-type="task" data-id="${r.id}" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #1e1e28;display:flex;align-items:center;gap:10px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${st?.color||"#7a7a8a"};flex-shrink:0"></span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;color:#d0d0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.t.title||"")}</div>
+              <div style="font-size:11px;color:#5a5a6a;margin-top:2px">${ar?esc(ar.name):""}${r.resps.length?" · "+esc(r.resps.slice(0,2).join(", "))+(r.resps.length>2?" +"+( r.resps.length-2):""):""}</div>
+            </div>
+            <span style="font-size:10px;color:#5a5a6a;flex-shrink:0">${st?.label||""}</span>
+          </div>`;
+        }
+        if(r.type==="area"){
+          return`<div class="search-result-item" data-type="area" data-id="${r.id}" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #1e1e28;display:flex;align-items:center;gap:10px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${r.a.color};flex-shrink:0"></span>
+            <div style="font-size:13px;color:#d0d0e0">${esc(r.a.name)}</div>
+            <span style="font-size:10px;color:#5a5a6a;margin-left:auto">Área</span>
+          </div>`;
+        }
+        if(r.type==="fyi"){
+          return`<div class="search-result-item" data-type="fyi" data-id="${r.id}" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #1e1e28;display:flex;align-items:center;gap:10px">
+            <span style="font-size:14px">💡</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;color:#d0d0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.n.title||"")}</div>
+            </div>
+            <span style="font-size:10px;color:#5a5a6a;flex-shrink:0">FYI</span>
+          </div>`;
+        }
+        return"";
+      }).join("");
+      searchResults.style.display="block";
+      // Wire clicks
+      searchResults.querySelectorAll(".search-result-item").forEach(el=>{
+        el.addEventListener("mouseenter",()=>el.style.background="#1e1e28");
+        el.addEventListener("mouseleave",()=>el.style.background="");
+        el.addEventListener("click",()=>{
+          searchResults.style.display="none";
+          searchInput.value="";
+          if(el.dataset.type==="task") openDetailModal(el.dataset.id);
+          else if(el.dataset.type==="area") nav("area",el.dataset.id);
+          else if(el.dataset.type==="fyi") nav("fyi");
+        });
+      });
+    });
+    // Close on click outside
+    document.addEventListener("click",e=>{
+      if(!document.getElementById("global-search-wrap")?.contains(e.target))
+        searchResults.style.display="none";
+    });
+  }
 }
 document.addEventListener("click",()=>{if(dropdownOpen){dropdownOpen=false;render();}});
 
