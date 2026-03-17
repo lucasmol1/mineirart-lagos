@@ -578,10 +578,28 @@ function renderAreaPage(){
       ${t.desc?`<div class="card-desc">${esc(t.desc)}</div>`:""}
       <div class="card-meta">
         ${t.priority?`<span class="chip" style="font-size:10px;font-weight:700;text-transform:uppercase;background:${PRIORITY[t.priority].color}18;color:${PRIORITY[t.priority].color};border:1px solid ${PRIORITY[t.priority].color}30">${t.priority}</span>`:""}
-        ${t.resp?`<span class="chip" style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30">${esc(t.resp)}</span>`:""}
         ${deadlineBadge(t.date)}
         ${t.date&&!deadlineClass(t.date)?`<span style="font-size:10px;color:#7a7a8a;margin-left:auto">${fmtDate(t.date)}</span>`:""}
       </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+        <div style="display:flex;align-items:center;gap:4px">
+          ${(()=>{
+            const rs=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
+            const avatars=rs.slice(0,4).map(r=>{
+              const u=Object.values(users).find(u=>u.name===r);
+              const c=u?.color||"#7c6eff";
+              return`<div title="${esc(r)} (Responsável)" style="width:24px;height:24px;border-radius:50%;background:${c};border:2px solid #13131a;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f;margin-left:-6px;first-child:margin-left:0">${initials(r)}</div>`;
+            }).join("");
+            const more=rs.length>4?`<span style="font-size:10px;color:#7a7a8a;margin-left:4px">+${rs.length-4}</span>`:"";
+            return rs.length?`<div style="display:flex;align-items:center;padding-left:6px">${avatars}${more}</div>`:"";
+          })()}
+        </div>
+        ${t.creatorName?`<div title="Criado por ${esc(t.creatorName)}" style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:9px;color:#5a5a6a">por</span>
+          <div style="width:20px;height:20px;border-radius:50%;background:${Object.values(users).find(u=>u.name===t.creatorName)?.color||"#4ac8e8"};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f" title="${esc(t.creatorName)}">${initials(t.creatorName)}</div>
+        </div>`:""}
+      </div>
+      ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:""}
     </div>`).join(""):`<div style="font-size:12px;color:#4a4a5a;text-align:center;padding:20px 8px">Vazio</div>`;
     return`<div class="column"><div class="col-header" style="border-bottom:2px solid ${st.color}35"><div class="dot" style="background:${st.color}"></div><div style="font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:${st.color};flex:1">${st.label}</div><div class="col-count">${col.length}</div></div><div class="cards-list">${cards}</div><button class="add-card-btn btn-add-task-col" data-status="${key}">+ Adicionar</button></div>`;
   }).join("");
@@ -3395,9 +3413,23 @@ function openDetailModal(taskId){
   const areaChip=(area?'<span class="chip" style="background:'+area.color+'18;color:'+area.color+';border:1px solid '+area.color+'30;padding:4px 12px">'+esc(area.name)+'</span>':"")
     +(Array.isArray(t.extraAreaIds)?t.extraAreaIds.map(eid=>{const ea=areas[eid];return ea?'<span class="chip" style="background:'+ea.color+'18;color:'+ea.color+';border:1px solid '+ea.color+'30;padding:4px 12px">'+esc(ea.name)+'</span>':"";}).join(""):"");
   const descBlock=t.desc?'<div style="font-size:13px;color:#a0a0b0;line-height:1.6;background:#18181c;padding:12px;border-radius:8px;margin-bottom:14px">'+esc(t.desc)+'</div>':"";
-  const respBlock=resps.length?'<div style="margin-bottom:12px"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Responsaveis</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+resps.map(r=>'<span style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30;padding:4px 12px;border-radius:20px;font-size:12px">'+esc(r)+'</span>').join("")+'</div></div>':"";
+  function personAvatar(name, color, role=""){
+    const u=Object.values(users).find(u=>u.name===name);
+    const c=u?.color||color||"#7c6eff";
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${c}12;border:1px solid ${c}33;border-radius:10px">
+      <div style="width:32px;height:32px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#0c0c0f;flex-shrink:0">${initials(name)}</div>
+      <div><div style="font-size:13px;font-weight:600;color:#f0eff5">${esc(name)}</div>${role?`<div style="font-size:10px;color:${c};margin-top:1px">${esc(role)}</div>`:""}</div>
+    </div>`;
+  }
+  const respBlock=resps.length?`<div style="margin-bottom:14px">
+    <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">&#128100; Responsáveis (${resps.length})</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${resps.map(r=>personAvatar(r,"#7c6eff","Responsável")).join("")}</div>
+  </div>`:"";
   const dateBlock=t.date?'<div><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Prazo</div><div>'+fmtDate(t.date)+'</div></div>':"";
-  const creatorBlock=t.creatorName?'<div style="font-size:11px;color:#5a5a6a;margin-top:10px;padding-top:10px;border-top:1px solid #1e1e28">Criada por: '+esc(t.creatorName)+'</div>':"";
+  const creatorBlock=t.creatorName?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28">
+    <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✏ Criada por</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.creatorName,"#4ac8e8","Criador(a)")}</div>
+  </div>`:"";
   const statusBtns=Object.entries(STATUS).map(([k,v])=>{
     const sel=t.status===k;
     const s=sel?'background:'+v.color+'22;color:'+v.color+';border:1px solid '+v.color+'60':'border:1px solid #2e2e3a;color:#7a7a8a';
