@@ -2302,7 +2302,7 @@ function renderOrgPage(){
     const parentBadge=n.parentId?`<rect x="0" y="0" width="${W}" height="4" rx="2" fill="${aColor}60" style="pointer-events:none"/>`:"";
     const nW=n.w||W, nH=n.h||H, nFs=n.fsize||12;
     return`<g class="org-node" data-nid="${n.id}" transform="translate(${n.x},${n.y})" style="cursor:grab">
-      ${orgGradDef}<rect x="0" y="0" width="${nW}" height="${nH}" rx="10" fill="${orgFill}" stroke="${orgStroke}" stroke-width="${n.parentId?"1.2":"1.8"}"/>
+      <rect x="0" y="0" width="${nW}" height="${nH}" rx="10" fill="${orgFill}" stroke="${orgStroke}" stroke-width="${n.parentId?"1.2":"1.8"}"/>
       <rect x="0" y="0" width="6" height="${H}" rx="3" fill="${aColor}"/>
       ${parentBadge}
       ${nameTxt?`<text x="16" y="22" fill="#f0eff5" font-size="${n.parentId?"11":"12"}" font-weight="700" font-family="Syne,sans-serif" style="pointer-events:none">${esc(nameTxt)}</text>`:""}
