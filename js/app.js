@@ -66,6 +66,8 @@ let auditLog={}, personalNotes={}, pendingUsers={}, areaNotes={}, taskComments={
 let dragging=null, connecting=null, selEdge=null, mousePos={x:0,y:0};
 let selectedNodes=new Set(), groupDragging=null, selBox=null, flowResizing=null;
 let flowSelecting=false, flowSelStart={x:0,y:0}; // drag-to-select state
+let flowSelectMode=false; // true = select mode, false = pan mode
+let orgSelectMode=false;
 let flowContainerExpanded={}; // {containerId: true/false}
 let expandedAreas=new Set(); // sidebar subarea toggle
 let areaNotesListeners={};
@@ -73,14 +75,65 @@ let alertsSent={}, calAlertsSent={};
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
 const dbRef=p=>ref(db,p);
-function dbSet(p,v){
-  // Don't rate-limit drag/resize position updates (x, y, w, h)
-  const isPos=/\/(x|y|w|h)$/.test(p);
-  if(!isPos&&!checkRateLimit("write",600))return Promise.resolve();
+// ── UNDO SYSTEM ──────────────────────────────────────────────────────────────
+const _undoStack=[]; // [{path, before, after}]
+const MAX_UNDO=5;
+let _undoInProgress=false;
+
+async function _captureAndSet(p,v){
+  if(_undoInProgress)return set(dbRef(p),v);
+  // Capture current value before overwriting
+  try{
+    const snap=await get(dbRef(p));
+    const before=snap.val();
+    const entry=_undoStack[_undoStack.length-1];
+    // Group rapid writes to same root path (e.g. drag x/y) into one undo step
+    const rootPath=p.split("/").slice(0,3).join("/");
+    if(entry&&entry.rootPath===rootPath&&Date.now()-entry.ts<800){
+      // Update the "after" but keep the original "before"
+      entry.ops.push({path:p,before,after:v});
+    } else {
+      if(_undoStack.length>=MAX_UNDO)_undoStack.shift();
+      _undoStack.push({rootPath,ts:Date.now(),ops:[{path:p,before,after:v}]});
+    }
+  }catch(e){}
   return set(dbRef(p),v);
 }
+
+async function undoLastAction(){
+  if(!_undoStack.length){toast("Nada para desfazer","error");return;}
+  const entry=_undoStack.pop();
+  _undoInProgress=true;
+  // Restore all ops in reverse order
+  const ops=[...entry.ops].reverse();
+  for(const op of ops){
+    if(op.before===null||op.before===undefined) await remove(dbRef(op.path));
+    else await set(dbRef(op.path),op.before);
+  }
+  _undoInProgress=false;
+  toast("↩ Ação desfeita","success");
+}
+
+function dbSet(p,v){
+  const isPos=/\/(x|y|w|h)$/.test(p);
+  if(!isPos&&!checkRateLimit("write",600))return Promise.resolve();
+  return _captureAndSet(p,v);
+}
 function dbPush(p,v){return push(dbRef(p),v);}
-function dbRemove(p){if(!checkRateLimit("write",600))return Promise.resolve();return remove(dbRef(p));}
+function dbRemove(p){
+  if(!checkRateLimit("write",600))return Promise.resolve();
+  if(!_undoInProgress){
+    // Capture before remove
+    get(dbRef(p)).then(snap=>{
+      const before=snap.val();
+      if(before!==null){
+        if(_undoStack.length>=MAX_UNDO)_undoStack.shift();
+        _undoStack.push({rootPath:p,ts:Date.now(),ops:[{path:p,before,after:null}]});
+      }
+    }).catch(()=>{});
+  }
+  return remove(dbRef(p));
+}
 function dbListen(p,cb){onValue(dbRef(p),s=>cb(s.val()||{}));}
 
 // ── AUDIT ─────────────────────────────────────────────────────────────────────
@@ -354,6 +407,8 @@ function renderTopbar(){
   const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",admin:"Administração",historico:"Histórico de Ações"};
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
   tb.innerHTML=`<div class="topbar-title">${esc(label)}</div>
+    <button id="btn-undo-topbar" title="Desfazer (Ctrl+Z)" onclick="undoLastAction()" style="background:none;border:1px solid #2e2e3a;border-radius:8px;color:#7a7a8a;cursor:pointer;padding:5px 10px;font-size:14px;flex-shrink:0;transition:all .12s" onmouseover="this.style.color='#c8f04e';this.style.borderColor='#c8f04e44'" onmouseout="this.style.color='#7a7a8a';this.style.borderColor='#2e2e3a'">↩</button>
+    <button id="btn-undo-topbar" title="Desfazer (Ctrl+Z)" onclick="undoLastAction()" style="background:none;border:1px solid #2e2e3a;border-radius:8px;color:#7a7a8a;cursor:pointer;padding:5px 10px;font-size:14px;flex-shrink:0">&#8629;</button>
     <div id="global-search-wrap" style="flex:1;max-width:320px;position:relative">
       <input id="global-search" placeholder="🔍 Buscar tarefas, áreas, responsáveis…" autocomplete="off"
         style="width:100%;box-sizing:border-box;background:#13131a;border:1px solid #2e2e3a;border-radius:20px;padding:7px 14px;color:#d0d0e0;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;transition:border-color .15s"/>
@@ -455,6 +510,23 @@ function renderTopbar(){
   }
 }
 document.addEventListener("click",()=>{if(dropdownOpen){dropdownOpen=false;render();}});
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==="z"&&!e.shiftKey){
+    const tag=document.activeElement?.tagName;
+    if(tag==="INPUT"||tag==="TEXTAREA"||document.activeElement?.isContentEditable)return;
+    e.preventDefault();
+    undoLastAction();
+  }
+});
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==="z"&&!e.shiftKey){
+    // Don't intercept if user is typing in an input/textarea
+    const tag=document.activeElement?.tagName;
+    if(tag==="INPUT"||tag==="TEXTAREA"||document.activeElement?.isContentEditable)return;
+    e.preventDefault();
+    undoLastAction();
+  }
+});
 
 // ── CONTENT ROUTER ────────────────────────────────────────────────────────────
 function renderContent(){
@@ -718,12 +790,13 @@ function renderFlowPage(){
         <button class="btn-primary" id="btn-add-node" ${nodeCount>=LIMITS.MAX_FLOW_NODES?"disabled":""}>+ Bloco</button>
         <button class="btn-small" id="btn-add-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">📝 Nota</button>
         <button class="btn-small" id="btn-add-container" style="border:1px solid #7c6eff44;color:#9d93ff;background:#7c6eff12">📦 Container</button>
+        <button class="btn-small" id="btn-flow-select-mode" style="border:1px solid ${flowSelectMode?"#c8f04e":"#2e2e3a"};color:${flowSelectMode?"#c8f04e":"#7a7a8a"};background:${flowSelectMode?"#c8f04e12":"transparent"}">${flowSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
       </div>
       ${areaButtons?`<div style="display:flex;gap:6px;flex-wrap:wrap">${areaButtons}</div>`:""}
     </div>`:""}
     <div class="flow-canvas" style="position:relative">
       <div id="stickies-layer" style="position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden"></div>
-      <svg id="flow-svg" width="100%" height="560" style="display:block;cursor:${connecting?"crosshair":"default"}">
+      <svg id="flow-svg" width="100%" height="560" style="display:block;cursor:${connecting?"crosshair":flowSelectMode?"crosshair":"grab"}">
         <defs>
           ${flowGradDefs}
         <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
@@ -757,8 +830,8 @@ function renderFlowPage(){
       <button id="flow-group-clear" class="btn-ghost" style="font-size:12px;padding:6px 10px">Limpar seleção</button>
     </div>`:""}
     <div style="font-size:11px;color:#4a4a5a;margin-top:8px;display:flex;gap:20px;flex-wrap:wrap">
-      <span>🖱 Arraste blocos · Shift+clique seleciona mais</span>
-      <span>⬜ Arraste no fundo para selecionar vários</span>
+      <span>🖱 Arraste no fundo para mover a tela</span>
+      <span>⬜ Botão "Selecionar" para selecionar vários blocos</span>
       <span>⭕ Círculo nas bordas para conectar blocos</span>
       <span>🔗 Clique na seta para editar/excluir</span>
       <span>📁 Blocos de área redirecionam ao clicar</span>
@@ -1388,6 +1461,11 @@ function attachFlowEvents(){
       }
       render(); return;
     }
+    if(flowPanning){
+      flowPan.x=e.clientX-flowPanStart.x;
+      flowPan.y=e.clientY-flowPanStart.y;
+      render(); return;
+    }
     if(flowSelecting&&selBox){
       selBox.x2=cx; selBox.y2=cy;
       render(); return;
@@ -1444,6 +1522,7 @@ function attachFlowEvents(){
       dbSet(`flow/nodes/${dragging.id}/x`,n.x);
       dbSet(`flow/nodes/${dragging.id}/y`,n.y);
     }
+    if(flowPanning){flowPanning=false; return;}
     selBox=null; flowSelecting=false;
     // Check if dragged node dropped onto a container
     if(dragging){
@@ -1484,16 +1563,23 @@ function attachFlowEvents(){
       flowResizing={id:nid,startX:e.clientX,startY:e.clientY,startW:n.w||150,startH:n.h||48};
       return;
     }
-    // Only start selBox on direct SVG background click (not on nodes/edges)
-    if(e.target!==svg&&e.target.getAttribute("fill")!=="url(#grid)")return;
+    // Background click only
+    if(e.target!==svg&&e.target.getAttribute("fill")!=="url(#grid)"&&!e.target.classList.contains("container-drop-zone"))return;
     if(connecting)return;
-    if(!e.shiftKey)selectedNodes.clear();
     const r=svg.getBoundingClientRect();
-    const cx=(e.clientX-r.left-flowPan.x)/flowZoom;
-    const cy=(e.clientY-r.top-flowPan.y)/flowZoom;
-    selBox={x1:cx,y1:cy,x2:cx,y2:cy};
-    flowSelecting=true;
-    render();
+    if(flowSelectMode){
+      // Select mode: draw selection box
+      if(!e.shiftKey)selectedNodes.clear();
+      const cx=(e.clientX-r.left-flowPan.x)/flowZoom;
+      const cy=(e.clientY-r.top-flowPan.y)/flowZoom;
+      selBox={x1:cx,y1:cy,x2:cx,y2:cy};
+      flowSelecting=true;
+      render();
+    } else {
+      // Pan mode: drag to move canvas
+      flowPanning=true;
+      flowPanStart={x:e.clientX-flowPan.x, y:e.clientY-flowPan.y};
+    }
   });
   // Zoom
   document.getElementById("flow-zoom-in")?.addEventListener("click",()=>{flowZoom=Math.min(2.5,+(flowZoom+0.15).toFixed(2));render();});
@@ -1536,6 +1622,11 @@ function attachFlowEvents(){
   document.getElementById("flow-group-clear")?.addEventListener("click",()=>{selectedNodes.clear();render();});
 
   // ── Container events ──
+  document.getElementById("btn-flow-select-mode")?.addEventListener("click",()=>{
+    flowSelectMode=!flowSelectMode;
+    if(!flowSelectMode){selectedNodes.clear();}
+    render();
+  });
   document.getElementById("btn-add-container")?.addEventListener("click",()=>{
     const id=uid();
     dbSet(`flow/nodes/${id}`,{id,type:"container",label:"Novo Container",color:"#7c6eff",x:80+Math.random()*200,y:60+Math.random()*150,w:300,h:220});
@@ -2600,11 +2691,12 @@ function renderOrgPage(){
       <input type="color" id="org-color" value="#7c6eff" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
       <button class="btn-primary" id="btn-add-org-node" ${nodeCount>=LIMITS.MAX_ORG_NODES?"disabled":""}>+ Bloco raiz</button>
       <button class="btn-small" id="btn-add-org-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">📝 Nota</button>
+      <button class="btn-small" id="btn-org-select-mode" style="border:1px solid ${orgSelectMode?"#c8f04e":"#2e2e3a"};color:${orgSelectMode?"#c8f04e":"#7a7a8a"};background:${orgSelectMode?"#c8f04e12":"transparent"}">${orgSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
     </div>
   </div>`:""}
   <div class="flow-canvas" style="position:relative">
     <div id="org-stickies-layer" style="position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden"></div>
-    <svg id="org-svg" width="100%" height="650" style="display:block;cursor:${orgConnecting?"crosshair":"default"}">
+    <svg id="org-svg" width="100%" height="650" style="display:block;cursor:${orgConnecting?"crosshair":orgSelectMode?"crosshair":"grab"}">
       <defs>
         ${orgGradDefs}
         <pattern id="org-grid" width="28" height="28" patternUnits="userSpaceOnUse">
@@ -2630,8 +2722,8 @@ function renderOrgPage(){
   </div>`:""}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px">
     <div style="font-size:11px;color:#4a4a5a;display:flex;gap:16px;flex-wrap:wrap">
-      <span>🖱 Arraste blocos · Shift+clique seleciona mais</span>
-      <span>⬜ Arraste no fundo para selecionar vários</span>
+      <span>🖱 Arraste no fundo para mover a tela</span>
+      <span>⬜ Botão "Selecionar" para selecionar vários blocos</span>
       <span>▼ N = expandir grupo (N filhos)</span>
       <span>⭕ Círculo = conectar com linha</span>
       <span>✏ Lápis = editar bloco</span>
@@ -2784,6 +2876,7 @@ function attachOrgEvents(){
     render();
   });
   svg.addEventListener("mouseup",()=>{
+    if(orgPanning){orgPanning=false; return;}
     if(orgSelBox){
       const x1=Math.min(orgSelBox.x1,orgSelBox.x2), x2=Math.max(orgSelBox.x1,orgSelBox.x2);
       const y1=Math.min(orgSelBox.y1,orgSelBox.y2), y2=Math.max(orgSelBox.y1,orgSelBox.y2);
@@ -2873,6 +2966,11 @@ function attachOrgEvents(){
   document.getElementById("org-group-clear")?.addEventListener("click",()=>{orgSelectedNodes.clear();render();});
 
   // ── Org sticky notes ──
+  document.getElementById("btn-org-select-mode")?.addEventListener("click",()=>{
+    orgSelectMode=!orgSelectMode;
+    if(!orgSelectMode){orgSelectedNodes.clear();}
+    render();
+  });
   document.getElementById("btn-add-org-sticky")?.addEventListener("click",()=>{
     const id=uid();
     dbSet(`org/stickies/${id}`,{id,text:"",color:"#f0a832",x:80+Math.random()*300,y:60+Math.random()*200,expanded:true,createdAt:new Date().toISOString()});
