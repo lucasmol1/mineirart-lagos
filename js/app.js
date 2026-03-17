@@ -63,7 +63,7 @@ function deadlineBadge(d){const c=deadlineClass(d);if(!c)return"";const m={"warn
 let currentUser=null, currentProfile=null, isAdmin1=false;
 let page="dashboard", activeAreaId=null, dropdownOpen=false;
 let areas={}, tasks={}, notes={}, users={}, flowData={nodes:{},edges:{}}, orgData={nodes:{},edges:{}}, calEvents={};
-let auditLog={}, personalNotes={}, pendingUsers={}, areaNotes={};
+let auditLog={}, personalNotes={}, pendingUsers={}, areaNotes={}, taskComments={};
 let dragging=null, connecting=null, selEdge=null, mousePos={x:0,y:0};
 let selectedNodes=new Set(), groupDragging=null, selBox=null, flowResizing=null;
 let flowSelecting=false, flowSelStart={x:0,y:0}; // drag-to-select state
@@ -3032,9 +3032,129 @@ function openDetailModal(taskId){
       </div>`;}).join("")}
   </div>`:"";
   const pinBtn=canPin?'<button id="m-pin" class="btn-small" style="border:1px solid '+(t.pinned?'#c8f04e':'#2e2e3a')+';color:'+(t.pinned?'#c8f04e':'#7a7a8a')+'">'+pinLabel+'</button>':"";
-  openModal('<div class="overlay" id="ov"><div class="modal"><div class="modal-header"><div class="modal-title">'+pinTitlePrefix+'Detalhe</div><button class="icon-btn" id="m-x">X</button></div><div class="modal-body"><div style="font-family:\'Syne\',sans-serif;font-size:18px;font-weight:700;line-height:1.3;margin-bottom:10px">'+esc(t.title)+'</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><span class="chip" style="background:'+st.color+'22;color:'+st.color+';border:1px solid '+st.color+'40;padding:4px 12px">'+st.label+'</span>'+priorityChip+areaChip+deadlineBadge(t.date)+'</div>'+collectiveBlock+descBlock+respBlock+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+dateBlock+'</div><div><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Mover para</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+statusBtns+'</div></div>'+creatorBlock+'</div><div class="modal-footer">'+pinBtn+(canDelete?'<button class="btn-danger" id="m-del" '+delAttrs+'>'+delLabel+'</button>':"")+'<button class="btn-ghost" id="m-x2">Fechar</button><button class="btn-primary" id="m-edit">Editar</button></div></div></div>');
-  document.getElementById("m-x").onclick=document.getElementById("m-x2").onclick=closeModal;
+  openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:860px;width:95vw">
+    <div class="modal-header">
+      <div class="modal-title">${pinTitlePrefix}Detalhe</div>
+      <button class="icon-btn" id="m-x">✕</button>
+    </div>
+    <div style="display:flex;gap:0;min-height:400px">
+      <!-- Left: task detail -->
+      <div class="modal-body" style="flex:1;min-width:0;border-right:1px solid #1e1e28;padding-right:20px">
+        <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;line-height:1.3;margin-bottom:10px">${esc(t.title)}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <span class="chip" style="background:${st.color}22;color:${st.color};border:1px solid ${st.color}40;padding:4px 12px">${st.label}</span>
+          ${priorityChip}${areaChip}${deadlineBadge(t.date)}
+        </div>
+        ${collectiveBlock}${descBlock}${respBlock}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">${dateBlock}</div>
+        <div>
+          <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Mover para</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${statusBtns}</div>
+        </div>
+        ${creatorBlock}
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #1a1a22">
+          <button id="m-send-alert" class="btn-small" style="border:1px solid #f0a83244;color:#f0a832;font-size:12px">🔔 Enviar alerta aos responsáveis</button>
+        </div>
+      </div>
+      <!-- Right: comments panel -->
+      <div style="width:280px;min-width:240px;display:flex;flex-direction:column;padding-left:18px">
+        <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-top:18px">💬 Comentários</div>
+        <div id="comments-list" style="flex:1;overflow-y:auto;max-height:340px;display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+          <div style="font-size:12px;color:#3a3a4a;text-align:center;padding:20px 0">Carregando…</div>
+        </div>
+        <div style="border-top:1px solid #1e1e28;padding-top:10px">
+          <textarea id="comment-input" placeholder="Escrever comentário…" rows="2" style="width:100%;box-sizing:border-box;background:#13131a;border:1px solid #1e1e28;border-radius:7px;padding:8px 10px;color:#d0d0e0;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;resize:none;transition:border-color .15s"></textarea>
+          <button id="comment-submit" class="btn-primary" style="width:100%;margin-top:6px;font-size:12px;padding:7px">Comentar</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      ${pinBtn}
+      ${canDelete?`<button class="btn-danger" id="m-del" ${delAttrs}>${delLabel}</button>`:""}
+      <button class="btn-ghost" id="m-x2">Fechar</button>
+      <button class="btn-primary" id="m-edit">Editar</button>
+    </div>
+  </div></div>`);
   document.getElementById("m-edit").onclick=()=>{closeModal();openTaskModal({...t});};
+
+  // ── Comments — real-time listener ──
+  const commentsPath=`task_comments/${taskId}`;
+  let commentsUnsub=null;
+  function renderComments(commentsObj){
+    const el=document.getElementById("comments-list"); if(!el)return;
+    const list=Object.entries(commentsObj||{}).map(([id,c])=>({id,...c})).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+    if(!list.length){el.innerHTML='<div style="font-size:12px;color:#3a3a4a;text-align:center;padding:20px 0">Sem comentários ainda.</div>';return;}
+    el.innerHTML=list.map(c=>{
+      const isMe=c.authorId===currentUser?.uid;
+      const canDel=isMe||isAdmin();
+      const uColor=Object.values(users).find(u=>u.name===c.authorName)?.color||"#7c6eff";
+      return`<div style="background:#13131a;border:1px solid #1e1e28;border-radius:8px;padding:8px 10px;position:relative" data-cid="${c.id}">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="width:20px;height:20px;border-radius:50%;background:${uColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#13131a;flex-shrink:0">${initials(c.authorName)}</div>
+          <span style="font-size:11px;font-weight:600;color:#d0d0e0">${esc(c.authorName||"?")}</span>
+          <span style="font-size:10px;color:#4a4a5a;margin-left:auto">${fmtTs(c.ts)}</span>
+          ${canDel?`<button class="btn-del-comment" data-cid="${c.id}" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:11px;padding:0 2px;opacity:0.5">✕</button>`:""}
+        </div>
+        <div style="font-size:12px;color:#a0a0b0;line-height:1.5;word-break:break-word">${linkify(c.text||"")}</div>
+      </div>`;
+    }).join("");
+    // wire delete buttons
+    el.querySelectorAll(".btn-del-comment").forEach(btn=>{
+      btn.addEventListener("click",async()=>{
+        if(!confirm("Excluir comentário?"))return;
+        await dbRemove(`${commentsPath}/${btn.dataset.cid}`);
+      });
+    });
+    // auto scroll to bottom
+    el.scrollTop=el.scrollHeight;
+  }
+  // Start listener
+  commentsUnsub=onValue(dbRef(commentsPath),snap=>renderComments(snap.val()||{}));
+  // Clean up listener when modal closes
+  const origCloseModal=window._origCloseForComments;
+  const _closeAndUnsub=()=>{if(commentsUnsub){commentsUnsub();commentsUnsub=null;}closeModal();};
+
+  // Submit comment
+  const commentInput=document.getElementById("comment-input");
+  commentInput?.addEventListener("focus",e=>{e.target.style.borderColor="#c8f04e44";});
+  commentInput?.addEventListener("blur",e=>{e.target.style.borderColor="#1e1e28";});
+  commentInput?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("comment-submit")?.click();}});
+  document.getElementById("comment-submit")?.addEventListener("click",async()=>{
+    const text=commentInput?.value.trim(); if(!text)return;
+    const cid=uid();
+    await dbSet(`${commentsPath}/${cid}`,{
+      id:cid, text, authorId:currentUser.uid, authorName:currentProfile.name,
+      ts:new Date().toISOString()
+    });
+    if(commentInput)commentInput.value="";
+    await logAction("comentar_tarefa",`Comentou em: ${t.title}`);
+    // Notify responsibles (except self)
+    const respUsers=Object.entries(users).filter(([,u])=>resps.includes(u.name)&&u.name!==currentProfile.name);
+    for(const [uid2] of respUsers){
+      await dbSet(`user_notifs/${uid2}/${uid()}`,{
+        type:"new_comment", msg:`💬 ${currentProfile.name} comentou em "${t.title}"`,
+        taskId, ts:new Date().toISOString(), read:false
+      });
+    }
+  });
+
+  // Manual alert button
+  document.getElementById("m-send-alert")?.addEventListener("click",async()=>{
+    if(!resps.length){toast("Tarefa sem responsáveis","error");return;}
+    const msg=prompt("Mensagem do alerta (opcional):")||`🔔 Atenção: ${t.title}`;
+    const respUsers=Object.entries(users).filter(([,u])=>resps.includes(u.name));
+    for(const [uid2] of respUsers){
+      await dbSet(`user_notifs/${uid2}/${uid()}`,{
+        type:"manual_alert", msg, taskId, ts:new Date().toISOString(), read:false
+      });
+    }
+    await logAction("alerta_manual",`Alerta enviado para ${resps.join(", ")}: ${t.title}`);
+    toast(`Alerta enviado para ${resps.length} responsável(is)`,"success");
+  });
+
+  // Override close buttons to also unsub
+  document.getElementById("m-x").onclick=document.getElementById("m-x2").onclick=_closeAndUnsub;
+
   document.getElementById("m-pin")?.addEventListener("click",async()=>{
     await dbSet(`tasks/${taskId}/pinned`,!t.pinned);
     await logAction(t.pinned?"desfixar_tarefa":"fixar_tarefa",(t.pinned?"Desfixada":"Fixada")+": "+t.title);
@@ -3239,7 +3359,7 @@ async function exportFullBackup(){
   const backup={
     exportedAt:new Date().toISOString(),
     areas,tasks,notes,users:Object.fromEntries(Object.entries(users).map(([id,u])=>[id,{...u}])),
-    flowData,orgData,calEvents,freelaEvents,flowStickies,orgStickies,fyiNotes,
+    flowData,orgData,calEvents,freelaEvents,flowStickies,orgStickies,fyiNotes,taskComments,
     // personal notes and area notes are per-user/area — include what's in memory
     areaNotes,personalNotes,auditLog
   };
