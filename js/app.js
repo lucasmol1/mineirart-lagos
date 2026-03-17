@@ -73,7 +73,12 @@ let alertsSent={}, calAlertsSent={};
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
 const dbRef=p=>ref(db,p);
-function dbSet(p,v){if(!checkRateLimit("write",300))return Promise.resolve();return set(dbRef(p),v);}
+function dbSet(p,v){
+  // Don't rate-limit drag/resize position updates (x, y, w, h)
+  const isPos=/\/(x|y|w|h)$/.test(p);
+  if(!isPos&&!checkRateLimit("write",600))return Promise.resolve();
+  return set(dbRef(p),v);
+}
 function dbPush(p,v){return push(dbRef(p),v);}
 function dbRemove(p){if(!checkRateLimit("write",300))return Promise.resolve();return remove(dbRef(p));}
 function dbListen(p,cb){onValue(dbRef(p),s=>cb(s.val()||{}));}
@@ -292,6 +297,8 @@ function renderSidebar(){
   // Nav click
   sn.querySelectorAll(".nav-item[data-nav]").forEach(el=>el.addEventListener("click",e=>{
     if(e.target.classList.contains("area-arrow")||e.target.classList.contains("area-add-sub"))return;
+    if(e.target.classList.contains("area-drag-handle"))return;
+    e.stopPropagation();
     const p=el.dataset.nav;p==="area"?nav("area",el.dataset.id):nav(p);
   }));
   // Toggle expand arrow
@@ -361,8 +368,14 @@ document.addEventListener("click",()=>{if(dropdownOpen){dropdownOpen=false;rende
 // ── CONTENT ROUTER ────────────────────────────────────────────────────────────
 function renderContent(){
   const mc=document.getElementById("main-content");if(!mc)return;
+  if(!window._myNotifs)window._myNotifs={};
   const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,admin:renderAdminPage,historico:renderHistoricoPage};
-  mc.innerHTML=(map[page]||renderDashboard)();
+  try{
+    mc.innerHTML=(map[page]||renderDashboard)();
+  }catch(err){
+    console.error("renderContent error on page="+page+":", err);
+    mc.innerHTML=`<div style="padding:40px;color:#ff6b6b;font-size:13px">Erro ao carregar: ${err.message}</div>`;
+  }
   attachContentEvents();
 }
 
@@ -868,13 +881,43 @@ function openAreaFYIModal(noteId, areaId, readOnly=false){
 function renderAlertsPage(){
   const myAreas=visibleAreas().map(a=>a.id);
   const urgent=Object.entries(tasks).map(([id,t])=>({id,...t})).filter(t=>myAreas.includes(t.areaId)&&t.date&&t.status!=="concluido"&&deadlineClass(t.date)).sort((a,b)=>new Date(a.date)-new Date(b.date));
-  if(!urgent.length)return`<div class="page-header"><div><div class="page-title">Alertas</div></div></div><div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">✅</div><div class="empty-title">Tudo em dia!</div></div>`;
   const cc={"warn-now":"#ff2020","warn-1":"#e85030","warn-2":"#f09030","warn-3":"#e8c84a"};
-  const cl={"warn-now":"⚠️ Menos de 3h","warn-1":"🔴 Amanhã","warn-2":"🟠 Em 2 dias","warn-3":"🟡 Em 3 dias"};
+  const cl={"warn-now":"\u26a0\ufe0f Menos de 3h","warn-1":"\ud83d\udd34 Amanh\u00e3","warn-2":"\ud83d\udfe0 Em 2 dias","warn-3":"\ud83d\udfe1 Em 3 dias"};
   const bm={"warn-now":"wnow","warn-1":"w1","warn-2":"w2","warn-3":"w3"};
-  return`<div class="page-header"><div><div class="page-title">Alertas</div><div class="page-sub">${urgent.length} tarefa${urgent.length!==1?"s":""} com prazo próximo</div></div></div>
-    ${urgent.map(t=>{const c=deadlineClass(t.date),ar=areas[t.areaId];return`<div class="alert-card" style="border-left:3px solid ${cc[c]}"><div class="alert-dot" style="background:${cc[c]}"></div><div style="flex:1"><div style="font-size:14px;font-weight:500;margin-bottom:4px">${esc(t.title)}</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#7a7a8a">${ar?`<span>📁 ${esc(ar.name)}</span>`:""}${t.resp?`<span>👤 ${esc(t.resp)}</span>`:""}<span>📅 ${fmtDate(t.date)}</span></div></div><span class="deadline-badge ${bm[c]}">${cl[c]}</span><button class="btn-small btn-detail-alert" data-id="${t.id}" style="border:1px solid #2e2e3a;color:#7a7a8a">Ver</button></div>`;}).join("")}`;
+  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="manual_alert")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const notifsHtml=myNotifs.length?`
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>\ud83d\udcac Notifica\u00e7\u00f5es (${myNotifs.length})</span>
+        <button id="btn-clear-notifs" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
+      </div>
+      ${myNotifs.map(n=>{
+        const isComment=n.type==="new_comment";
+        const borderColor=isComment?"#7c6eff":"#f0a832";
+        const task=n.taskId?tasks[n.taskId]:null;
+        return`<div class="alert-card" style="border-left:3px solid ${borderColor};margin-bottom:8px">
+          <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${isComment?"\ud83d\udcac":"\ud83d\udd14"}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;color:#d0d0e0;line-height:1.4">${esc(n.msg||"")}</div>
+            <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+            ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a">Ver tarefa</button>`:""}
+            <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">\u2715</button>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`:"";
+  const deadlineHtml=urgent.length?`
+    <div>
+      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">\u23f0 Prazos pr\u00f3ximos (${urgent.length})</div>
+      ${urgent.map(t=>{const c=deadlineClass(t.date),ar=areas[t.areaId];return`<div class="alert-card" style="border-left:3px solid ${cc[c]};margin-bottom:8px"><div class="alert-dot" style="background:${cc[c]}"></div><div style="flex:1"><div style="font-size:14px;font-weight:500;margin-bottom:4px">${esc(t.title)}</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#7a7a8a">${ar?`<span>\ud83d\udcc1 ${esc(ar.name)}</span>`:""}${t.resp?`<span>\ud83d\udc64 ${esc(t.resp)}</span>`:""}<span>\ud83d\udcc5 ${fmtDate(t.date)}</span></div></div><span class="deadline-badge ${bm[c]}">${cl[c]}</span><button class="btn-small btn-detail-alert" data-id="${t.id}" style="border:1px solid #2e2e3a;color:#7a7a8a">Ver</button></div>`;}).join("")}
+    </div>`:"";
+  const empty=!urgent.length&&!myNotifs.length;
+  return`<div class="page-header"><div><div class="page-title">Alertas</div><div class="page-sub">${urgent.length} prazo${urgent.length!==1?"s":""} \u00b7 ${myNotifs.length} notifica\u00e7${myNotifs.length!==1?"\u00f5es":"\u00e3o"}</div></div></div>
+    ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\u2705</div><div class="empty-title">Tudo em dia!</div></div>`:`${notifsHtml}${deadlineHtml}`}`;
 }
+
 
 // ── HISTÓRICO ─────────────────────────────────────────────────────────────────
 function renderHistoricoPage(){
@@ -996,6 +1039,15 @@ function attachContentEvents(){
   document.querySelectorAll(".btn-add-task-col").forEach(b=>b.addEventListener("click",()=>openTaskModal({areaId:activeAreaId,status:b.dataset.status,priority:"media"})));
   document.querySelectorAll(".card[data-detail]").forEach(c=>c.addEventListener("click",()=>openDetailModal(c.dataset.detail)));
   document.querySelectorAll(".btn-detail-alert").forEach(b=>b.addEventListener("click",()=>openDetailModal(b.dataset.id)));
+  document.querySelectorAll(".btn-del-notif").forEach(b=>b.addEventListener("click",async()=>{
+    await dbRemove(`user_notifs/${currentUser.uid}/${b.dataset.nid}`);
+  }));
+  document.getElementById("btn-clear-notifs")?.addEventListener("click",async()=>{
+    const notifs=window._myNotifs||{};
+    const commentAlerts=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="manual_alert");
+    for(const k of commentAlerts) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
+    toast("Notificações limpas","success");
+  });
   document.getElementById("btn-export-area")?.addEventListener("click",()=>exportAreaTasks(activeAreaId));
   document.getElementById("btn-full-backup")?.addEventListener("click",exportFullBackup);
   document.querySelectorAll(".btn-detail-task").forEach(b=>b.addEventListener("click",()=>openDetailModal(b.dataset.id)));
@@ -1188,25 +1240,14 @@ function attachFlowEvents(){
     if(flowResizing){
       const dx=(e.clientX-flowResizing.startX)/flowZoom;
       const dy=(e.clientY-flowResizing.startY)/flowZoom;
-      const newW=Math.max(60,Math.round(flowResizing.startW+dx));
-      const newH=Math.max(30,Math.round(flowResizing.startH+dy));
-      dbSet(`flow/nodes/${flowResizing.id}/w`,newW);
-      dbSet(`flow/nodes/${flowResizing.id}/h`,newH);
-      return;
-    }
-    if(flowResizing){
-      const dx=(e.clientX-flowResizing.startX)/flowZoom;
-      const dy=(e.clientY-flowResizing.startY)/flowZoom;
-      dbSet(`flow/nodes/${flowResizing.id}/w`,Math.max(80,Math.round(flowResizing.startW+dx)));
-      dbSet(`flow/nodes/${flowResizing.id}/h`,Math.max(32,Math.round(flowResizing.startH+dy)));
-      return;
-    }
-    if(flowResizing){
-      const dx=(e.clientX-flowResizing.startX)/flowZoom;
-      const dy=(e.clientY-flowResizing.startY)/flowZoom;
-      dbSet(`flow/nodes/${flowResizing.id}/w`,Math.max(80,Math.round(flowResizing.startW+dx)));
-      dbSet(`flow/nodes/${flowResizing.id}/h`,Math.max(32,Math.round(flowResizing.startH+dy)));
-      return;
+      flowResizing.curW=Math.max(60,Math.round(flowResizing.startW+dx));
+      flowResizing.curH=Math.max(30,Math.round(flowResizing.startH+dy));
+      // Update local render only (no Firebase during drag)
+      if(flowData.nodes[flowResizing.id]){
+        flowData.nodes[flowResizing.id].w=flowResizing.curW;
+        flowData.nodes[flowResizing.id].h=flowResizing.curH;
+      }
+      render(); return;
     }
     if(flowSelecting&&selBox){
       selBox.x2=cx; selBox.y2=cy;
@@ -1215,21 +1256,28 @@ function attachFlowEvents(){
     if(groupDragging){
       const dx=(e.clientX-groupDragging.startX)/flowZoom;
       const dy=(e.clientY-groupDragging.startY)/flowZoom;
+      // Update local state only during drag
       Object.entries(groupDragging.nodes).forEach(([sid,orig])=>{
-        dbSet(`flow/nodes/${sid}/x`,Math.max(0,orig.x+dx));
-        dbSet(`flow/nodes/${sid}/y`,Math.max(0,orig.y+dy));
+        if(flowData.nodes[sid]){
+          flowData.nodes[sid].x=Math.max(0,orig.x+dx);
+          flowData.nodes[sid].y=Math.max(0,orig.y+dy);
+        }
       });
-      return;
+      groupDragging.lastDx=dx; groupDragging.lastDy=dy;
+      render(); return;
     }
     if(!dragging)return;
-    dbSet(`flow/nodes/${dragging.id}/x`,Math.max(0,cx-dragging.ox));
-    dbSet(`flow/nodes/${dragging.id}/y`,Math.max(0,cy-dragging.oy));
+    // Update local state only during drag
+    if(flowData.nodes[dragging.id]){
+      flowData.nodes[dragging.id].x=Math.max(0,cx-dragging.ox);
+      flowData.nodes[dragging.id].y=Math.max(0,cy-dragging.oy);
+    }
+    render();
   });
   svg.addEventListener("mouseup",()=>{
     if(flowSelecting&&selBox){
       const x1=Math.min(selBox.x1,selBox.x2), x2=Math.max(selBox.x1,selBox.x2);
       const y1=Math.min(selBox.y1,selBox.y2), y2=Math.max(selBox.y1,selBox.y2);
-      // Only select if dragged enough (avoid click)
       if(Math.abs(x2-x1)>8||Math.abs(y2-y1)>8){
         const allNds=Object.entries(flowData.nodes||{}).map(([id,n])=>({id,...n}));
         allNds.forEach(n=>{
@@ -1240,6 +1288,22 @@ function attachFlowEvents(){
       }
       selBox=null; flowSelecting=false;
       render(); return;
+    }
+    // Save final positions to Firebase (once on mouseup)
+    if(flowResizing){
+      dbSet(`flow/nodes/${flowResizing.id}/w`,flowResizing.curW||flowResizing.startW);
+      dbSet(`flow/nodes/${flowResizing.id}/h`,flowResizing.curH||flowResizing.startH);
+    }
+    if(groupDragging&&groupDragging.lastDx!=null){
+      Object.entries(groupDragging.nodes).forEach(([sid,orig])=>{
+        dbSet(`flow/nodes/${sid}/x`,Math.max(0,orig.x+groupDragging.lastDx));
+        dbSet(`flow/nodes/${sid}/y`,Math.max(0,orig.y+groupDragging.lastDy));
+      });
+    }
+    if(dragging&&flowData.nodes[dragging.id]){
+      const n=flowData.nodes[dragging.id];
+      dbSet(`flow/nodes/${dragging.id}/x`,n.x);
+      dbSet(`flow/nodes/${dragging.id}/y`,n.y);
     }
     selBox=null; flowSelecting=false;
     dragging=null; groupDragging=null; flowResizing=null;
@@ -2187,6 +2251,8 @@ let orgExpanded={}; // {nodeId: true/false} — expanded state per group
 
 // ── ORGANOGRAMA ───────────────────────────────────────────────────────────────
 function renderOrgPage(){
+  if(!orgData){return`<div style="padding:40px;color:#7a7a8a">Carregando...</div>`;}
+  if(!orgData){return`<div style="padding:40px;color:#7a7a8a">Carregando organograma...</div>`;}
   const allNodes=Object.entries(orgData.nodes||{}).map(([id,n])=>({id,...n}));
   const allEdges=Object.entries(orgData.edges||{}).map(([id,e])=>({id,...e}));
   const areaColors=Object.fromEntries(Object.entries(areas).map(([id,a])=>[a.name,a.color]));
@@ -2489,19 +2555,26 @@ function attachOrgEvents(){
     if(orgResizing){
       const dx=(e.clientX-orgResizing.startX)/orgZoom;
       const dy=(e.clientY-orgResizing.startY)/orgZoom;
-      dbSet(`org/nodes/${orgResizing.id}/w`,Math.max(60,Math.round(orgResizing.startW+dx)));
-      dbSet(`org/nodes/${orgResizing.id}/h`,Math.max(40,Math.round(orgResizing.startH+dy)));
-      return;
+      orgResizing.curW=Math.max(60,Math.round(orgResizing.startW+dx));
+      orgResizing.curH=Math.max(40,Math.round(orgResizing.startH+dy));
+      if(orgData.nodes[orgResizing.id]){
+        orgData.nodes[orgResizing.id].w=orgResizing.curW;
+        orgData.nodes[orgResizing.id].h=orgResizing.curH;
+      }
+      render(); return;
     }
     if(orgGroupDragging){
       const dx=(e.clientX-orgGroupDragging.startClientX)/orgZoom;
       const dy=(e.clientY-orgGroupDragging.startClientY)/orgZoom;
       [...orgSelectedNodes].forEach(id=>{
         const orig=orgGroupDragging.origPos[id];if(!orig)return;
-        dbSet(`org/nodes/${id}/x`,Math.max(0,orig.x+dx));
-        dbSet(`org/nodes/${id}/y`,Math.max(0,orig.y+dy));
+        if(orgData.nodes[id]){
+          orgData.nodes[id].x=Math.max(0,orig.x+dx);
+          orgData.nodes[id].y=Math.max(0,orig.y+dy);
+        }
       });
-      return;
+      orgGroupDragging.lastDx=dx; orgGroupDragging.lastDy=dy;
+      render(); return;
     }
     if(orgSelBox){
       orgSelBox.x2=(e.clientX-r.left-orgPan.x)/orgZoom;
@@ -2510,8 +2583,10 @@ function attachOrgEvents(){
     }
     if(orgConnecting){render();return;}
     if(!orgDragging)return;
-    dbSet(`org/nodes/${orgDragging.id}/x`,Math.max(0,(e.clientX-r.left-orgPan.x)/orgZoom-orgDragging.ox));
-    dbSet(`org/nodes/${orgDragging.id}/y`,Math.max(0,(e.clientY-r.top-orgPan.y)/orgZoom-orgDragging.oy));
+    const nx=Math.max(0,(e.clientX-r.left-orgPan.x)/orgZoom-orgDragging.ox);
+    const ny=Math.max(0,(e.clientY-r.top-orgPan.y)/orgZoom-orgDragging.oy);
+    if(orgData.nodes[orgDragging.id]){orgData.nodes[orgDragging.id].x=nx;orgData.nodes[orgDragging.id].y=ny;}
+    render();
   });
   svg.addEventListener("mouseup",()=>{
     if(orgSelBox){
@@ -2524,6 +2599,23 @@ function attachOrgEvents(){
         });
       }
       orgSelBox=null; render(); return;
+    }
+    // Save final positions to Firebase once on mouseup
+    if(orgResizing){
+      dbSet(`org/nodes/${orgResizing.id}/w`,orgResizing.curW||orgResizing.startW);
+      dbSet(`org/nodes/${orgResizing.id}/h`,orgResizing.curH||orgResizing.startH);
+    }
+    if(orgGroupDragging&&orgGroupDragging.lastDx!=null){
+      [...orgSelectedNodes].forEach(id=>{
+        const orig=orgGroupDragging.origPos[id];if(!orig)return;
+        dbSet(`org/nodes/${id}/x`,Math.max(0,orig.x+orgGroupDragging.lastDx));
+        dbSet(`org/nodes/${id}/y`,Math.max(0,orig.y+orgGroupDragging.lastDy));
+      });
+    }
+    if(orgDragging&&orgData.nodes[orgDragging.id]){
+      const n=orgData.nodes[orgDragging.id];
+      dbSet(`org/nodes/${orgDragging.id}/x`,n.x);
+      dbSet(`org/nodes/${orgDragging.id}/y`,n.y);
     }
     orgDragging=null; orgGroupDragging=null; orgResizing=null;
   });
@@ -3126,9 +3218,11 @@ function openDetailModal(taskId){
     });
     if(commentInput)commentInput.value="";
     await logAction("comentar_tarefa",`Comentou em: ${t.title}`);
-    // Notify responsibles (except self)
-    const respUsers=Object.entries(users).filter(([,u])=>resps.includes(u.name)&&u.name!==currentProfile.name);
-    for(const [uid2] of respUsers){
+    // Notify responsibles + creator (except self)
+    const toNotify=new Set();
+    Object.entries(users).filter(([,u])=>resps.includes(u.name)&&u.name!==currentProfile.name).forEach(([uid2])=>toNotify.add(uid2));
+    if(t.creatorId&&t.creatorId!==currentUser.uid) toNotify.add(t.creatorId);
+    for(const uid2 of toNotify){
       await dbSet(`user_notifs/${uid2}/${uid()}`,{
         type:"new_comment", msg:`💬 ${currentProfile.name} comentou em "${t.title}"`,
         taskId, ts:new Date().toISOString(), read:false
@@ -3397,6 +3491,7 @@ function listenUserNotifs(){
   if(!currentUser)return;
   onValue(dbRef(`user_notifs/${currentUser.uid}`),snap=>{
     const notifs=snap.val()||{};
+    window._myNotifs=notifs;
     userNotifsUnread=Object.values(notifs).filter(n=>!n.read).length;
     // Show banners for unread
     Object.entries(notifs).filter(([,n])=>!n.read).forEach(([nid,n])=>{
