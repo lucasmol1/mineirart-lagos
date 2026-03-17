@@ -66,6 +66,7 @@ let auditLog={}, personalNotes={}, pendingUsers={}, areaNotes={}, taskComments={
 let dragging=null, connecting=null, selEdge=null, mousePos={x:0,y:0};
 let selectedNodes=new Set(), groupDragging=null, selBox=null, flowResizing=null;
 let flowSelecting=false, flowSelStart={x:0,y:0}; // drag-to-select state
+let flowContainerExpanded={}; // {containerId: true/false}
 let expandedAreas=new Set(); // sidebar subarea toggle
 let areaNotesListeners={};
 let alertsSent={}, calAlertsSent={};
@@ -359,7 +360,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">X</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">Y</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -541,10 +542,57 @@ function renderAreaPage(){
 
 // ── FLUXOGRAMA ────────────────────────────────────────────────────────────────
 function renderFlowPage(){
-  const nodes=Object.entries(flowData.nodes||{}).map(([id,n])=>({id,...n}));
+  const allFlowNodes=Object.entries(flowData.nodes||{}).map(([id,n])=>({id,...n}));
+  // Filter: hide children of collapsed containers
+  const nodes=allFlowNodes.filter(n=>{
+    if(!n.containerParent)return true;
+    const exp=flowContainerExpanded[n.containerParent];
+    return exp===true||(exp===undefined&&true); // default expanded
+  });
   const edges=Object.entries(flowData.edges||{}).map(([id,e])=>({id,...e}));
   const myAreas=visibleAreas();
   const nodeCount=nodes.length;
+
+  // ── Containers (Bloco Mãe) ──
+  const containers=allFlowNodes.filter(n=>n.type==="container");
+  const svgContainers=containers.map(c=>{
+    const isExp=flowContainerExpanded[c.id]!==false; // default expanded
+    const children=allFlowNodes.filter(n=>n.containerParent===c.id);
+    const cColor=c.color||"#7c6eff";
+    const cW=c.w||300, cH=c.h||200;
+    if(!isExp){
+      // Minimized: show just the header bar
+      return`<g class="flow-container" data-cid="${c.id}" transform="translate(${c.x},${c.y})">
+        <rect x="0" y="0" width="${cW}" height="36" rx="10" fill="${cColor}22" stroke="${cColor}66" stroke-width="2"/>
+        <text x="32" y="18" dominant-baseline="middle" fill="${cColor}" font-size="13" font-weight="700" font-family="Syne,sans-serif" style="pointer-events:none">${esc(c.label||"Container")}</text>
+        <text x="14" y="18" dominant-baseline="middle" fill="${cColor}" font-size="12" style="pointer-events:none;cursor:pointer" class="container-toggle" data-cid="${c.id}">▶</text>
+        <text x="${cW-12}" y="18" text-anchor="end" dominant-baseline="middle" fill="${cColor}88" font-size="10" style="pointer-events:none">${children.length} bloco${children.length!==1?"s":""}</text>
+        ${isAdmin1?`<circle cx="${cW+4}" cy="-4" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2" class="del-container" data-cid="${c.id}" style="cursor:pointer"/><text x="${cW+4}" y="-4" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text>`:""}
+        <rect x="0" y="0" width="${cW}" height="36" rx="10" fill="transparent" stroke="transparent" stroke-width="20" class="container-toggle" data-cid="${c.id}" style="cursor:pointer"/>
+      </g>`;
+    }
+    // Expanded: show full box
+    // Compute bounding box from children + padding
+    let bx=c.x, by=c.y, bw=cW, bh=cH;
+    if(children.length){
+      const xs=children.map(n=>n.x-c.x), ys=children.map(n=>n.y-c.y);
+      const ws=children.map(n=>n.w||150), hs=children.map(n=>n.h||48);
+      const minX=Math.min(...xs)-20, minY=Math.min(...ys)-20;
+      const maxX=Math.max(...children.map((n,i)=>(n.x-c.x)+ws[i]))+20;
+      const maxY=Math.max(...children.map((n,i)=>(n.y-c.y)+hs[i]))+40;
+      bw=Math.max(cW, maxX-minX+20); bh=Math.max(cH, maxY-minY+50);
+    }
+    return`<g class="flow-container" data-cid="${c.id}" transform="translate(${c.x},${c.y})">
+      <rect x="0" y="0" width="${bw}" height="${bh}" rx="12" fill="${cColor}0a" stroke="${cColor}44" stroke-width="2" stroke-dasharray="8,4" class="container-drop-zone" data-cid="${c.id}"/>
+      <rect x="0" y="0" width="${bw}" height="32" rx="10" fill="${cColor}22" stroke="${cColor}44" stroke-width="1.5"/>
+      <text x="30" y="16" dominant-baseline="middle" fill="${cColor}" font-size="13" font-weight="700" font-family="Syne,sans-serif" style="pointer-events:none">${esc(c.label||"Container")}</text>
+      <text x="14" y="16" dominant-baseline="middle" fill="${cColor}" font-size="12" style="pointer-events:none" class="container-toggle" data-cid="${c.id}">▼</text>
+      <text x="${bw-12}" y="16" text-anchor="end" dominant-baseline="middle" fill="${cColor}88" font-size="10" style="pointer-events:none">${children.length} bloco${children.length!==1?"s":""}</text>
+      ${isAdmin1?`<circle cx="${bw+4}" cy="-4" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2" class="del-container" data-cid="${c.id}" style="cursor:pointer"/><text x="${bw+4}" y="-4" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text>`:""}
+      <rect x="0" y="0" width="28" height="32" fill="transparent" class="container-toggle" data-cid="${c.id}" style="cursor:pointer"/>
+      <rect x="${bw-6}" y="${bh-6}" width="10" height="10" rx="2" fill="${cColor}44" stroke="${cColor}" stroke-width="1" class="flow-resize-handle" data-node-id="${c.id}" style="cursor:se-resize"/>
+    </g>`;
+  }).join("");
 
   // SVG group backgrounds (nodes that are parents of other nodes)
   const groupParents=new Map();
@@ -669,6 +717,7 @@ function renderFlowPage(){
         <input type="color" id="node-color" value="#c8f04e" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
         <button class="btn-primary" id="btn-add-node" ${nodeCount>=LIMITS.MAX_FLOW_NODES?"disabled":""}>+ Bloco</button>
         <button class="btn-small" id="btn-add-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">📝 Nota</button>
+        <button class="btn-small" id="btn-add-container" style="border:1px solid #7c6eff44;color:#9d93ff;background:#7c6eff12">📦 Container</button>
       </div>
       ${areaButtons?`<div style="display:flex;gap:6px;flex-wrap:wrap">${areaButtons}</div>`:""}
     </div>`:""}
@@ -691,7 +740,7 @@ function renderFlowPage(){
           </marker>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)"/>
-        <g id="flow-zoom-group" transform="translate(${flowPan.x},${flowPan.y}) scale(${flowZoom})">${svgGroups}${svgEdges}${liveEdge}${svgNodes}${selBox?`<rect x="${Math.min(selBox.x1,selBox.x2)}" y="${Math.min(selBox.y1,selBox.y2)}" width="${Math.abs(selBox.x2-selBox.x1)}" height="${Math.abs(selBox.y2-selBox.y1)}" fill="#c8f04e08" stroke="#c8f04e" stroke-width="1" stroke-dasharray="5,3" style="pointer-events:none"/>`:""}</g>
+        <g id="flow-zoom-group" transform="translate(${flowPan.x},${flowPan.y}) scale(${flowZoom})">${svgContainers}${svgGroups}${svgEdges}${liveEdge}${svgNodes}${selBox?`<rect x="${Math.min(selBox.x1,selBox.x2)}" y="${Math.min(selBox.y1,selBox.y2)}" width="${Math.abs(selBox.x2-selBox.x1)}" height="${Math.abs(selBox.y2-selBox.y1)}" fill="#c8f04e08" stroke="#c8f04e" stroke-width="1" stroke-dasharray="5,3" style="pointer-events:none"/>`:""}</g>
         ${nodes.length===0?`<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="#2e2e42" font-size="15" font-family="DM Sans,sans-serif">Use os botões acima para adicionar blocos e conectar áreas</text>`:""}
       </svg>
     </div>
@@ -1396,6 +1445,32 @@ function attachFlowEvents(){
       dbSet(`flow/nodes/${dragging.id}/y`,n.y);
     }
     selBox=null; flowSelecting=false;
+    // Check if dragged node dropped onto a container
+    if(dragging){
+      const draggedNode=flowData.nodes?.[dragging.id];
+      if(draggedNode&&draggedNode.type!=="container"){
+        const nx=draggedNode.x+(draggedNode.w||150)/2;
+        const ny=draggedNode.y+(draggedNode.h||48)/2;
+        // Find container that contains this point
+        const containers2=Object.entries(flowData.nodes||{}).filter(([,n])=>n.type==="container"&&flowContainerExpanded[n.id]!==false);
+        let dropped=false;
+        for(const [cid,cn] of containers2){
+          if(cid===dragging.id)continue;
+          const cW=cn.w||300, cH=cn.h||220;
+          if(nx>=cn.x&&nx<=cn.x+cW&&ny>=cn.y+32&&ny<=cn.y+cH){
+            if(draggedNode.containerParent!==cid){
+              dbSet(`flow/nodes/${dragging.id}/containerParent`,cid);
+              toast("Bloco adicionado ao container","success");
+            }
+            dropped=true; break;
+          }
+        }
+        // If dropped outside all containers, remove containerParent
+        if(!dropped&&draggedNode.containerParent){
+          dbSet(`flow/nodes/${dragging.id}/containerParent`,null);
+        }
+      }
+    }
     dragging=null; groupDragging=null; flowResizing=null;
   });
   svg.addEventListener("click",e=>{if(connecting&&e.target===svg){connecting=null;render();return;}});
@@ -1459,6 +1534,36 @@ function attachFlowEvents(){
     render();
   });
   document.getElementById("flow-group-clear")?.addEventListener("click",()=>{selectedNodes.clear();render();});
+
+  // ── Container events ──
+  document.getElementById("btn-add-container")?.addEventListener("click",()=>{
+    const id=uid();
+    dbSet(`flow/nodes/${id}`,{id,type:"container",label:"Novo Container",color:"#7c6eff",x:80+Math.random()*200,y:60+Math.random()*150,w:300,h:220});
+    flowContainerExpanded[id]=true;
+  });
+  document.querySelectorAll(".container-toggle").forEach(el=>{
+    el.addEventListener("click",e=>{
+      e.stopPropagation();
+      const cid=el.dataset.cid;
+      flowContainerExpanded[cid]=flowContainerExpanded[cid]===false?true:false;
+      render();
+    });
+  });
+  document.querySelectorAll(".del-container").forEach(el=>{
+    el.addEventListener("click",async e=>{
+      e.stopPropagation();
+      if(!confirm("Excluir container? Os blocos dentro serão desvinculados."))return;
+      const cid=el.dataset.cid;
+      // Unlink all children
+      const children=Object.entries(flowData.nodes||{}).filter(([,n])=>n.containerParent===cid);
+      for(const [nid] of children) await dbSet(`flow/nodes/${nid}/containerParent`,null);
+      await dbRemove(`flow/nodes/${cid}`);
+    });
+  });
+
+  // ── Drop node onto container ──
+  // When dragging ends, check if node center is over a container
+  // This is handled in mouseup after dragging
 
   // ── Sticky notes ──
   document.getElementById("btn-add-sticky")?.addEventListener("click",()=>{
