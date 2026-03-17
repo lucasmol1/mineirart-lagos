@@ -356,6 +356,10 @@ textarea { resize: vertical; }
   border-radius: var(--r3); width: 100%; max-width: 520px; max-height: 90vh;
   overflow-y: auto; animation: modal-in .18s ease;
 }
+.modal[style*="max-width:860px"], .modal[style*="max-width: 860px"] {
+  max-width: 860px !important;
+  overflow-y: visible;
+}
 .modal-lg { max-width: 680px; }
 @keyframes modal-in { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
 .modal-header {
@@ -365,6 +369,7 @@ textarea { resize: vertical; }
 }
 .modal-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; }
 .modal-body  { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.modal-body[style*='display:block'] { display: block !important; }
 .modal-footer {
   padding: 14px 22px; border-top: 1px solid var(--border);
   display: flex; gap: 10px; justify-content: flex-end;

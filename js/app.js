@@ -3038,8 +3038,7 @@ function openDetailModal(taskId){
       <button class="icon-btn" id="m-x">✕</button>
     </div>
     <div style="display:flex;gap:0;min-height:400px">
-      <!-- Left: task detail -->
-      <div class="modal-body" style="flex:1;min-width:0;border-right:1px solid #1e1e28;padding-right:20px">
+      <div class="modal-body" style="flex:1;min-width:0;border-right:1px solid #1e1e28;padding-right:20px;display:block;overflow-y:auto">
         <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;line-height:1.3;margin-bottom:10px">${esc(t.title)}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <span class="chip" style="background:${st.color}22;color:${st.color};border:1px solid ${st.color}40;padding:4px 12px">${st.label}</span>
@@ -3056,7 +3055,6 @@ function openDetailModal(taskId){
           <button id="m-send-alert" class="btn-small" style="border:1px solid #f0a83244;color:#f0a832;font-size:12px">🔔 Enviar alerta aos responsáveis</button>
         </div>
       </div>
-      <!-- Right: comments panel -->
       <div style="width:280px;min-width:240px;display:flex;flex-direction:column;padding-left:18px">
         <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-top:18px">💬 Comentários</div>
         <div id="comments-list" style="flex:1;overflow-y:auto;max-height:340px;display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
