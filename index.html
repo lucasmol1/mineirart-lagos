@@ -14,9 +14,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/style.css"/>
 <script>
+  // Remove qualquer service worker que possa estar travando o app
   if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('/mineirart-lagos/sw.js',{scope:'/mineirart-lagos/'}).catch(()=>{});
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      regs.forEach(r=>r.unregister());
     });
   }
 </script>
