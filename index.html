@@ -2,25 +2,10 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Mineirart"/>
-<meta name="theme-color" content="#0c0c0f"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Mineirart Lagos</title>
-<link rel="manifest" href="manifest.json"/>
-<link rel="apple-touch-icon" href="img/logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/style.css"/>
-<script>
-  // Remove qualquer service worker que possa estar travando o app
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.getRegistrations().then(regs=>{
-      regs.forEach(r=>r.unregister());
-    });
-  }
-</script>
 </head>
 <body>
 
@@ -86,9 +71,6 @@
     <main class="main-content" id="main-content"></main>
   </div>
 </div>
-
-<!-- DRAWER OVERLAY MOBILE -->
-<div id="drawer-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199;backdrop-filter:blur(2px)"></div>
 
 <!-- MODALS CONTAINER -->
 <div id="modals"></div>

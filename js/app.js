@@ -306,18 +306,7 @@ function visibleAreas(){
   return all.filter(a=>permitted.has(a.id)||(a.parentId&&permitted.has(a.parentId)));
 }
 
-function nav(p,extra){
-  page=p;dropdownOpen=false;
-  if(p==="area")activeAreaId=extra;
-  // Fechar drawer mobile ao navegar
-  const sidebar=document.querySelector(".sidebar");
-  const overlay=document.getElementById("drawer-overlay");
-  if(sidebar&&window.innerWidth<=768){
-    sidebar.classList.remove("mobile-open");
-    if(overlay)overlay.style.display="none";
-  }
-  render();
-}
+function nav(p,extra){page=p;dropdownOpen=false;if(p==="area")activeAreaId=extra;render();}
 
 // ── ALERT WATCHER ─────────────────────────────────────────────────────────────
 let alertInterval=null;
@@ -455,9 +444,9 @@ function renderTopbar(){
   const tb=document.getElementById("topbar");if(!tb)return;
   const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",admin:"Administração",historico:"Histórico de Ações"};
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
-  tb.innerHTML=`<button id="hamburger-btn" aria-label="Menu">☰</button>
-    <div class="topbar-title">${esc(label)}</div>
+  tb.innerHTML=`<div class="topbar-title">${esc(label)}</div>
     <button id="btn-undo-topbar" title="Desfazer (Ctrl+Z)" onclick="undoLastAction()" style="background:none;border:1px solid #2e2e3a;border-radius:8px;color:#7a7a8a;cursor:pointer;padding:5px 10px;font-size:14px;flex-shrink:0;transition:all .12s" onmouseover="this.style.color='#c8f04e';this.style.borderColor='#c8f04e44'" onmouseout="this.style.color='#7a7a8a';this.style.borderColor='#2e2e3a'">↩</button>
+    <button id="btn-undo-topbar" title="Desfazer (Ctrl+Z)" onclick="undoLastAction()" style="background:none;border:1px solid #2e2e3a;border-radius:8px;color:#7a7a8a;cursor:pointer;padding:5px 10px;font-size:14px;flex-shrink:0">&#8629;</button>
     <div id="global-search-wrap" style="flex:1;max-width:320px;position:relative">
       <input id="global-search" placeholder="🔍 Buscar tarefas, áreas, responsáveis…" autocomplete="off"
         style="width:100%;box-sizing:border-box;background:#13131a;border:1px solid #2e2e3a;border-radius:20px;padding:7px 14px;color:#d0d0e0;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;transition:border-color .15s"/>
@@ -469,26 +458,6 @@ function renderTopbar(){
     </div>
     </div>`;
   document.getElementById("user-btn").addEventListener("click",e=>{e.stopPropagation();dropdownOpen=!dropdownOpen;render();});
-
-  // ── Hambúrguer mobile ──
-  document.getElementById("hamburger-btn")?.addEventListener("click",e=>{
-    e.stopPropagation();
-    const sidebar=document.querySelector(".sidebar");
-    const overlay=document.getElementById("drawer-overlay");
-    if(!sidebar)return;
-    const isOpen=sidebar.classList.contains("mobile-open");
-    if(isOpen){
-      sidebar.classList.remove("mobile-open");
-      if(overlay)overlay.style.display="none";
-    } else {
-      sidebar.classList.add("mobile-open");
-      if(overlay){overlay.style.display="block";}
-    }
-  });
-  document.getElementById("drawer-overlay")?.addEventListener("click",()=>{
-    document.querySelector(".sidebar")?.classList.remove("mobile-open");
-    document.getElementById("drawer-overlay").style.display="none";
-  });
   document.getElementById("dd-logout")?.addEventListener("click",()=>signOut(auth));
   document.getElementById("dd-profile")?.addEventListener("click",()=>{dropdownOpen=false;openProfileModal();});
 
@@ -1748,43 +1717,8 @@ function attachFlowEvents(){
     const id=uid();
     dbSet(`flow/stickies/${id}`,{id,text:"",color:"#f0a832",x:80+Math.random()*300,y:60+Math.random()*200,expanded:true,createdAt:new Date().toISOString()});
   });
-  // ── Touch events mobile — Fluxograma (só visualização + clique nos blocos) ──
-  (function attachFlowTouch(){
-    const svg=document.getElementById("flow-svg"); if(!svg)return;
-    let lastDist=0, touchStartX=0, touchStartY=0, panStartX=0, panStartY=0;
-    svg.addEventListener("touchstart",e=>{
-      if(e.touches.length===2){
-        // Pinch zoom
-        const dx=e.touches[0].clientX-e.touches[1].clientX;
-        const dy=e.touches[0].clientY-e.touches[1].clientY;
-        lastDist=Math.sqrt(dx*dx+dy*dy);
-      } else if(e.touches.length===1){
-        touchStartX=e.touches[0].clientX;
-        touchStartY=e.touches[0].clientY;
-        panStartX=flowPan.x;
-        panStartY=flowPan.y;
-      }
-    },{passive:true});
-    svg.addEventListener("touchmove",e=>{
-      e.preventDefault();
-      if(e.touches.length===2){
-        const dx=e.touches[0].clientX-e.touches[1].clientX;
-        const dy=e.touches[0].clientY-e.touches[1].clientY;
-        const dist=Math.sqrt(dx*dx+dy*dy);
-        if(lastDist>0){
-          const scale=dist/lastDist;
-          flowZoom=Math.min(2.5,Math.max(0.25,+(flowZoom*scale).toFixed(2)));
-          render();
-        }
-        lastDist=dist;
-      } else if(e.touches.length===1){
-        flowPan.x=panStartX+(e.touches[0].clientX-touchStartX);
-        flowPan.y=panStartY+(e.touches[0].clientY-touchStartY);
-        render();
-      }
-    },{passive:false});
-    svg.addEventListener("touchend",()=>{lastDist=0;},{passive:true});
-  })();
+  renderStickies();
+}
 
 function renderStickies(){
   const layer=document.getElementById("stickies-layer"); if(!layer)return;
@@ -3098,43 +3032,7 @@ function attachOrgEvents(){
     dbSet(`org/stickies/${id}`,{id,text:"",color:"#f0a832",x:80+Math.random()*300,y:60+Math.random()*200,expanded:true,createdAt:new Date().toISOString()});
   });
   renderOrgStickies();
-
-  // ── Touch events mobile — Organograma (só visualização + clique nos blocos) ──
-  (function attachOrgTouch(){
-    const svg=document.getElementById("org-svg"); if(!svg)return;
-    let lastDist=0, touchStartX=0, touchStartY=0, panStartX=0, panStartY=0;
-    svg.addEventListener("touchstart",e=>{
-      if(e.touches.length===2){
-        const dx=e.touches[0].clientX-e.touches[1].clientX;
-        const dy=e.touches[0].clientY-e.touches[1].clientY;
-        lastDist=Math.sqrt(dx*dx+dy*dy);
-      } else if(e.touches.length===1){
-        touchStartX=e.touches[0].clientX;
-        touchStartY=e.touches[0].clientY;
-        panStartX=orgPan.x;
-        panStartY=orgPan.y;
-      }
-    },{passive:true});
-    svg.addEventListener("touchmove",e=>{
-      e.preventDefault();
-      if(e.touches.length===2){
-        const dx=e.touches[0].clientX-e.touches[1].clientX;
-        const dy=e.touches[0].clientY-e.touches[1].clientY;
-        const dist=Math.sqrt(dx*dx+dy*dy);
-        if(lastDist>0){
-          const scale=dist/lastDist;
-          orgZoom=Math.min(2.5,Math.max(0.25,+(orgZoom*scale).toFixed(2)));
-          render();
-        }
-        lastDist=dist;
-      } else if(e.touches.length===1){
-        orgPan.x=panStartX+(e.touches[0].clientX-touchStartX);
-        orgPan.y=panStartY+(e.touches[0].clientY-touchStartY);
-        render();
-      }
-    },{passive:false});
-    svg.addEventListener("touchend",()=>{lastDist=0;},{passive:true});
-  })();
+}
 
 function renderOrgStickies(){
   const layer=document.getElementById("org-stickies-layer"); if(!layer)return;
