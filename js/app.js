@@ -164,9 +164,47 @@ async function safePurgeTasks(){
   return true;
 }
 
+// ── SIDEBAR RESIZE ────────────────────────────────────────────────────────────
+function initSidebarResize(){
+  const sidebar=document.querySelector(".sidebar"); if(!sidebar)return;
+  if(sidebar.querySelector(".sidebar-resizer"))return; // já inicializado
+  const resizer=document.createElement("div");
+  resizer.className="sidebar-resizer";
+  sidebar.appendChild(resizer);
+  // Restaurar largura salva
+  const saved=localStorage.getItem("sidebarWidth");
+  if(saved){const w=parseInt(saved);sidebar.style.width=w+"px";if(w<72)sidebar.classList.add("collapsed");else sidebar.classList.remove("collapsed");}
+  let startX=0,startW=0;
+  resizer.addEventListener("mousedown",e=>{
+    e.preventDefault();
+    startX=e.clientX; startW=sidebar.getBoundingClientRect().width;
+    resizer.classList.add("dragging");
+    document.body.style.cursor="col-resize"; document.body.style.userSelect="none";
+    function onMove(ev){
+      const w=Math.max(52,Math.min(480,startW+(ev.clientX-startX)));
+      sidebar.style.width=w+"px";
+      w<72?sidebar.classList.add("collapsed"):sidebar.classList.remove("collapsed");
+    }
+    function onUp(){
+      resizer.classList.remove("dragging");
+      document.body.style.cursor=""; document.body.style.userSelect="";
+      localStorage.setItem("sidebarWidth",Math.round(sidebar.getBoundingClientRect().width));
+      document.removeEventListener("mousemove",onMove);
+      document.removeEventListener("mouseup",onUp);
+    }
+    document.addEventListener("mousemove",onMove);
+    document.addEventListener("mouseup",onUp);
+  });
+  // Duplo clique reseta para 220px
+  resizer.addEventListener("dblclick",()=>{
+    sidebar.style.width="220px"; sidebar.classList.remove("collapsed");
+    localStorage.setItem("sidebarWidth","220");
+  });
+}
+
 // ── LISTENERS ─────────────────────────────────────────────────────────────────
 let listenersReady=0;
-function checkReady(){listenersReady++;if(listenersReady>=10){document.getElementById("loader").style.display="none";document.getElementById("app").style.display="flex";render();startAlertWatcher();}}
+function checkReady(){listenersReady++;if(listenersReady>=10){document.getElementById("loader").style.display="none";document.getElementById("app").style.display="flex";render();startAlertWatcher();initSidebarResize();}}
 
 function initListeners(){
   dbListen("areas", v=>{
@@ -415,7 +453,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">Y</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">X</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -3285,7 +3323,26 @@ function openTaskModal(init={}){
   }
   const isCreator=!init.id||(init.creatorId===currentUser?.uid)||isAdmin();
   const existingResps=Array.isArray(init.resps)?init.resps:(init.resp?[init.resp]:[]);
-  const userNames=Object.values(users).map(u=>u.name).filter(Boolean);
+
+  // Filtro: usuários com permissão na área selecionada
+  function buildRespOptions(areaId){
+    let filtered;
+    if(!areaId){
+      filtered=Object.values(users);
+    } else {
+      filtered=Object.values(users).filter(u=>{
+        // Admins sempre aparecem
+        if(u.role==="admin1"||u.role==="admin") return true;
+        // Usuário aparece se tiver a área nas suas permissões
+        const perms=u.permissions||[];
+        return perms.includes(areaId);
+      });
+      // Se nenhum usuário comum tem permissão ainda, mostra todos (segurança)
+      const nonAdmins=filtered.filter(u=>u.role==="user");
+      if(!nonAdmins.length) filtered=Object.values(users);
+    }
+    return filtered.filter(u=>u.name).map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.email?" ("+esc(u.email)+")":""}</option>`).join("");
+  }
   openModal(`<div class="overlay" id="ov"><div class="modal"><div class="modal-header"><div class="modal-title">${init.id?"Editar":"Nova"} Tarefa</div><button class="icon-btn" id="m-x">\u2715</button></div><div class="modal-body">
     <div class="field"><label>T\u00edtulo *</label><input id="m-title" value="${esc(init.title||"")}" placeholder="Descreva a tarefa\u2026"/></div>
     <div class="field"><label>Descri\u00e7\u00e3o</label><textarea id="m-desc" rows="3">${esc(init.desc||"")}</textarea></div>
@@ -3299,7 +3356,7 @@ function openTaskModal(init={}){
       ${isCreator?`<div style="display:flex;gap:8px">
         <select id="m-resp-sel" style="flex:1;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
           <option value="">Selecionar usu\u00e1rio\u2026</option>
-          ${Object.values(users).filter(u=>u.name).map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.email?" (" + esc(u.email)+")":""}</option>`).join("")}
+          ${buildRespOptions(init.areaId)}
         </select>
         <input id="m-resp-manual" placeholder="Ou digitar nome\u2026" style="flex:1;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
         <button class="btn-small" id="m-resp-add" style="border:1px solid #2e2e3a;color:#c8f04e;white-space:nowrap">+ Add</button>
@@ -3331,6 +3388,16 @@ function openTaskModal(init={}){
     if(isCreator) el.querySelectorAll("[data-r]").forEach(ch=>ch.addEventListener("click",()=>{selResps=selResps.filter(r=>r!==ch.dataset.r);refreshRespChips();}));
   }
   refreshRespChips();
+
+  // Atualiza o select de responsáveis quando a área principal muda
+  if(isCreator){
+    document.getElementById("m-area")?.addEventListener("change",e=>{
+      const sel=document.getElementById("m-resp-sel"); if(!sel)return;
+      const cur=sel.value;
+      sel.innerHTML=`<option value="">Selecionar usuário…</option>${buildRespOptions(e.target.value)}`;
+      sel.value=cur;
+    });
+  }
 
   // Extra areas chips
   let extraAreaIds=Array.isArray(init.extraAreaIds)?[...init.extraAreaIds]:[];
@@ -3403,6 +3470,64 @@ function openTaskModal(init={}){
   setTimeout(()=>document.getElementById("m-title")?.focus(),80);
 }
 
+// ── ABA MEMBROS DA ÁREA ───────────────────────────────────────────────────────
+function renderAreaMembersTab(task){
+  const container=document.getElementById("area-members-list"); if(!container)return;
+  container.innerHTML="";
+  const taskAreaIds=[
+    ...(task.areaId?[task.areaId]:[]),
+    ...(Array.isArray(task.extraAreaIds)?task.extraAreaIds:[])
+  ];
+
+  if(!taskAreaIds.length){
+    container.innerHTML='<p style="color:#7a7a8a;padding:8px 0;font-size:13px">Nenhuma área associada a esta tarefa.</p>';
+    return;
+  }
+
+  // Coleta membros: usuários que têm pelo menos uma das áreas nas suas permissões
+  const memberUids=new Set();
+  Object.entries(users).forEach(([uid2,u])=>{
+    // Admins sempre aparecem
+    if(u.role==="admin1"||u.role==="admin"){memberUids.add(uid2);return;}
+    // Usuário comum: aparece se tiver qualquer área da tarefa nas permissões
+    const perms=u.permissions||[];
+    if(taskAreaIds.some(aid=>perms.includes(aid))) memberUids.add(uid2);
+  });
+
+  if(!memberUids.size){
+    container.innerHTML='<p style="color:#7a7a8a;padding:8px 0;font-size:13px">Nenhum membro com acesso a estas áreas ainda.<br><span style="font-size:11px;color:#5a5a6a">Configure as permissões na aba Administração.</span></p>';
+    return;
+  }
+
+  const assigneeNames=new Set(Array.isArray(task.resps)?task.resps:(task.resp?[task.resp]:[]));
+  const COLORS=["#c8f04e","#4ec8f0","#f04ec8","#f0c84e","#4ef0c8","#c84ef0","#f04e4e","#4e4ef0"];
+  function avatarColor(uid2){let h=0;for(let i=0;i<uid2.length;i++)h=uid2.charCodeAt(i)+((h<<5)-h);return COLORS[Math.abs(h)%COLORS.length];}
+
+  // Ordena: responsáveis atribuídos primeiro
+  const sorted=[...memberUids].sort((a,b)=>{
+    const ua=users[a],ub=users[b];
+    const aA=assigneeNames.has(ua?.name)?0:1, bB=assigneeNames.has(ub?.name)?0:1;
+    return aA-bB;
+  });
+
+  sorted.forEach(uid2=>{
+    const u=users[uid2]; if(!u)return;
+    const name=u.name||u.email||uid2;
+    const init2=name.split(" ").map(p=>p[0]).join("").toUpperCase().slice(0,2);
+    const color=u.color||avatarColor(uid2);
+    const isAss=assigneeNames.has(name);
+    const roleLabel={admin1:"👑 Super Admin",admin:"Admin",user:"Membro"}[u.role]||"Membro";
+    const card=document.createElement("div");
+    card.className="member-card"+(isAss?" is-assignee":"");
+    card.innerHTML=`<div class="member-avatar-sm" style="background:${color}">${init2}</div>
+      <div class="member-info">
+        <span class="member-name">${esc(name)}</span>
+        <span class="member-role-badge">${roleLabel}</span>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
 function openDetailModal(taskId){
   const t={id:taskId,...tasks[taskId]};if(!t.title)return;
   const area=areas[t.areaId],st=STATUS[t.status];
@@ -3456,6 +3581,11 @@ function openDetailModal(taskId){
     </div>
     <div style="display:flex;gap:0;min-height:400px">
       <div class="modal-body" style="flex:1;min-width:0;border-right:1px solid #1e1e28;padding-right:20px;display:block;overflow-y:auto">
+        <div class="modal-tabs">
+          <button class="modal-tab-btn active" id="dtab-detail">📋 Detalhes</button>
+          <button class="modal-tab-btn" id="dtab-members">👥 Membros</button>
+        </div>
+        <div id="dtab-panel-detail">
         <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;line-height:1.3;margin-bottom:10px">${esc(t.title)}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <span class="chip" style="background:${st.color}22;color:${st.color};border:1px solid ${st.color}40;padding:4px 12px">${st.label}</span>
@@ -3470,6 +3600,10 @@ function openDetailModal(taskId){
         ${creatorBlock}
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid #1a1a22">
           <button id="m-send-alert" class="btn-small" style="border:1px solid #f0a83244;color:#f0a832;font-size:12px">🔔 Enviar alerta aos responsáveis</button>
+        </div>
+        </div>
+        <div id="dtab-panel-members" style="display:none">
+          <div class="members-grid" id="area-members-list"></div>
         </div>
       </div>
       <div style="width:280px;min-width:240px;display:flex;flex-direction:column;padding-left:18px">
@@ -3491,6 +3625,21 @@ function openDetailModal(taskId){
     </div>
   </div></div>`);
   document.getElementById("m-edit").onclick=()=>{closeModal();openTaskModal({...t});};
+
+  // ── Handlers das abas Detalhes / Membros ──
+  document.getElementById("dtab-detail")?.addEventListener("click",()=>{
+    document.getElementById("dtab-panel-detail").style.display="";
+    document.getElementById("dtab-panel-members").style.display="none";
+    document.getElementById("dtab-detail").classList.add("active");
+    document.getElementById("dtab-members").classList.remove("active");
+  });
+  document.getElementById("dtab-members")?.addEventListener("click",()=>{
+    document.getElementById("dtab-panel-detail").style.display="none";
+    document.getElementById("dtab-panel-members").style.display="";
+    document.getElementById("dtab-members").classList.add("active");
+    document.getElementById("dtab-detail").classList.remove("active");
+    renderAreaMembersTab(t);
+  });
 
   // ── Comments — real-time listener ──
   const commentsPath=`task_comments/${taskId}`;

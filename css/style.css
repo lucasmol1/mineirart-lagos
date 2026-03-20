@@ -95,7 +95,25 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 .sidebar {
   width: 220px; background: var(--surface); border-right: 1px solid var(--border);
   display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+  position: relative; min-width: 52px; max-width: 480px;
 }
+
+/* ── SIDEBAR RESIZER ── */
+.sidebar-resizer {
+  position: absolute; top: 0; right: 0; width: 5px; height: 100%;
+  cursor: col-resize; z-index: 100; background: transparent; transition: background .15s;
+}
+.sidebar-resizer:hover, .sidebar-resizer.dragging { background: rgba(200,240,78,.25); }
+
+/* Modo colapsado — abaixo de 72px só ícones */
+.sidebar.collapsed .side-label,
+.sidebar.collapsed .nav-item span:not(:first-child),
+.sidebar.collapsed .area-row span:not(.dot):not(.area-drag-handle):not(.area-arrow),
+.sidebar.collapsed .active-bar,
+.sidebar.collapsed .nav-alert-count,
+.sidebar.collapsed #sidebar-bottom { display: none; }
+.sidebar.collapsed .nav-item { justify-content: center; padding: 10px 4px; }
+.sidebar.collapsed .sidenav { padding: 6px 4px; }
 .sidebar-top { padding: 18px 16px 12px; border-bottom: 1px solid var(--border); }
 .sidebar-logo { display: flex; align-items: center; gap: 10px; }
 .sidenav { flex: 1; overflow-y: auto; padding: 10px 8px; display: flex; flex-direction: column; gap: 1px; }
@@ -516,3 +534,32 @@ a:hover { text-decoration: underline; }
 .cal-task-count:hover { color: var(--accent) !important; }
 
 @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+
+/* ── ABA MEMBROS DA ÁREA ── */
+.members-grid { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px 0; }
+.member-card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 10px 14px; min-width: 150px; flex: 1 1 150px;
+  transition: border-color .12s;
+}
+.member-card.is-assignee { border-color: rgba(200,240,78,.4); background: rgba(200,240,78,.05); }
+.member-avatar-sm {
+  width: 34px; height: 34px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; color: #0c0c0f; flex-shrink: 0;
+}
+.member-info { display: flex; flex-direction: column; overflow: hidden; }
+.member-name { font-size: 13px; font-weight: 600; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.member-role-badge { font-size: 10px; color: #888; margin-top: 2px; }
+.member-card.is-assignee .member-name::after { content: ' ✓'; color: #c8f04e; font-size: 10px; }
+
+/* ── MODAL TABS ── */
+.modal-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 22px; margin: 0 -22px 16px; }
+.modal-tab-btn {
+  padding: 10px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+  background: none; border: none; color: var(--muted); border-bottom: 2px solid transparent;
+  transition: all .12s; font-family: inherit; margin-bottom: -1px;
+}
+.modal-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.modal-tab-btn:hover:not(.active) { color: var(--text); }
