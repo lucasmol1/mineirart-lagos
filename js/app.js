@@ -1785,6 +1785,7 @@ function attachFlowEvents(){
     },{passive:false});
     svg.addEventListener("touchend",()=>{lastDist=0;},{passive:true});
   })();
+} // fim attachFlowEvents
 
 function renderStickies(){
   const layer=document.getElementById("stickies-layer"); if(!layer)return;
@@ -3135,6 +3136,7 @@ function attachOrgEvents(){
     },{passive:false});
     svg.addEventListener("touchend",()=>{lastDist=0;},{passive:true});
   })();
+} // fim attachOrgEvents
 
 function renderOrgStickies(){
   const layer=document.getElementById("org-stickies-layer"); if(!layer)return;
