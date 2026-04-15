@@ -694,7 +694,7 @@ function renderAreaPage(){
   if(!areaCalCollapsed[activeAreaId]) areaCalCollapsed[activeAreaId]={};
   const colCollapsed=areaCalCollapsed[activeAreaId];
 
- const listaStatus = Object.entries(STATUS).map(([key,st])=>{
+  const cols=Object.entries(STATUS).map(([key,st])=>{
     const col=myTasks.filter(t=>t.status===key);
     const isCollapsed=!!colCollapsed[key];
     const cards=col.length?col.map(t=>`<div class="card ${deadlineClass(t.date)||""}" data-detail="${t.id}" style="border-left-color:${st.color}">
@@ -751,7 +751,7 @@ function renderAreaPage(){
   }).join("");
 
   // ── Notes section for this area ── (block editor)
-   notesEditorHtml=renderAreaNotesEditor(activeAreaId);
+  const notesEditorHtml=renderAreaNotesEditor(activeAreaId);
 
   return`<div class="page-header">
     <div style="display:flex;align-items:center;gap:12px"><div class="dot" style="background:${area.color};width:14px;height:14px"></div><div><div style="display:flex;align-items:center;gap:8px"><div class="page-title">${esc(area.name)}</div>${isAdmin()?`<button class="icon-btn btn-edit-area" data-id="${activeAreaId}" title="Editar área" style="font-size:13px">✏</button>`:""}</div><div class="page-sub">${myTasks.length} tarefa${myTasks.length!==1?"s":""}</div></div></div>
