@@ -694,7 +694,7 @@ function renderAreaPage(){
   if(!areaCalCollapsed[activeAreaId]) areaCalCollapsed[activeAreaId]={};
   const colCollapsed=areaCalCollapsed[activeAreaId];
 
- const statusCols = Object.entries(STATUS).map(([key,st])=>{
+ const listaStatus = Object.entries(STATUS).map(([key,st])=>{
     const col=myTasks.filter(t=>t.status===key);
     const isCollapsed=!!colCollapsed[key];
     const cards=col.length?col.map(t=>`<div class="card ${deadlineClass(t.date)||""}" data-detail="${t.id}" style="border-left-color:${st.color}">
