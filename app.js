@@ -72,6 +72,11 @@ let flowContainerExpanded={}; // {containerId: true/false}
 let expandedAreas=new Set(); // sidebar subarea toggle
 let areaNotesListeners={};
 let alertsSent={}, calAlertsSent={};
+let flowStickies={}, orgStickies={}, fyiNotes={};
+let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
+let freelaEvents={}, prospEvents={};
+let areaCalCollapsed={};
+let orgExpanded={};
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
 const dbRef=p=>ref(db,p);
@@ -2373,13 +2378,11 @@ function renderMyTasksPage(){
 }
 
 
-let areaCalCollapsed={}; // {areaId: true/false} — persiste na sessão
+// (areaCalCollapsed, freelaEvents, prospEvents declared at top)
 let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
 let calAreaFilter=[]; // [] = todas; array de areaIds = filtrado. Reseta ao sair do calendário
 let freelaYear=new Date().getFullYear(), freelaMonth=new Date().getMonth();
-let freelaEvents={};
 let prospYear=new Date().getFullYear(), prospMonth=new Date().getMonth();
-let prospEvents={};
 
 const CAL_PRIORITY={
   essential:{label:"Essencial",color:"#ff6b6b",alertDays:[3,2,1,0]},
@@ -3453,11 +3456,7 @@ function _orgMouseUp(){
 // Registra UMA VEZ — nunca dentro de render/attachOrgEvents
 document.addEventListener("mousemove",_orgMouseMove);
 document.addEventListener("mouseup",_orgMouseUp);
-let orgStickies={};
-let fyiNotes={};
-let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
-let flowStickies={};
-let orgExpanded={}; // {nodeId: true/false} — expanded state per group
+// (orgStickies, fyiNotes, flowZoom, flowPan, flowStickies, orgExpanded declared at top)
 
 // ── ORGANOGRAMA ───────────────────────────────────────────────────────────────
 function renderOrgPage(){
