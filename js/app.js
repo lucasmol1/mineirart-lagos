@@ -72,6 +72,11 @@ let flowContainerExpanded={}; // {containerId: true/false}
 let expandedAreas=new Set(); // sidebar subarea toggle
 let areaNotesListeners={};
 let alertsSent={}, calAlertsSent={};
+let flowStickies={}, orgStickies={}, fyiNotes={};
+let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
+let freelaEvents={}, prospEvents={};
+let areaCalCollapsed={};
+let orgExpanded={};
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
 const dbRef=p=>ref(db,p);
@@ -653,43 +658,6 @@ function renderDashboard(){
 function renderAreaPage(){
   const area=areas[activeAreaId];if(!area)return`<div class="empty-state"><div class="empty-title">Área não encontrada</div></div>`;
   const myTasks=Object.entries(tasks).filter(([,t])=>t.areaId===activeAreaId).map(([id,t])=>({id,...t}));
-  const cols=Object.entries(STATUS).map(([key,st])=>{
-    const col=myTasks.filter(t=>t.status===key);
-    const cards=col.length?col.map(t=>`<div class="card ${deadlineClass(t.date)||""}" data-detail="${t.id}" style="border-left-color:${st.color}">
-      <div class="card-title">${esc(t.title)}</div>
-      ${t.desc?`<div class="card-desc">${esc(t.desc)}</div>`:""}
-      <div class="card-meta">
-        ${t.priority?`<span class="chip" style="font-size:10px;font-weight:700;text-transform:uppercase;background:${PRIORITY[t.priority].color}18;color:${PRIORITY[t.priority].color};border:1px solid ${PRIORITY[t.priority].color}30">${t.priority}</span>`:""}
-        ${deadlineBadge(t.date)}
-        ${t.recurrence?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff30;border-radius:4px;padding:2px 5px">🔁 ${({diaria:"Diária",semanal:"Semanal",quinzenal:"Quinzenal",mensal:"Mensal",anual:"Anual",custom:`${t.recurrence.interval||7}d`})[t.recurrence.freq]||"Recorr."}</span>`:""}
-        ${t.date&&!deadlineClass(t.date)?`<span style="font-size:10px;color:#7a7a8a;margin-left:auto">${fmtDate(t.date)}</span>`:""}
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
-        <div style="display:flex;align-items:center;gap:4px">
-          ${(()=>{
-            const rs=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
-            const avatars=rs.slice(0,4).map(r=>{
-              const u=Object.values(users).find(u=>u.name===r);
-              const c=u?.color||"#7c6eff";
-              return`<div title="${esc(r)} (Responsável)" style="width:24px;height:24px;border-radius:50%;background:${c};border:2px solid #13131a;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f;margin-left:-6px;first-child:margin-left:0">${initials(r)}</div>`;
-            }).join("");
-            const more=rs.length>4?`<span style="font-size:10px;color:#7a7a8a;margin-left:4px">+${rs.length-4}</span>`:"";
-            return rs.length?`<div style="display:flex;align-items:center;padding-left:6px">${avatars}${more}</div>`:"";
-          })()}
-        </div>
-        ${t.creatorName?`<div title="Criado por ${esc(t.creatorName)}" style="display:flex;align-items:center;gap:4px">
-          <span style="font-size:9px;color:#5a5a6a">por</span>
-          <div style="width:20px;height:20px;border-radius:50%;background:${Object.values(users).find(u=>u.name===t.creatorName)?.color||"#4ac8e8"};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f" title="${esc(t.creatorName)}">${initials(t.creatorName)}</div>
-        </div>`:""}
-      </div>
-      ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:""}
-    </div>`).join(""):`<div style="font-size:12px;color:#4a4a5a;text-align:center;padding:20px 8px">Vazio</div>`;
-    return`<div class="column"><div class="col-header" style="border-bottom:2px solid ${st.color}35"><div class="dot" style="background:${st.color}"></div><div style="font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:${st.color};flex:1">${st.label}</div><div class="col-count">${col.length}</div></div><div class="cards-list">${cards}</div><button class="add-card-btn btn-add-task-col" data-status="${key}">+ Adicionar</button></div>`;
-  }).join("");
-
-  // ── Notes section for this area ── (block editor)
-  const notesEditorHtml=renderAreaNotesEditor(activeAreaId);
-
   // Estado de colapso das colunas — persiste na sessão por área
   if(!areaCalCollapsed[activeAreaId]) areaCalCollapsed[activeAreaId]={};
   const colCollapsed=areaCalCollapsed[activeAreaId];
@@ -2410,13 +2378,11 @@ function renderMyTasksPage(){
 }
 
 
-let areaCalCollapsed={}; // {areaId: true/false} — persiste na sessão
+// (areaCalCollapsed, freelaEvents, prospEvents declared at top)
 let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
 let calAreaFilter=[]; // [] = todas; array de areaIds = filtrado. Reseta ao sair do calendário
 let freelaYear=new Date().getFullYear(), freelaMonth=new Date().getMonth();
-let freelaEvents={};
 let prospYear=new Date().getFullYear(), prospMonth=new Date().getMonth();
-let prospEvents={};
 
 const CAL_PRIORITY={
   essential:{label:"Essencial",color:"#ff6b6b",alertDays:[3,2,1,0]},
@@ -3490,11 +3456,7 @@ function _orgMouseUp(){
 // Registra UMA VEZ — nunca dentro de render/attachOrgEvents
 document.addEventListener("mousemove",_orgMouseMove);
 document.addEventListener("mouseup",_orgMouseUp);
-let orgStickies={};
-let fyiNotes={};
-let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
-let flowStickies={};
-let orgExpanded={}; // {nodeId: true/false} — expanded state per group
+// (orgStickies, fyiNotes, flowZoom, flowPan, flowStickies, orgExpanded declared at top)
 
 // ── ORGANOGRAMA ───────────────────────────────────────────────────────────────
 function renderOrgPage(){
