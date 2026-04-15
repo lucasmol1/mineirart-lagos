@@ -1,0 +1,85 @@
+╔══════════════════════════════════════════════════════════════╗
+║          MINEIRART LAGOS — SISTEMA DE GESTÃO v4             ║
+╚══════════════════════════════════════════════════════════════╝
+
+▶ MUDANÇAS DA V4
+  - Canais (chat estilo Slack) REMOVIDOS
+  - Aba Fluxograma com blocos clicáveis que redirecionam para as áreas
+  - Restrições Firebase para NUNCA ultrapassar o plano gratuito
+
+══════════════════════════════════════════════════════════════
+ PASSO 1 — CONFIGURAR FIREBASE
+══════════════════════════════════════════════════════════════
+
+1. Acesse: https://console.firebase.google.com
+2. Criar Projeto > dê um nome (ex: mineirart-lagos)
+3. Authentication > Primeiros passos > Ativar: Email/senha
+4. Realtime Database > Criar banco > "Modo de teste"
+5. Configuracoes do projeto (engrenagem) > Seus aplicativos > Web (</>)
+   Registre o app e copie o bloco firebaseConfig
+
+6. Abra js/firebase-config.js e substitua os valores:
+
+   const firebaseConfig = {
+     apiKey: "SUA_API_KEY",
+     authDomain: "SEU_PROJETO.firebaseapp.com",
+     databaseURL: "https://SEU_PROJETO-default-rtdb.firebaseio.com",
+     projectId: "SEU_PROJETO",
+     ...
+   };
+
+══════════════════════════════════════════════════════════════
+ PASSO 2 — REGRAS DE SEGURANÇA (IMPORTANTE!)
+══════════════════════════════════════════════════════════════
+
+Firebase Console > Realtime Database > Regras, cole:
+
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null"
+  }
+}
+
+══════════════════════════════════════════════════════════════
+ PASSO 3 — PUBLICAR NO NETLIFY
+══════════════════════════════════════════════════════════════
+
+1. Acesse https://app.netlify.com
+2. "Add new site" > "Deploy manually"
+3. Arraste a pasta "mineirart4" inteira
+
+══════════════════════════════════════════════════════════════
+ PASSO 4 — PRIMEIRO USUARIO (Super Admin)
+══════════════════════════════════════════════════════════════
+
+Firebase Console > Authentication > Adicionar usuario
+> E-mail + senha do administrador principal
+Faca login no sistema — esse usuario vira automaticamente o Super Admin.
+
+══════════════════════════════════════════════════════════════
+ PROTECOES FIREBASE — PLANO GRATUITO (SPARK)
+══════════════════════════════════════════════════════════════
+
+Limites automaticos no sistema (visíveis em Administracao):
+
+  Tarefas:              max 500
+  Areas:                max 30
+  Notas da equipe:      max 200
+  Rascunhos pessoais:   max 50 por usuario
+  Blocos fluxograma:    max 80
+  Historico de acoes:   auto-purga ao atingir 300 (mantém 200)
+
+  Quando um limite e atingido, criacao e bloqueada e um aviso aparece.
+
+══════════════════════════════════════════════════════════════
+ FLUXOGRAMA
+══════════════════════════════════════════════════════════════
+
+- Botoes coloridos "+" adicionam blocos das areas existentes
+- Blocos de area sao CLICAVEIS -> abrem a aba daquela area
+- Circulo direito do bloco: arraste para conectar dois blocos
+- Clique na seta para selecionar/deletar conexao
+- Blocos podem ser arrastados livremente no canvas
+
+══════════════════════════════════════════════════════════════
