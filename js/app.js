@@ -728,7 +728,6 @@ function renderAreaPage(){
       <button class="btn-primary" id="btn-add-task" style="background:${area.color};color:#0c0c0f">+ Nova tarefa</button>
     </div>
   </div>
-  <div class="kanban">${cols}</div>
 
   <!-- Area details block -->
   <div style="margin:10px 0 4px 0;background:#13131a;border:1px solid #1e1e28;border-radius:8px;padding:10px 14px">
@@ -741,7 +740,8 @@ function renderAreaPage(){
       :`<div style="font-size:12px;color:#a0a0b0;line-height:1.6;min-height:18px">${esc(area.detail||"—")}</div>`}
   </div>
 
-  ${notesEditorHtml}`;
+  ${notesEditorHtml}
+  <div class="kanban">${cols}</div>`;
 }
 
 // ── FLUXOGRAMA ────────────────────────────────────────────────────────────────
