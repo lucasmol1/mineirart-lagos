@@ -2394,10 +2394,10 @@ function renderCalPage(){
   const yr=calYear, mo=calMonth;
   const firstDay=new Date(yr,mo,1);
   const lastDay=new Date(yr,mo+1,0);
-  const startWd=(firstDay.getDay()+6)%7; // Mon=0
+  const startWd=firstDay.getDay(); // Sun=0
   const totalCells=Math.ceil((startWd+lastDay.getDate())/7)*7;
   const monthNames=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  const dayNames=["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const dayNames=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
   // Build map: dateStr -> [events]
   const eventMap={};
@@ -2581,10 +2581,10 @@ function renderFreelaPage(){
   const yr=freelaYear, mo=freelaMonth;
   const firstDay=new Date(yr,mo,1);
   const lastDay=new Date(yr,mo+1,0);
-  const startWd=(firstDay.getDay()+6)%7;
+  const startWd=firstDay.getDay(); // Sun=0
   const totalCells=Math.ceil((startWd+lastDay.getDate())/7)*7;
   const monthNames=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  const dayNames=["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const dayNames=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
   // Build event map
   const eventMap={};
@@ -2921,10 +2921,10 @@ function renderProspPage(){
   const yr=prospYear, mo=prospMonth;
   const firstDay=new Date(yr,mo,1);
   const lastDay=new Date(yr,mo+1,0);
-  const startWd=(firstDay.getDay()+6)%7;
+  const startWd=firstDay.getDay(); // Sun=0
   const totalCells=Math.ceil((startWd+lastDay.getDate())/7)*7;
   const monthNames=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  const dayNames=["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const dayNames=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
   const eventMap={};
   Object.entries(prospEvents).forEach(([eid,e])=>{
