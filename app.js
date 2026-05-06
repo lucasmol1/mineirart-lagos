@@ -407,6 +407,7 @@ function renderSidebar(){
     ${ni("fyi","💡","FYI")}
     ${ni("notas-pessoais","📝","Rascunhos Pessoais")}
     ${(isAdmin()||currentProfile?.manageAreas)?ni("admin","⚙️","Administração",pendingCount>0?`<span class="nav-alert-count">${pendingCount}</span>`:""):""}
+    ${(isAdmin1||currentProfile?.viewPerformance)?ni("performance","📊","Performance"):""}
     ${ni("historico","🕵️","Histórico")}
     <div class="side-label">ÁREAS</div>
     ${areaTreeHtml}`;
@@ -471,7 +472,7 @@ function renderSidebar(){
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 function renderTopbar(){
   const tb=document.getElementById("topbar");if(!tb)return;
-  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",admin:"Administração",historico:"Histórico de Ações"};
+  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",admin:"Administração",historico:"Histórico de Ações",performance:"Performance"};
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
   tb.innerHTML=`<button id="hamburger-btn" aria-label="Menu">☰</button>
     <div class="topbar-title">${esc(label)}</div>
@@ -619,7 +620,7 @@ document.addEventListener("keydown",e=>{
 function renderContent(){
   const mc=document.getElementById("main-content");if(!mc)return;
   if(!window._myNotifs)window._myNotifs={};
-  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,admin:renderAdminPage,historico:renderHistoricoPage};
+  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage};
   try{
     mc.innerHTML=(map[page]||renderDashboard)();
   }catch(err){
@@ -1264,6 +1265,1264 @@ function renderHistoricoPage(){
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════
+//  PERFORMANCE MODULE — embutido
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  // Injeta CSS do módulo de performance com escopo
+  if(!document.getElementById('perf-style')){
+    const s=document.createElement('style');
+    s.id='perf-style';
+    s.textContent=`
+#perf-wrap{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--surface3:#22223a;--border:#2a2a3f;--accent:#5b6ef5;--accent2:#a78bfa;--green:#22d3a0;--yellow:#f5c842;--red:#f55b5b;--orange:#f5944a;--text:#e8e8f5;--text2:#9090b8;--text3:#5a5a80;--radius:12px;--radius2:8px;}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(91,110,245,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(91,110,245,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;}
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;position:relative;z-index:1;}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:400px;max-width:100%;}
+.login-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;}
+.login-sub{font-size:12px;color:var(--text3);font-family:'IBM Plex Mono';margin-bottom:32px;}
+.login-error{background:rgba(245,91,91,0.1);border:1px solid rgba(245,91,91,0.25);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:16px;display:none;}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:225px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:24px 0;z-index:100;}
+.logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.logo-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo-sub{font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';margin-top:2px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;border-left:3px solid transparent;transition:all 0.15s;}
+.nav-item:hover{color:var(--text);background:var(--surface2);}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(91,110,245,0.07);}
+.nav-icon{font-size:15px;width:20px;text-align:center;}
+.nav-section{font-size:10px;color:var(--text3);font-family:'IBM Plex Mono';padding:16px 20px 6px;letter-spacing:0.1em;text-transform:uppercase;}
+.sidebar-user{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);}
+.sidebar-user-name{font-size:13px;font-weight:600;color:var(--text);}
+.sidebar-user-role{font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';margin-top:2px;}
+.btn-logout{margin-top:10px;width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius2);padding:7px;font-size:12px;color:var(--text3);cursor:pointer;transition:all 0.15s;}
+.btn-logout:hover{color:var(--red);border-color:rgba(245,91,91,0.4);}
+.main{margin-left:225px;min-height:100vh;}
+.topbar{height:60px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:90;}
+.topbar-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px;}
+.month-selector{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius2);padding:6px 12px;font-size:13px;color:var(--text);font-family:'IBM Plex Mono';}
+.month-selector select{background:transparent;border:none;color:var(--text);font-family:'IBM Plex Mono';font-size:13px;cursor:pointer;outline:none;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#7b8ef5);color:#fff;border:none;border-radius:var(--radius2);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity 0.15s;display:flex;align-items:center;gap:6px;}
+.btn-primary:hover{opacity:0.88;}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:var(--radius2);padding:7px 14px;font-size:13px;cursor:pointer;transition:all 0.15s;}
+.btn-ghost:hover{color:var(--text);border-color:var(--accent);}
+.btn-danger{background:rgba(245,91,91,0.12);color:var(--red);border:1px solid rgba(245,91,91,0.25);border-radius:var(--radius2);padding:6px 12px;font-size:12px;cursor:pointer;transition:all 0.15s;}
+.btn-danger:hover{background:rgba(245,91,91,0.22);}
+.btn-warn{background:rgba(245,148,74,0.12);color:var(--orange);border:1px solid rgba(245,148,74,0.25);border-radius:var(--radius2);padding:6px 12px;font-size:12px;cursor:pointer;transition:all 0.15s;}
+.btn-warn:hover{background:rgba(245,148,74,0.22);}
+.btn-green{background:rgba(34,211,160,0.12);color:var(--green);border:1px solid rgba(34,211,160,0.25);border-radius:var(--radius2);padding:6px 12px;font-size:12px;cursor:pointer;transition:all 0.15s;}
+.btn-green:hover{background:rgba(34,211,160,0.22);}
+.content{padding:24px 28px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.card-title{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--text2);letter-spacing:0.04em;margin-bottom:16px;text-transform:uppercase;}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.stat-label{font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.stat-value{font-family:'Syne',sans-serif;font-weight:800;font-size:28px;letter-spacing:-1px;}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:4px;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:'IBM Plex Mono';}
+.badge-green{background:rgba(34,211,160,0.12);color:var(--green);border:1px solid rgba(34,211,160,0.2);}
+.badge-yellow{background:rgba(245,200,66,0.12);color:var(--yellow);border:1px solid rgba(245,200,66,0.2);}
+.badge-red{background:rgba(245,91,91,0.12);color:var(--red);border:1px solid rgba(245,91,91,0.2);}
+.badge-blue{background:rgba(91,110,245,0.12);color:var(--accent);border:1px solid rgba(91,110,245,0.2);}
+.score-dot{width:7px;height:7px;border-radius:50%;}
+.dot-green{background:var(--green);}.dot-yellow{background:var(--yellow);}.dot-red{background:var(--red);}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:10px 12px;font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap;}
+td{padding:12px 12px;border-bottom:1px solid rgba(42,42,63,0.6);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(91,110,245,0.03);}
+.td-name{font-weight:600;font-size:14px;cursor:pointer;color:var(--text);}
+.td-name:hover{color:var(--accent);}
+.score-cell{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;}
+.trend{font-family:'IBM Plex Mono';font-size:12px;}
+.trend-up{color:var(--green);}.trend-down{color:var(--red);}.trend-flat{color:var(--text3);}
+.fail-count{font-family:'IBM Plex Mono';font-size:13px;color:var(--text2);}
+.fail-zero{color:var(--text3);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity 0.2s;}
+.overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:28px;width:500px;max-width:96vw;max-height:90vh;overflow-y:auto;transform:translateY(12px);transition:transform 0.2s;}
+.overlay.open .modal{transform:translateY(0);}
+.modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;margin-bottom:20px;}
+.form-group{margin-bottom:16px;}
+.form-label{display:block;font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
+.form-control{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius2);padding:10px 12px;color:var(--text);font-size:14px;font-family:'Inter';outline:none;transition:border-color 0.15s;}
+.form-control:focus{border-color:var(--accent);}
+.form-control option{background:var(--surface3);}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.detail-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap;}
+.detail-name{font-family:'Syne',sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.5px;}
+.detail-score{font-family:'Syne',sans-serif;font-weight:800;font-size:48px;letter-spacing:-2px;line-height:1;}
+.score-green{color:var(--green);}.score-yellow{color:var(--yellow);}.score-red{color:var(--red);}
+.chart-container{position:relative;height:140px;margin-bottom:4px;}
+canvas{display:block;}
+.fail-item{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid rgba(42,42,63,0.6);}
+.fail-item:last-child{border-bottom:none;}
+.fail-date{font-family:'IBM Plex Mono';font-size:11px;color:var(--text3);white-space:nowrap;padding-top:2px;}
+.fail-body{flex:1;}
+.fail-type{font-size:13px;font-weight:600;color:var(--text);}
+.fail-reason{font-size:12px;color:var(--text3);margin-top:2px;}
+.fail-by{font-size:11px;color:var(--text3);margin-top:3px;font-family:'IBM Plex Mono';}
+.fail-impact{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;white-space:nowrap;}
+.fail-impact.neg{color:var(--red);}
+.fail-impact.pos{color:var(--green);}
+.fail-impact-btn{display:flex;align-items:center;gap:8px;}
+.chips-row{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{background:var(--surface3);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;font-family:'IBM Plex Mono';display:flex;align-items:center;gap:6px;}
+.chip-count{font-weight:700;}.chip-label{color:var(--text2);}
+.chip-neg .chip-count{color:var(--red);}
+.chip-pos .chip-count{color:var(--green);}
+.notes-area{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius2);padding:12px;color:var(--text);font-size:13px;font-family:'Inter';outline:none;resize:vertical;min-height:100px;transition:border-color 0.15s;line-height:1.6;}
+.notes-area:focus{border-color:var(--accent);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.page{display:none;}.page.active{display:block;}
+.empty{text-align:center;padding:40px;color:var(--text3);}
+.empty-icon{font-size:36px;margin-bottom:12px;}.empty-text{font-size:14px;}
+.filter-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.filter-select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius2);padding:7px 12px;color:var(--text);font-size:13px;font-family:'IBM Plex Mono';outline:none;cursor:pointer;}
+.filter-select option{background:var(--surface2);}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+::-webkit-scrollbar{width:6px;height:6px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.notif{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--accent);border-radius:var(--radius);padding:12px 18px;font-size:13px;color:var(--text);transform:translateY(20px);opacity:0;transition:all 0.3s;z-index:2000;display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px rgba(91,110,245,0.25);}
+.notif.show{transform:translateY(0);opacity:1;}
+/* Employee grid */
+.employee-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+.employee-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:10px;}
+.employee-card-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;}
+.employee-card-team{font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';}
+.sep{height:1px;background:var(--border);margin:4px 0;}
+.score-bar-wrap{height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:4px;}
+.score-bar-fill{height:100%;border-radius:3px;transition:width 0.5s;}
+/* Log */
+.log-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid rgba(42,42,63,0.5);align-items:flex-start;}
+.log-item:last-child{border-bottom:none;}
+.log-time{font-family:'IBM Plex Mono';font-size:10px;color:var(--text3);white-space:nowrap;padding-top:3px;min-width:80px;}
+.log-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.lic-fail{background:rgba(245,91,91,0.15);}
+.lic-del{background:rgba(245,148,74,0.15);}
+.lic-add{background:rgba(34,211,160,0.15);}
+.lic-edit{background:rgba(91,110,245,0.15);}
+.lic-login{background:rgba(167,139,250,0.15);}
+.lic-note{background:rgba(245,200,66,0.15);}
+.lic-bonus{background:rgba(34,211,160,0.15);}
+.log-body{flex:1;}
+.log-action{font-size:13px;font-weight:600;color:var(--text);}
+.log-detail{font-size:12px;color:var(--text3);margin-top:2px;line-height:1.5;}
+.log-user{display:inline-flex;align-items:center;gap:5px;background:var(--surface3);border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:11px;font-family:'IBM Plex Mono';color:var(--text2);}
+/* Users */
+.user-list-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid rgba(42,42,63,0.5);}
+.user-list-item:last-child{border-bottom:none;}
+.user-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:'Syne',sans-serif;flex-shrink:0;}
+.user-info{flex:1;}
+.user-name-t{font-size:14px;font-weight:600;}
+.user-meta{font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';margin-top:2px;}
+.rb{display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-family:'IBM Plex Mono';font-weight:600;}
+.rb-admin{background:rgba(91,110,245,0.15);color:var(--accent);}
+.rb-manager{background:rgba(34,211,160,0.15);color:var(--green);}
+.rb-viewer{background:rgba(144,144,184,0.15);color:var(--text2);}
+.perm-warn{background:rgba(245,148,74,0.08);border:1px solid rgba(245,148,74,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--orange);}
+/* Scoring info box */
+.score-info-box{background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px 16px;font-size:12px;color:var(--text3);line-height:1.8;margin-bottom:16px;}
+.score-info-box b{color:var(--text2);}
+.bonus-row{background:rgba(34,211,160,0.06);border:1px solid rgba(34,211,160,0.15);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13px;}
+.cap-tag{display:inline-flex;align-items:center;background:rgba(245,200,66,0.12);color:var(--yellow);border:1px solid rgba(245,200,66,0.2);border-radius:10px;padding:1px 7px;font-size:10px;font-family:'IBM Plex Mono';margin-left:6px;}
+@media(max-width:900px){.sidebar{width:52px;}.nav-item span,.logo-title,.logo-sub,.nav-section,.sidebar-user-name,.sidebar-user-role,.btn-logout{display:none;}.main{margin-left:52px;}.stats-grid{grid-template-columns:1fr 1fr;}.grid-2{grid-template-columns:1fr;}}
+#perf-wrap .sidebar{display:none !important;}
+#perf-wrap .main{margin-left:0 !important;}
+#perf-wrap{min-height:calc(100vh - 56px);background:var(--bg,#0a0a0f);}
+`;
+    document.head.appendChild(s);
+  }
+
+  // Injeta JS do performance apenas uma vez
+  if(!window._perfLoaded){
+    window._perfLoaded=true;
+// ============================================================
+// SCORING SYSTEM v3
+// ============================================================
+const FAIL_TYPES = [
+  // id, label, peso, cap (teto/mês), progressivo
+  {id:'falta_inj',   label:'Falta injustificada',             peso:-12, cap:-24, progressivo:false, cat:'alto',
+   desc:'−12pts por ocorrência. Teto de −24pts/mês (máx 2 faltas com impacto total).'},
+  {id:'ponto',       label:'Não bater ponto',                 peso:-7,  cap:-21, progressivo:false, cat:'alto',
+   desc:'−7pts por ocorrência. Teto de −21pts/mês.'},
+  {id:'notificacao', label:'Não atender notificação/chamada', peso:-7,  cap:-21, progressivo:false, cat:'medio',
+   desc:'−7pts por ocorrência (urgência operacional). Teto de −21pts/mês.'},
+  {id:'checklist',   label:'Não preencher checklist',         peso:-5,  cap:-15, progressivo:false, cat:'medio',
+   desc:'−5pts por ocorrência. Teto de −15pts/mês.'},
+  {id:'entrega',     label:'Não inserir info de entrega',     peso:-5,  cap:-15, progressivo:false, cat:'medio',
+   desc:'−5pts por ocorrência. Teto de −15pts/mês.'},
+  {id:'atraso',      label:'Atraso / Pontualidade',           peso:-3,  cap:-18, progressivo:true,  cat:'baixo',
+   desc:'−3pts (1°/2° atraso), −6pts a partir do 3° (progressivo). Teto de −18pts/mês.'},
+  {id:'mobiliario',  label:'Cuidado com mobiliário',          peso:-3,  cap:-9,  progressivo:false, cat:'baixo',
+   desc:'−3pts por ocorrência. Teto de −9pts/mês.'},
+  {id:'recusa_extra',label:'Recusa injustificada (extra)',    peso:-3,  cap:-9,  progressivo:false, cat:'condicional',
+   desc:'−3pts por recusa. Teto de −9pts/mês.'},
+];
+
+const BONUS_TYPES = [
+  {id:'semana_limpa',   label:'Semana sem falhas',     valor:+1, cap:+5,
+   desc:'+1pt por semana sem nenhuma falha registrada. Máx +5pts/mês.'},
+  {id:'bonus_manual',   label:'Bônus por desempenho',  valor:+2, cap:+5,
+   desc:'+2pts por reconhecimento manual do gestor. Máx +5pts/mês total de bônus manual.'},
+  {id:'cobertura',      label:'Cobertura de colega',   valor:+2, cap:+4,
+   desc:'+2pts por cobrir colega ausente. Máx +4pts/mês.'},
+  {id:'cliente_pos',    label:'Feedback positivo cliente', valor:+1, cap:+3,
+   desc:'+1pt por feedback positivo documentado de cliente. Máx +3pts/mês.'},
+];
+
+function getFT(id){return FAIL_TYPES.find(f=>f.id===id);}
+function getBT(id){return BONUS_TYPES.find(b=>b.id===id);}
+
+// ============================================================
+// DB
+// ============================================================
+function loadDB(){
+  try{const r=localStorage.getItem('pos_db_v3');if(r)return JSON.parse(r);}catch(e){}
+  return{
+    users:[{id:'u1',nome:'Administrador',login:'admin',senha:'admin123',role:'admin',cor:'#5b6ef5'}],
+    funcionarios:[
+      {id:'f1',nome:'Ana Souza',equipe:'Operações',cargo:'Analista',email:'',obs:''},
+      {id:'f2',nome:'Bruno Lima',equipe:'Vendas',cargo:'Consultor',email:'',obs:''},
+      {id:'f3',nome:'Carla Mendes',equipe:'Operações',cargo:'Assistente',email:'',obs:''},
+      {id:'f4',nome:'Diego Castro',equipe:'Logística',cargo:'Motorista',email:'',obs:''},
+    ],
+    falhas:[
+      {id:'fl1',func_id:'f1',data:'2025-05-02',tipo:'atraso',peso:-3,motivo:'Atraso de 15min',by_user:'u1'},
+      {id:'fl2',func_id:'f1',data:'2025-05-04',tipo:'checklist',peso:-5,motivo:'Checklist do turno da tarde',by_user:'u1'},
+      {id:'fl3',func_id:'f2',data:'2025-05-01',tipo:'falta_inj',peso:-12,motivo:'Não avisou ausência',by_user:'u1'},
+      {id:'fl4',func_id:'f2',data:'2025-05-05',tipo:'notificacao',peso:-7,motivo:'Não atendeu chamada',by_user:'u1'},
+      {id:'fl5',func_id:'f3',data:'2025-05-03',tipo:'ponto',peso:-7,motivo:'Saída sem bater ponto',by_user:'u1'},
+      {id:'fl6',func_id:'f4',data:'2025-05-02',tipo:'atraso',peso:-3,motivo:'Atraso de 10min',by_user:'u1'},
+    ],
+    bonus:[
+      {id:'bn1',func_id:'f1',data:'2025-05-07',tipo:'semana_limpa',valor:+1,motivo:'Semana 1 sem falhas',by_user:'u1'},
+      {id:'bn2',func_id:'f4',data:'2025-05-07',tipo:'semana_limpa',valor:+1,motivo:'Semana 1 sem falhas',by_user:'u1'},
+    ],
+    anotacoes:{
+      'f1_2025-05':'Atrasos na segunda semana. Boa melhora no final do mês.',
+      'f2_2025-05':'Falta injustificada impactou operação. Conversar sobre comunicação.',
+    },
+    log:[]
+  };
+}
+let DB=loadDB();
+let SESSION=null;
+function saveDB(){localStorage.setItem('pos_db_v3',JSON.stringify(DB));}
+function perfUid(){return 'id'+Date.now()+Math.random().toString(36).slice(2,7);}
+function getMonthKey(d){return d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'));}
+function monthLabel(k){const[y,m]=k.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m)-1]+'/'+y;}
+function curMonth(){const el=document.getElementById('perf-month-global');return el?el.value:new Date().getFullYear()+'-'+(String(new Date().getMonth()+1).padStart(2,'0'));}
+function perfFmtDate(ds){if(!ds)return'';const[y,m,d]=ds.split('-');return`${d}/${m}/${y}`;}
+function fmtTS(ts){const d=new Date(ts);return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+function perfCanEdit(){return SESSION&&(SESSION.role==='admin'||SESSION.role==='manager');}
+function perfIsAdmin(){return SESSION&&SESSION.role==='admin';}
+function getUserById(id){return DB.users.find(u=>u.id===id);}
+
+// ============================================================
+// SCORE ENGINE v3
+// ============================================================
+function getMonthFalhas(fid, mk){
+  const[y,m]=mk.split('-');
+  return DB.falhas.filter(f=>{
+    if(f.func_id!==fid)return false;
+    const fd=new Date(f.data+'T00:00:00');
+    return fd.getFullYear()===parseInt(y)&&(fd.getMonth()+1)===parseInt(m);
+  }).sort((a,b)=>new Date(a.data)-new Date(b.data));
+}
+function getMonthBonus(fid, mk){
+  const[y,m]=mk.split('-');
+  return (DB.bonus||[]).filter(b=>{
+    if(b.func_id!==fid)return false;
+    const bd=new Date(b.data+'T00:00:00');
+    return bd.getFullYear()===parseInt(y)&&(bd.getMonth()+1)===parseInt(m);
+  });
+}
+
+function calcPenalties(falhas){
+  // Group by type, apply progressive logic and caps
+  let total=0;
+  const byType={};
+  falhas.forEach(f=>{
+    if(!byType[f.tipo])byType[f.tipo]=[];
+    byType[f.tipo].push(f);
+  });
+  Object.keys(byType).forEach(tipo=>{
+    const ft=getFT(tipo);if(!ft)return;
+    const items=byType[tipo];
+    let typeTotal=0;
+    if(ft.progressivo){
+      // atraso: 1st & 2nd = base, 3rd+ = base*2
+      items.forEach((item,i)=>{
+        const p = i<2 ? ft.peso : ft.peso*2;
+        typeTotal+=p;
+      });
+    } else {
+      typeTotal=items.reduce((a,f)=>a+f.peso,0);
+    }
+    // Apply cap (cap is negative number)
+    if(ft.cap && typeTotal < ft.cap) typeTotal=ft.cap;
+    total+=typeTotal;
+  });
+  return total;
+}
+
+function calcBonusTotal(bonusArr){
+  // Group by tipo and apply per-type cap
+  const byType={};
+  bonusArr.forEach(b=>{
+    if(!byType[b.tipo])byType[b.tipo]=[];
+    byType[b.tipo].push(b);
+  });
+  let total=0;
+  Object.keys(byType).forEach(tipo=>{
+    const bt=getBT(tipo);
+    let typeTotal=byType[tipo].reduce((a,b)=>a+b.valor,0);
+    if(bt?.cap && typeTotal>bt.cap) typeTotal=bt.cap;
+    total+=typeTotal;
+  });
+  // Global bonus cap: +10/month
+  if(total>10)total=10;
+  return total;
+}
+
+function calcScore(fid, mk){
+  const falhas=getMonthFalhas(fid,mk);
+  const bonusArr=getMonthBonus(fid,mk);
+  const pen=calcPenalties(falhas);
+  const bon=calcBonusTotal(bonusArr);
+  return Math.max(0, Math.min(105, 100+pen+bon));
+}
+
+function getFalhas(fid,mk){
+  return getMonthFalhas(fid,mk).sort((a,b)=>new Date(b.data)-new Date(a.data));
+}
+
+// Calculate effective peso for a NEW failure given current state
+function calcEffectivePeso(fid, mk, tipo){
+  const ft=getFT(tipo);if(!ft)return ft?.peso||0;
+  const existing=getMonthFalhas(fid,mk).filter(f=>f.tipo===tipo);
+  const n=existing.length; // how many already exist this month
+  if(!ft.progressivo)return ft.peso;
+  // For progressive: if this would be 3rd or beyond
+  return n>=2 ? ft.peso*2 : ft.peso;
+}
+
+function statusBadge(s){
+  if(s>=95)return`<span class="badge badge-green"><span class="score-dot dot-green"></span>Excelente ≥95</span>`;
+  if(s>=90)return`<span class="badge badge-yellow"><span class="score-dot dot-yellow"></span>Atenção 90–94</span>`;
+  return`<span class="badge badge-red"><span class="score-dot dot-red"></span>Crítico &lt;90</span>`;
+}
+function sc(s){return s>=95?'score-green':s>=90?'score-yellow':'score-red';}
+function calcTrend(fid,mk){
+  const[y,m]=mk.split('-');const d=new Date(parseInt(y),parseInt(m)-1,1);d.setMonth(d.getMonth()-1);
+  const diff=calcScore(fid,mk)-calcScore(fid,getMonthKey(d));
+  return diff>0?`<span class="trend trend-up">▲ +${diff}</span>`:diff<0?`<span class="trend trend-down">▼ ${diff}</span>`:`<span class="trend trend-flat">— 0</span>`;
+}
+function userColor(uid){
+  const u=getUserById(uid);if(u?.cor)return u.cor;
+  const c=['#5b6ef5','#22d3a0','#f5c842','#f55b5b','#a78bfa','#f5944a'];
+  const i=DB.users.findIndex(u=>u.id===uid);return c[Math.max(0,i)%c.length];
+}
+function userInitials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
+
+// ============================================================
+// LOG
+// ============================================================
+function addLog(type,action,detail){
+  DB.log.unshift({id:perfUid(),ts:new Date().toISOString(),type,action,detail,user_id:SESSION?.id||'system',user_nome:SESSION?.nome||'Sistema'});
+  if(DB.log.length>1000)DB.log=DB.log.slice(0,1000);
+  saveDB();
+}
+function perfNotify(msg,color){
+  const el=document.getElementById('perf-notif');
+  el.innerHTML=(color==='green'?'✦ ':'✓ ')+msg;
+  el.style.borderColor=color==='green'?'var(--green)':'var(--accent)';
+  el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);
+}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('#perf-wrap .overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+
+// ============================================================
+// LOGIN
+// ============================================================
+  document.getElementById('login-error').style.display='none';
+  SESSION=u;
+  sessionStorage.setItem('pos_sess3',JSON.stringify({id:u.id,senha:u.senha}));
+  addLog('login','Login realizado',`Usuário: ${u.nome} | Perfil: ${u.role}`);
+  /* login handled by main app */
+  /* login handled by main app */
+  /* sidebar handled by main app */
+  /* sidebar handled by main app */
+  document.getElementById('nav-users').style.display=perfIsAdmin()?'flex':'none';
+  initMonthSelector();renderAll();
+}
+
+// ============================================================
+// MONTH + NAV
+// ============================================================
+function initMonthSelector(){
+  const sel=document.getElementById('perf-month-global');
+  const now=new Date();const months=[];
+  for(let i=0;i<12;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push(getMonthKey(d));}
+  sel.innerHTML=months.map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join('');
+}
+
+let _page='dashboard';
+function showPage(name,fromPage){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name)?.classList.add('active');
+  const T={dashboard:'Dashboard',tabela:'Tabela Geral',funcionario:'Funcionário',funcionarios:'Funcionários',historico:'Histórico de Ações',usuarios:'Usuários',regras:'Regras de Score',exportar:'Exportar'};
+  const _ptEl=document.getElementById('perf-page-title');if(_ptEl)_ptEl.textContent=T[name]||'';
+  _page=name;
+  if(fromPage){const bb=document.getElementById('back-btn');if(bb)bb.onclick=()=>showPage(fromPage);}
+  const ni=document.querySelectorAll('.nav-item');
+  const map={dashboard:0,tabela:1,historico:4,funcionarios:5,usuarios:6,regras:7,exportar:8};
+  if(map[name]!==undefined)ni[map[name]]?.classList.add('active');
+  renderAll();
+}
+function renderAll(){
+  if(_page==='dashboard')renderDashboard();
+  if(_page==='tabela')renderTabela();
+  if(_page==='funcionarios')renderFuncionarios();
+  if(_page==='funcionario')renderFuncionarioDetail(window._did);
+  if(_page==='historico')renderHistorico();
+  if(_page==='usuarios')renderUsuarios();
+  if(_page==='regras')renderRegras();
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard(){
+  const mk=curMonth();const funcs=DB.funcionarios;
+  if(!funcs.length){
+    document.getElementById('stats-grid').innerHTML='';
+    document.getElementById('ranking-list').innerHTML=`<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Nenhum funcionário cadastrado</div></div>`;
+    document.getElementById('recent-fails').innerHTML='';return;
+  }
+  const sc2=funcs.map(f=>({...f,score:calcScore(f.id,mk),falhas:getFalhas(f.id,mk),bonus:getMonthBonus(f.id,mk)}));
+  const avg=Math.round(sc2.reduce((a,s)=>a+s.score,0)/sc2.length);
+  const tot=sc2.reduce((a,s)=>a+s.falhas.length,0);
+  const exc=sc2.filter(s=>s.score>=95).length;
+  const crit=sc2.filter(s=>s.score<90).length;
+  const totBonus=sc2.reduce((a,s)=>a+s.bonus.length,0);
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Score médio</div><div class="stat-value" style="color:${avg>=95?'var(--green)':avg>=90?'var(--yellow)':'var(--red)'}">${avg}</div><div class="stat-sub">${monthLabel(mk)}</div></div>
+    <div class="stat-card"><div class="stat-label">Excelente ≥95</div><div class="stat-value" style="color:var(--green)">${exc}</div><div class="stat-sub">funcionários</div></div>
+    <div class="stat-card"><div class="stat-label">Falhas / Bônus</div><div class="stat-value"><span style="color:var(--red)">${tot}</span><span style="color:var(--text3);font-size:16px"> / </span><span style="color:var(--green)">${totBonus}</span></div><div class="stat-sub">registros no mês</div></div>
+    <div class="stat-card"><div class="stat-label">Críticos &lt;90</div><div class="stat-value" style="color:var(--red)">${crit}</div><div class="stat-sub">precisam atenção</div></div>`;
+  const sorted=[...sc2].sort((a,b)=>b.score-a.score);
+  document.getElementById('ranking-list').innerHTML=sorted.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(42,42,63,0.5);cursor:pointer" onclick="openDetail('${s.id}')">
+      <div style="width:22px;font-family:'IBM Plex Mono';font-size:12px;color:var(--text3);text-align:right">${i+1}</div>
+      <div style="flex:1"><div style="font-weight:600">${s.nome}</div><div style="font-size:11px;color:var(--text3)">${s.equipe||''}</div></div>
+      <div class="detail-score ${sc(s.score)}" style="font-size:22px">${s.score}</div>
+      ${statusBadge(s.score)}
+    </div>`).join('');
+  const[y,m]=mk.split('-');
+  const allRecs=[
+    ...DB.falhas.filter(f=>{const fd=new Date(f.data+'T00:00:00');return fd.getFullYear()===parseInt(y)&&(fd.getMonth()+1)===parseInt(m);}).map(f=>({...f,kind:'fail'})),
+    ...(DB.bonus||[]).filter(b=>{const bd=new Date(b.data+'T00:00:00');return bd.getFullYear()===parseInt(y)&&(bd.getMonth()+1)===parseInt(m);}).map(b=>({...b,kind:'bonus'}))
+  ].sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,9);
+  document.getElementById('recent-fails').innerHTML=allRecs.length?allRecs.map(r=>{
+    const fn=DB.funcionarios.find(fn=>fn.id===r.func_id);
+    const bu=getUserById(r.by_user);
+    if(r.kind==='bonus'){
+      const bt=getBT(r.tipo);
+      return`<div class="fail-item" style="cursor:pointer" onclick="openDetail('${r.func_id}')">
+        <div class="fail-date">${perfFmtDate(r.data)}</div>
+        <div class="fail-body"><div class="fail-type" style="color:var(--green)">✦ ${fn?.nome||'?'} — ${bt?.label||r.tipo}</div><div class="fail-reason">${r.motivo}</div><div class="fail-by">por ${bu?.nome||'?'}</div></div>
+        <div class="fail-impact pos">+${r.valor}</div></div>`;
+    }
+    const ft=getFT(r.tipo);
+    return`<div class="fail-item" style="cursor:pointer" onclick="openDetail('${r.func_id}')">
+      <div class="fail-date">${perfFmtDate(r.data)}</div>
+      <div class="fail-body"><div class="fail-type">${fn?.nome||'?'} — ${ft?.label||r.tipo}</div><div class="fail-reason">${r.motivo}</div><div class="fail-by">por ${bu?.nome||'?'}</div></div>
+      <div class="fail-impact neg">${r.peso}</div></div>`;
+  }).join(''):`<div class="empty"><div class="empty-icon">✓</div><div class="empty-text">Nenhum registro este mês</div></div>`;
+}
+
+// ============================================================
+// TABELA
+// ============================================================
+function renderTabela(){
+  const mk=curMonth();
+  const ts=document.getElementById('filter-team');const teams=[...new Set(DB.funcionarios.map(f=>f.equipe).filter(Boolean))];
+  const ct=ts.value;ts.innerHTML='<option value="">Todas as equipes</option>'+teams.map(t=>`<option value="${t}" ${t===ct?'selected':''}>${t}</option>`).join('');
+  const ti=document.getElementById('filter-tipo');const cti=ti.value;
+  ti.innerHTML='<option value="">Todos os tipos</option>'+FAIL_TYPES.map(f=>`<option value="${f.id}" ${f.id===cti?'selected':''}>${f.label}</option>`).join('');
+  let funcs=DB.funcionarios;if(ct)funcs=funcs.filter(f=>f.equipe===ct);
+  if(!funcs.length){document.getElementById('tabela-body').innerHTML=`<tr><td colspan="14"><div class="empty">Nenhum funcionário</div></td></tr>`;return;}
+  document.getElementById('tabela-body').innerHTML=funcs.map((fn,i)=>{
+    let fl=getFalhas(fn.id,mk);if(cti)fl=fl.filter(f=>f.tipo===cti);
+    const bn=getMonthBonus(fn.id,mk);
+    const s=calcScore(fn.id,mk);
+    const c={falta_inj:0,atraso:0,checklist:0,notificacao:0,ponto:0};
+    fl.forEach(f=>{if(c[f.tipo]!==undefined)c[f.tipo]++;});
+    const bonTotal=calcBonusTotal(bn);
+    return`<tr>
+      <td style="color:var(--text3);font-family:'IBM Plex Mono';font-size:12px">${i+1}</td>
+      <td><span class="td-name" onclick="openDetail('${fn.id}')">${fn.nome}</span><div style="font-size:11px;color:var(--text3)">${fn.cargo||''}</div></td>
+      <td><span class="score-cell ${sc(s)}">${s}</span></td>
+      <td>${statusBadge(s)}</td>
+      <td class="fail-count ${fl.length===0?'fail-zero':''}">${fl.length}</td>
+      <td class="fail-count ${c.falta_inj===0?'fail-zero':''}">${c.falta_inj||'—'}</td>
+      <td class="fail-count ${c.atraso===0?'fail-zero':''}">${c.atraso||'—'}</td>
+      <td class="fail-count ${c.checklist===0?'fail-zero':''}">${c.checklist||'—'}</td>
+      <td class="fail-count ${c.notificacao===0?'fail-zero':''}">${c.notificacao||'—'}</td>
+      <td class="fail-count ${c.ponto===0?'fail-zero':''}">${c.ponto||'—'}</td>
+      <td style="font-family:'IBM Plex Mono';font-size:13px;color:${bonTotal>0?'var(--green)':'var(--text3)'}">${bonTotal>0?'+'+bonTotal:'—'}</td>
+      <td>${calcTrend(fn.id,mk)}</td>
+      <td>${s>=95?'<span class="badge badge-green">✓ Sim</span>':'<span style="color:var(--text3);font-size:12px">Não</span>'}</td>
+      <td><button class="btn-ghost btn-sm" onclick="openDetail('${fn.id}')">Ver</button></td></tr>`;
+  }).join('');
+}
+
+// ============================================================
+// FUNCIONÁRIO DETAIL
+// ============================================================
+function openDetail(id){window._did=id;window._fromPage=_page;showPage('funcionario',_page);}
+function renderFuncionarioDetail(id){
+  const fn=DB.funcionarios.find(f=>f.id===id);
+  if(!fn){document.getElementById('funcionario-detail').innerHTML='Não encontrado';return;}
+  const mk=curMonth();
+  const fl=getFalhas(id,mk);
+  const bn=getMonthBonus(id,mk);
+  const score=calcScore(id,mk);
+  const nota=DB.anotacoes[id+'_'+mk]||'';
+  // Counts
+  const cnts={};FAIL_TYPES.forEach(ft=>{cnts[ft.id]=0;});fl.forEach(f=>{if(cnts[f.tipo]!==undefined)cnts[f.tipo]++;});
+  const bonTotal=calcBonusTotal(bn);
+  const pen=calcPenalties(fl);
+  // Hist
+  const hist=[];for(let i=11;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);const k=getMonthKey(d);hist.push({key:k,label:monthLabel(k),score:calcScore(id,k)});}
+  // chips
+  const fchips=FAIL_TYPES.filter(ft=>cnts[ft.id]>0).map(ft=>{
+    const isCapped=ft.progressivo||false;
+    return`<div class="chip chip-neg"><span class="chip-count">${cnts[ft.id]}x</span><span class="chip-label">${ft.label}${isCapped&&cnts[ft.id]>=3?'<span class="cap-tag">progressivo</span>':''}</span></div>`;
+  }).join('');
+  const bchips=bn.length?bn.map(b=>{const bt=getBT(b.tipo);return`<div class="chip chip-pos"><span class="chip-count">+${b.valor}</span><span class="chip-label">${bt?.label||b.tipo}</span></div>`;}).join(''):'';
+  // Registros combinados
+  const allRecs=[
+    ...fl.map(f=>({...f,kind:'fail'})),
+    ...bn.map(b=>({...b,kind:'bonus'}))
+  ].sort((a,b)=>new Date(b.data)-new Date(a.data));
+  const recsHtml=allRecs.length?allRecs.map(r=>{
+    if(r.kind==='bonus'){
+      const bt=getBT(r.tipo);const bu=getUserById(r.by_user);const ce=perfCanEdit();
+      return`<div class="fail-item"><div class="fail-date">${perfFmtDate(r.data)}</div>
+        <div class="fail-body"><div class="fail-type" style="color:var(--green)">✦ ${bt?.label||r.tipo}</div><div class="fail-reason">${r.motivo}</div><div class="fail-by">por <b style="color:var(--text2)">${bu?.nome||'?'}</b></div></div>
+        <div class="fail-impact-btn"><div class="fail-impact pos">+${r.valor}</div>${ce?`<button class="btn-green" style="padding:3px 8px;font-size:11px" onclick="deletarBonus('${r.id}')">✕</button>`:''}</div></div>`;
+    }
+    const ft=getFT(r.tipo);const bu=getUserById(r.by_user);const ce=perfCanEdit();
+    const isProgr=ft?.progressivo&&fl.filter(f=>f.tipo===r.tipo).indexOf(r)>=2;
+    return`<div class="fail-item"><div class="fail-date">${perfFmtDate(r.data)}</div>
+      <div class="fail-body">
+        <div class="fail-type">${ft?.label||r.tipo}${isProgr?'<span class="cap-tag">progressivo</span>':''}</div>
+        <div class="fail-reason">${r.motivo}</div>
+        <div class="fail-by">por <b style="color:var(--text2)">${bu?.nome||'?'}</b></div>
+      </div>
+      <div class="fail-impact-btn"><div class="fail-impact neg">${r.peso}</div>${ce?`<button class="btn-danger" style="padding:3px 8px;font-size:11px" onclick="deletarFalha('${r.id}')">✕</button>`:''}</div></div>`;
+  }).join(''):`<div class="empty"><div class="empty-icon">✓</div><div class="empty-text">Sem registros este mês</div></div>`;
+  const bc=score>=95?'var(--green)':score>=90?'var(--yellow)':'var(--red)';
+  const eb=perfCanEdit()?`<button class="btn-ghost btn-sm" onclick="openEditFuncionario('${id}')">✏ Editar</button>`:'';
+  document.getElementById('funcionario-detail').innerHTML=`
+    <div class="detail-header">
+      <div>
+        <div class="detail-name">${fn.nome}</div>
+        <div style="color:var(--text3);font-size:13px;margin-top:4px">${fn.cargo||''} ${fn.equipe?'· '+fn.equipe:''}</div>
+        ${fn.email?`<div style="color:var(--text3);font-size:12px;margin-top:2px;font-family:'IBM Plex Mono'">${fn.email}</div>`:''}
+        ${fn.obs?`<div style="color:var(--text3);font-size:12px;margin-top:2px">${fn.obs}</div>`:''}
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${statusBadge(score)} ${eb}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';margin-bottom:4px">SCORE ${monthLabel(mk)}</div>
+        <div class="detail-score ${sc(score)}">${score}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:'IBM Plex Mono'">100 <span style="color:var(--red)">${pen}</span> <span style="color:var(--green)">+${bonTotal}</span> = <b style="color:var(--text)">${score}</b></div>
+        <div class="score-bar-wrap" style="width:160px;margin-top:8px;margin-left:auto"><div class="score-bar-fill" style="width:${Math.min(100,score)}%;background:${bc}"></div></div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="card"><div class="card-title">Histórico 12 meses</div><div class="chart-container"><canvas id="chart-${id}"></canvas></div></div>
+      <div class="card">
+        <div class="card-title">Resumo — ${monthLabel(mk)}</div>
+        <div style="margin-bottom:10px">
+          ${fchips||'<span style="color:var(--text3);font-size:12px">Sem falhas</span>'}
+        </div>
+        ${bchips?`<div style="margin-bottom:12px">${bchips}</div>`:''}
+        <div style="margin-top:16px">
+          <div class="card-title">Anotações do Mês</div>
+          ${perfCanEdit()?`<textarea class="notes-area" id="notes-${id}" placeholder="Anotações qualitativas...">${nota}</textarea><div style="margin-top:8px;text-align:right"><button class="btn-primary btn-sm" onclick="salvarNota('${id}','${mk}')">Salvar</button></div>`:`<div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text2);min-height:80px">${nota||'<span style="color:var(--text3)">Sem anotações</span>'}</div>`}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin-bottom:0">Registros — ${monthLabel(mk)}</div>
+        ${perfCanEdit()?`<div style="display:flex;gap:8px">
+          <button class="btn-primary btn-sm" onclick="openRegistrarFalha('${id}')">⊕ Falha</button>
+          <button class="btn-green btn-sm" onclick="openRegistrarBonus('${id}')" style="border-radius:var(--radius2);padding:5px 10px;font-size:12px;cursor:pointer">✦ Bônus</button>
+        </div>`:''}
+      </div>${recsHtml}
+    </div>`;
+  setTimeout(()=>drawChart('chart-'+id,hist),50);
+}
+
+function drawChart(cid,data){
+  const canvas=document.getElementById(cid);if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.parentElement.clientWidth||400;const H=130;
+  canvas.width=W;canvas.height=H;
+  const pad={l:30,r:10,t:10,b:24};const w=W-pad.l-pad.r;const h=H-pad.t-pad.b;
+  ctx.clearRect(0,0,W,H);
+  const scores=data.map(d=>d.score);
+  const minS=Math.max(0,Math.min(...scores)-5);const maxS=Math.min(105,Math.max(...scores)+5);const range=maxS-minS||10;
+  const xs=data.map((_,i)=>pad.l+(i/(data.length-1))*w);
+  const ys=scores.map(s=>pad.t+h-((s-minS)/range)*h);
+  ctx.strokeStyle='rgba(42,42,63,0.8)';ctx.lineWidth=1;
+  [0,25,50,75,100].forEach(p=>{const y=pad.t+h-(p/100)*h;if(y<pad.t||y>pad.t+h)return;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();});
+  const g=ctx.createLinearGradient(0,pad.t,0,pad.t+h);g.addColorStop(0,'rgba(91,110,245,0.18)');g.addColorStop(1,'rgba(91,110,245,0)');
+  ctx.beginPath();ctx.moveTo(xs[0],ys[0]);xs.forEach((x,i)=>{if(i>0)ctx.lineTo(x,ys[i]);});
+  ctx.lineTo(xs[xs.length-1],pad.t+h);ctx.lineTo(xs[0],pad.t+h);ctx.closePath();ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath();ctx.strokeStyle='#5b6ef5';ctx.lineWidth=2;xs.forEach((x,i)=>{i===0?ctx.moveTo(x,ys[i]):ctx.lineTo(x,ys[i]);});ctx.stroke();
+  xs.forEach((x,i)=>{
+    const s=scores[i];const c=s>=95?'#22d3a0':s>=90?'#f5c842':'#f55b5b';
+    ctx.beginPath();ctx.arc(x,ys[i],3.5,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();
+    if(i%2===0||data.length<=6){ctx.fillStyle='rgba(144,144,184,0.7)';ctx.font='9px IBM Plex Mono';ctx.textAlign='center';ctx.fillText(data[i].label.slice(0,3),x,H-4);}
+  });
+  ctx.fillStyle='#fff';ctx.font='bold 11px Syne,sans-serif';ctx.textAlign='center';ctx.fillText(scores[scores.length-1],xs[xs.length-1],ys[ys.length-1]-8);
+}
+
+// ============================================================
+// FUNCIONÁRIOS
+// ============================================================
+function renderFuncionarios(){
+  document.getElementById('btn-add-func').style.display=perfCanEdit()?'flex':'none';
+  if(!DB.funcionarios.length){document.getElementById('employee-grid').innerHTML=`<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Nenhum funcionário.</div></div>`;return;}
+  const mk=curMonth();
+  document.getElementById('employee-grid').innerHTML=DB.funcionarios.map(f=>{
+    const s=calcScore(f.id,mk);const bc=s>=95?'var(--green)':s>=90?'var(--yellow)':'var(--red)';
+    const bon=calcBonusTotal(getMonthBonus(f.id,mk));
+    return`<div class="employee-card">
+      <div><div class="employee-card-name">${f.nome}</div><div class="employee-card-team">${f.cargo||''} ${f.equipe?'· '+f.equipe:''}</div></div>
+      <div style="display:flex;align-items:center;gap:10px"><div style="font-family:'Syne';font-weight:800;font-size:22px;color:${bc}">${s}</div>${statusBadge(s)}</div>
+      ${bon>0?`<div style="font-size:11px;color:var(--green);font-family:'IBM Plex Mono'">✦ +${bon}pts bônus este mês</div>`:''}
+      <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${Math.min(100,s)}%;background:${bc}"></div></div>
+      <div class="sep"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost btn-sm" style="flex:1" onclick="openDetail('${f.id}')">Ver perfil</button>
+        ${perfCanEdit()?`<button class="btn-warn btn-sm" onclick="openEditFuncionario('${f.id}')">✏</button>`:''}
+        ${perfIsAdmin()?`<button class="btn-danger btn-sm" onclick="deletarFuncionario('${f.id}')">✕</button>`:''}
+      </div></div>`;
+  }).join('');
+}
+function openAddFuncionario(){
+  if(!perfCanEdit()){perfNotify('Sem permissão');return;}
+  document.getElementById('func-modal-title').textContent='Novo Funcionário';
+  ['func-nome','func-equipe','func-cargo','func-email','func-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('func-edit-id').value='';
+  openModal('overlay-func');
+}
+function openEditFuncionario(id){
+  if(!perfCanEdit()){perfNotify('Sem permissão');return;}
+  const f=DB.funcionarios.find(fn=>fn.id===id);if(!f)return;
+  document.getElementById('func-modal-title').textContent='Editar Funcionário';
+  document.getElementById('func-nome').value=f.nome||'';
+  document.getElementById('func-equipe').value=f.equipe||'';
+  document.getElementById('func-cargo').value=f.cargo||'';
+  document.getElementById('func-email').value=f.email||'';
+  document.getElementById('func-obs').value=f.obs||'';
+  document.getElementById('func-edit-id').value=id;
+  openModal('overlay-func');
+}
+function salvarFuncionario(){
+  const nome=document.getElementById('func-nome').value.trim();
+  if(!nome){alert('Informe o nome.');return;}
+  const eid=document.getElementById('func-edit-id').value;
+  const d={nome,equipe:document.getElementById('func-equipe').value.trim(),cargo:document.getElementById('func-cargo').value.trim(),email:document.getElementById('func-email').value.trim(),obs:document.getElementById('func-obs').value.trim()};
+  if(eid){
+    const i=DB.funcionarios.findIndex(f=>f.id===eid);
+    if(i>-1){DB.funcionarios[i]={...DB.funcionarios[i],...d};addLog('func_edit',`Funcionário editado: ${nome}`,`Equipe: ${d.equipe} | Cargo: ${d.cargo}`);}
+    perfNotify('Funcionário atualizado');
+  } else {
+    DB.funcionarios.push({id:perfUid(),...d});
+    addLog('func_add',`Funcionário adicionado: ${nome}`,`Equipe: ${d.equipe} | Cargo: ${d.cargo}`);
+    perfNotify('Funcionário adicionado');
+  }
+  saveDB();closeModal('overlay-func');renderAll();
+}
+function deletarFuncionario(id){
+  if(!perfIsAdmin()){perfNotify('Apenas admins podem remover');return;}
+  const f=DB.funcionarios.find(fn=>fn.id===id);
+  if(!confirm(`Remover ${f?.nome}?`))return;
+  addLog('func_delete',`Funcionário removido: ${f?.nome}`,'');
+  DB.funcionarios=DB.funcionarios.filter(fn=>fn.id!==id);
+  DB.falhas=DB.falhas.filter(fl=>fl.func_id!==id);
+  DB.bonus=(DB.bonus||[]).filter(b=>b.func_id!==id);
+  Object.keys(DB.anotacoes).forEach(k=>{if(k.startsWith(id+'_'))delete DB.anotacoes[k];});
+  saveDB();perfNotify('Removido');renderFuncionarios();
+}
+
+// ============================================================
+// FALHAS
+// ============================================================
+function openRegistrarFalha(pre){
+  if(!perfCanEdit()){perfNotify('Sem permissão');return;}
+  const sel=document.getElementById('fail-func');
+  sel.innerHTML=DB.funcionarios.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
+  if(pre)sel.value=pre;
+  const ts=document.getElementById('fail-tipo');
+  ts.innerHTML='<option value="">Selecione...</option>'+FAIL_TYPES.map(ft=>`<option value="${ft.id}">${ft.label}</option>`).join('');
+  document.getElementById('fail-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('fail-motivo').value='';
+  document.getElementById('peso-preview').style.display='none';
+  openModal('overlay-falha');
+}
+function updatePeso(){
+  const tipo=document.getElementById('fail-tipo').value;
+  const fid=document.getElementById('fail-func').value;
+  const mk=getMonthKey(new Date(document.getElementById('fail-data').value+'T12:00:00'));
+  const ft=getFT(tipo);const pr=document.getElementById('peso-preview');
+  if(!ft){pr.style.display='none';return;}
+  pr.style.display='block';
+  const ep=calcEffectivePeso(fid,mk,tipo);
+  const existing=getMonthFalhas(fid,mk).filter(f=>f.tipo===tipo).length;
+  let msg=`<b style="color:var(--red)">Impacto: ${ep}pts</b> &nbsp;·&nbsp; ${ft.desc}`;
+  if(ft.progressivo&&existing>=2)msg+=` <b style="color:var(--yellow)"> — PROGRESSIVO: este é o ${existing+1}° atraso este mês!</b>`;
+  const curTotal=calcPenalties(getMonthFalhas(fid,mk).filter(f=>f.tipo===tipo));
+  if(ft.cap&&(curTotal+ep)<ft.cap)msg+=` <span style="color:var(--yellow)">Teto desta categoria já atingido (${ft.cap}pts)</span>`;
+  document.getElementById('peso-detail').innerHTML=msg;
+}
+function salvarFalha(){
+  const fid=document.getElementById('fail-func').value;
+  const tipo=document.getElementById('fail-tipo').value;
+  const data=document.getElementById('fail-data').value;
+  const motivo=document.getElementById('fail-motivo').value.trim();
+  if(!fid||!tipo||!data||!motivo){alert('Preencha todos os campos.');return;}
+  const ft=getFT(tipo);const fn=DB.funcionarios.find(f=>f.id===fid);
+  const mk=getMonthKey(new Date(data+'T12:00:00'));
+  const ep=calcEffectivePeso(fid,mk,tipo);
+  DB.falhas.push({id:perfUid(),func_id:fid,data,tipo,peso:ep,motivo,by_user:SESSION.id});
+  addLog('fail_add',`Falha registrada: ${ft.label}`,`Funcionário: ${fn?.nome} | Data: ${perfFmtDate(data)} | Impacto: ${ep}pts | Motivo: ${motivo}`);
+  saveDB();closeModal('overlay-falha');perfNotify('Falha registrada');renderAll();
+}
+function deletarFalha(id){
+  if(!perfCanEdit()){perfNotify('Sem permissão');return;}
+  if(!confirm('Remover este registro?'))return;
+  const f=DB.falhas.find(fl=>fl.id===id);
+  const ft=getFT(f?.tipo);const fn=DB.funcionarios.find(fn=>fn.id===f?.func_id);
+  addLog('fail_delete',`Falha removida: ${ft?.label||f?.tipo}`,`Funcionário: ${fn?.nome} | Data: ${perfFmtDate(f?.data||'')} | Motivo: ${f?.motivo}`);
+  DB.falhas=DB.falhas.filter(fl=>fl.id!==id);
+  saveDB();perfNotify('Removido');renderFuncionarioDetail(window._did);
+}
+
+// ============================================================
+// BÔNUS
+// ============================================================
+function openRegistrarBonus(pre){
+  if(!perfCanEdit()){perfNotify('Sem permissão');return;}
+  const sel=document.getElementById('bon-func');
+  sel.innerHTML=DB.funcionarios.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
+  if(pre)sel.value=pre;
+  const ts=document.getElementById('bon-tipo');
+  ts.innerHTML='<option value="">Selecione...</option>'+BONUS_TYPES.map(bt=>`<option value="${bt.id}">${bt.label} (+${bt.valor}pts)</option>`).join('');
+  document.getElementById('bon-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bon-motivo').value='';
+  document.getElementById('bonus-info').style.display='none';
+  openModal('overlay-bonus');
+}
+function updateBonusInfo(){
+  const tipo=document.getElementById('bon-tipo').value;
+  const bt=getBT(tipo);const bi=document.getElementById('bonus-info');
+  if(!bt){bi.style.display='none';return;}
+  bi.style.display='block';
+  document.getElementById('bonus-detail').innerHTML=`<b style="color:var(--green)">+${bt.valor}pts</b> &nbsp;·&nbsp; ${bt.desc}`;
+}
+function salvarBonus(){
+  const fid=document.getElementById('bon-func').value;
+  const tipo=document.getElementById('bon-tipo').value;
+  const data=document.getElementById('bon-data').value;
+  const motivo=document.getElementById('bon-motivo').value.trim();
+  if(!fid||!tipo||!data){alert('Preencha funcionário, tipo e data.');return;}
+  const bt=getBT(tipo);const fn=DB.funcionarios.find(f=>f.id===fid);
+  if(!DB.bonus)DB.bonus=[];
+  DB.bonus.push({id:perfUid(),func_id:fid,data,tipo,valor:bt.valor,motivo,by_user:SESSION.id});
+  addLog('bonus_add',`Bônus registrado: ${bt.label}`,`Funcionário: ${fn?.nome} | Data: ${perfFmtDate(data)} | Valor: +${bt.valor}pts | Motivo: ${motivo}`);
+  saveDB();closeModal('overlay-bonus');perfNotify('Bônus registrado!','green');renderAll();
+}
+function deletarBonus(id){
+  if(!perfCanEdit()){perfNotify('Sem permissão');return;}
+  if(!confirm('Remover este bônus?'))return;
+  const b=(DB.bonus||[]).find(bn=>bn.id===id);
+  const bt=getBT(b?.tipo);const fn=DB.funcionarios.find(fn=>fn.id===b?.func_id);
+  addLog('bonus_delete',`Bônus removido: ${bt?.label||b?.tipo}`,`Funcionário: ${fn?.nome}`);
+  DB.bonus=(DB.bonus||[]).filter(bn=>bn.id!==id);
+  saveDB();perfNotify('Bônus removido');renderFuncionarioDetail(window._did);
+}
+
+// ============================================================
+// NOTAS
+// ============================================================
+function salvarNota(fid,mk){
+  if(!perfCanEdit()){perfNotify('Sem permissão');return;}
+  const txt=document.getElementById('notes-'+fid)?.value||'';
+  DB.anotacoes[fid+'_'+mk]=txt;
+  const fn=DB.funcionarios.find(f=>f.id===fid);
+  addLog('note_save','Anotação salva',`Funcionário: ${fn?.nome} | Mês: ${monthLabel(mk)}`);
+  saveDB();perfNotify('Anotação salva');
+}
+
+// ============================================================
+// HISTÓRICO
+// ============================================================
+const LI={fail_add:'⊕',fail_delete:'✕',bonus_add:'✦',bonus_delete:'✕',func_add:'👤',func_edit:'✏',func_delete:'🗑',note_save:'📝',login:'→',user_add:'🔑',user_edit:'✏',user_delete:'🗑'};
+const LC={fail_add:'lic-fail',fail_delete:'lic-del',bonus_add:'lic-bonus',bonus_delete:'lic-del',func_add:'lic-add',func_edit:'lic-edit',func_delete:'lic-del',note_save:'lic-note',login:'lic-login',user_add:'lic-add',user_edit:'lic-edit',user_delete:'lic-del'};
+function renderHistorico(){
+  const us=document.getElementById('hist-fu');const cu=us.value;
+  us.innerHTML='<option value="">Todos os usuários</option>'+DB.users.map(u=>`<option value="${u.id}" ${u.id===cu?'selected':''}>${u.nome}</option>`).join('');
+  const ct=document.getElementById('hist-tp').value;
+  let logs=DB.log;
+  if(cu)logs=logs.filter(l=>l.user_id===cu);
+  if(ct)logs=logs.filter(l=>l.type===ct);
+  const el=document.getElementById('historico-list');
+  if(!logs.length){el.innerHTML=`<div class="empty"><div class="empty-icon">◷</div><div class="empty-text">Nenhuma ação registrada ainda</div></div>`;return;}
+  el.innerHTML=logs.map(l=>{
+    const ic=LI[l.type]||'○';const cc=LC[l.type]||'lic-add';
+    const uc=userColor(l.user_id);
+    return`<div class="log-item">
+      <div class="log-time">${fmtTS(l.ts)}</div>
+      <div class="log-icon ${cc}">${ic}</div>
+      <div class="log-body">
+        <div class="log-action">${l.action}</div>
+        ${l.detail?`<div class="log-detail">${l.detail}</div>`:''}
+        <div style="margin-top:5px"><span class="log-user"><span style="width:8px;height:8px;border-radius:50%;background:${uc};display:inline-block"></span>${l.user_nome}</span></div>
+      </div></div>`;
+  }).join('');
+}
+
+// ============================================================
+// USUÁRIOS
+// ============================================================
+const RL={admin:'Admin',manager:'Gestor',viewer:'Visualizador'};
+const RCL={admin:'rb-admin',manager:'rb-manager',viewer:'rb-viewer'};
+function renderUsuarios(){
+  if(!perfIsAdmin()){document.getElementById('user-list').innerHTML=`<div class="perm-warn">⚠ Apenas administradores podem gerenciar usuários.</div>`;document.getElementById('btn-add-user').style.display='none';return;}
+  document.getElementById('user-list').innerHTML=DB.users.map(u=>{
+    const uc=userColor(u.id);const isSelf=u.id===SESSION?.id;
+    return`<div class="user-list-item">
+      <div class="user-avatar" style="background:${uc}22;color:${uc}">${userInitials(u.nome)}</div>
+      <div class="user-info">
+        <div class="user-name-t">${u.nome}${isSelf?' <span style="font-size:11px;color:var(--text3)">(você)</span>':''}</div>
+        <div class="user-meta">${u.login} · <span class="rb ${RCL[u.role]||''}">${RL[u.role]||u.role}</span></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${isSelf?`<button class="btn-ghost btn-sm" onclick="openModal('overlay-pwd')">🔒 Senha</button>`:''}
+        <button class="btn-warn btn-sm" onclick="openEditUser('${u.id}')">✏</button>
+        ${!isSelf?`<button class="btn-danger btn-sm" onclick="deletarUser('${u.id}')">✕</button>`:''}
+      </div></div>`;
+  }).join('');
+}
+function openAddUser(){
+  if(!perfIsAdmin())return;
+  document.getElementById('user-modal-title').textContent='Novo Usuário';
+  ['user-nome','user-login','user-senha'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('user-role').value='manager';
+  document.getElementById('user-edit-id').value='';
+  document.getElementById('edit-pwd-note').textContent='';
+  document.getElementById('pwd-hint').textContent='(mín. 6)';
+  openModal('overlay-user');
+}
+function openEditUser(id){
+  if(!perfIsAdmin())return;
+  const u=DB.users.find(us=>us.id===id);if(!u)return;
+  document.getElementById('user-modal-title').textContent='Editar Usuário';
+  document.getElementById('user-nome').value=u.nome;
+  document.getElementById('user-login').value=u.login;
+  document.getElementById('user-senha').value='';
+  document.getElementById('user-role').value=u.role;
+  document.getElementById('user-edit-id').value=id;
+  document.getElementById('edit-pwd-note').textContent='Deixe a senha em branco para não alterar.';
+  document.getElementById('pwd-hint').textContent='(opcional)';
+  openModal('overlay-user');
+}
+function salvarUser(){
+  const nome=document.getElementById('user-nome').value.trim();
+  const login=document.getElementById('user-login').value.trim().toLowerCase();
+  const senha=document.getElementById('user-senha').value;
+  const role=document.getElementById('user-role').value;
+  const eid=document.getElementById('user-edit-id').value;
+  if(!nome||!login){alert('Preencha nome e login.');return;}
+  if(eid){
+    const i=DB.users.findIndex(u=>u.id===eid);
+    if(i>-1){
+      if(senha){if(senha.length<6){alert('Senha mín. 6 chars.');return;}DB.users[i].senha=senha;}
+      DB.users[i]={...DB.users[i],nome,login,role};
+      if(eid===SESSION?.id)SESSION={...SESSION,...DB.users[i]};
+      addLog('user_edit',`Usuário editado: ${nome}`,`Login: ${login} | Perfil: ${RL[role]}`);
+    }
+    perfNotify('Usuário atualizado');
+  } else {
+    if(senha.length<6){alert('Senha mín. 6 chars.');return;}
+    if(DB.users.find(u=>u.login===login)){alert('Login já existe.');return;}
+    const colors=['#5b6ef5','#22d3a0','#f5c842','#f55b5b','#a78bfa','#f5944a','#22c5f5'];
+    DB.users.push({id:perfUid(),nome,login,senha,role,cor:colors[DB.users.length%colors.length]});
+    addLog('user_add',`Usuário criado: ${nome}`,`Login: ${login} | Perfil: ${RL[role]}`);
+    perfNotify('Usuário criado');
+  }
+  saveDB();closeModal('overlay-user');
+  /* sidebar handled by main app */
+  renderAll();
+}
+function deletarUser(id){
+  if(!perfIsAdmin())return;
+  const u=DB.users.find(us=>us.id===id);
+  if(DB.users.length<=1){alert('Não é possível remover o único usuário.');return;}
+  if(!confirm(`Remover "${u?.nome}"?`))return;
+  addLog('user_delete',`Usuário removido: ${u?.nome}`,'');
+  DB.users=DB.users.filter(us=>us.id!==id);
+  saveDB();perfNotify('Usuário removido');renderUsuarios();
+}
+function salvarSenha(){
+  const np=document.getElementById('pwd-new').value;const cp=document.getElementById('pwd-confirm').value;
+  if(np.length<6){alert('Mín. 6 caracteres.');return;}
+  if(np!==cp){alert('Senhas não conferem.');return;}
+  const i=DB.users.findIndex(u=>u.id===SESSION.id);
+  if(i>-1){DB.users[i].senha=np;SESSION={...SESSION,senha:np};}
+  saveDB();closeModal('overlay-pwd');perfNotify('Senha alterada');
+}
+
+// ============================================================
+// REGRAS PAGE
+// ============================================================
+function renderRegras(){
+  document.getElementById('regras-falhas-body').innerHTML=FAIL_TYPES.map(ft=>`
+    <tr><td style="font-size:13px;padding:10px 12px;border-bottom:1px solid rgba(42,42,63,0.5)">${ft.label}</td>
+    <td style="font-family:'IBM Plex Mono';font-size:13px;color:var(--red);padding:10px 12px;border-bottom:1px solid rgba(42,42,63,0.5)">${ft.peso}</td>
+    <td style="font-family:'IBM Plex Mono';font-size:13px;color:var(--yellow);padding:10px 12px;border-bottom:1px solid rgba(42,42,63,0.5)">${ft.cap}</td>
+    <td style="padding:10px 12px;border-bottom:1px solid rgba(42,42,63,0.5)">${ft.progressivo?'<span class="cap-tag" style="font-size:11px">Sim (×2 a partir do 3°)</span>':'—'}</td></tr>`).join('');
+  document.getElementById('regras-bonus-body').innerHTML=BONUS_TYPES.map(bt=>`
+    <tr><td style="font-size:13px;padding:10px 12px;border-bottom:1px solid rgba(42,42,63,0.5)">${bt.label}</td>
+    <td style="font-family:'IBM Plex Mono';font-size:13px;color:var(--green);padding:10px 12px;border-bottom:1px solid rgba(42,42,63,0.5)">+${bt.valor}</td>
+    <td style="font-family:'IBM Plex Mono';font-size:13px;color:var(--green);padding:10px 12px;border-bottom:1px solid rgba(42,42,63,0.5)">+${bt.cap}/mês</td></tr>`).join('');
+}
+
+// ============================================================
+// EXPORTAR
+// ============================================================
+function exportarJSON(){
+  const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='pos3_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  addLog('export','Exportação JSON','');saveDB();perfNotify('JSON exportado');
+}
+function importarJSON(){document.getElementById('file-import').click();}
+function handleImport(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.funcionarios||!d.falhas){alert('Arquivo inválido.');return;}
+      DB={...d,users:d.users||DB.users,log:d.log||[],bonus:d.bonus||[]};
+      saveDB();perfNotify('Dados importados');renderAll();
+    }catch(er){alert('Erro: '+er.message);}
+  };r.readAsText(file);e.target.value='';
+}
+function exportarCSV(){
+  const mk=curMonth();
+  const rows=[['Nome','Equipe','Cargo','Score','Penalidades','Bônus','Falhas','Falta Inj.','Ponto','Atraso','Checklist','Notif.','Elegível Bônus']];
+  DB.funcionarios.forEach(fn=>{
+    const fl=getFalhas(fn.id,mk);const bn=getMonthBonus(fn.id,mk);
+    const s=calcScore(fn.id,mk);const pen=calcPenalties(fl);const bon=calcBonusTotal(bn);
+    const c=t=>fl.filter(f=>f.tipo===t).length;
+    rows.push([fn.nome,fn.equipe||'',fn.cargo||'',s,pen,bon,fl.length,c('falta_inj'),c('ponto'),c('atraso'),c('checklist'),c('notificacao'),s>=95?'Sim':'Não']);
+  });
+  const b=new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='perf_'+mk+'.csv';a.click();perfNotify('CSV exportado');
+}
+function resetarDados(){
+  if(!perfIsAdmin()){perfNotify('Apenas admins');return;}
+  if(!confirm('Apagar todos os dados?'))return;
+  if(!confirm('Confirmação final — não pode desfazer.'))return;
+  const me=DB.users.find(u=>u.id===SESSION.id);
+  localStorage.removeItem('pos_db_v3');
+  DB={users:[me],funcionarios:[],falhas:[],bonus:[],anotacoes:{},log:[]};
+  saveDB();perfNotify('Dados resetados');renderAll();
+}
+
+
+  }
+})();
+
+function renderPerformancePage(){
+  if(!isAdmin1&&!currentProfile?.viewPerformance) return'<div style="padding:60px;text-align:center;color:#7a7a8a">Você não tem permissão para acessar este módulo.</div>';
+  // Garante que o CSS foi injetado
+  if(!document.getElementById('perf-style')){
+    const s=document.createElement('style');s.id='perf-style';document.head.appendChild(s);
+  }
+  const html=`<div id="perf-wrap">
+<div class="topbar">
+    <div class="topbar-title" id="perf-page-title">Dashboard</div>
+    <div class="topbar-actions">
+      <div class="month-selector">📅<select id="perf-month-global" onchange="renderAll()"></select></div>
+      <button class="btn-primary" onclick="openRegistrarFalha()">⊕ Registrar Falha</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-title">Ranking do Mês</div><div id="ranking-list"></div></div>
+        <div class="card"><div class="card-title">Registros Recentes</div><div id="recent-fails"></div></div>
+      </div>
+    </div>
+
+    <!-- TABELA -->
+    <div class="page" id="page-tabela">
+      <div class="filter-row">
+        <select class="filter-select" id="filter-team" onchange="renderTabela()"><option value="">Todas as equipes</option></select>
+        <select class="filter-select" id="filter-tipo" onchange="renderTabela()"><option value="">Todos os tipos</option></select>
+      </div>
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Funcionário</th><th>Score</th><th>Status</th><th>Falhas</th><th>Faltas inj.</th><th>Atrasos</th><th>Checklist</th><th>Notif.</th><th>Ponto</th><th>Bônus</th><th>Tendência</th><th>Elegível</th><th></th></tr></thead>
+        <tbody id="tabela-body"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- FUNCIONÁRIO DETAIL -->
+    <div class="page" id="page-funcionario">
+      <div style="margin-bottom:16px;"><button class="btn-ghost btn-sm" id="back-btn" onclick="showPage('tabela')">← Voltar</button></div>
+      <div id="funcionario-detail"></div>
+    </div>
+
+    <!-- FUNCIONÁRIOS -->
+    <div class="page" id="page-funcionarios">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <div style="color:var(--text2);font-size:13px;">Gerencie os membros da equipe</div>
+        <button class="btn-primary" id="btn-add-func" onclick="openAddFuncionario()">+ Novo Funcionário</button>
+      </div>
+      <div class="employee-grid" id="employee-grid"></div>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="page" id="page-historico">
+      <div class="filter-row">
+        <select class="filter-select" id="hist-fu" onchange="renderHistorico()"><option value="">Todos os usuários</option></select>
+        <select class="filter-select" id="hist-tp" onchange="renderHistorico()">
+          <option value="">Todos os tipos</option>
+          <option value="fail_add">Falha registrada</option>
+          <option value="fail_delete">Falha removida</option>
+          <option value="bonus_add">Bônus registrado</option>
+          <option value="bonus_delete">Bônus removido</option>
+          <option value="func_add">Funcionário adicionado</option>
+          <option value="func_edit">Funcionário editado</option>
+          <option value="func_delete">Funcionário removido</option>
+          <option value="note_save">Anotação salva</option>
+          <option value="login">Login</option>
+          <option value="user_add">Usuário criado</option>
+          <option value="user_edit">Usuário editado</option>
+        </select>
+      </div>
+      <div class="card" id="historico-list"></div>
+    </div>
+
+    <!-- USUÁRIOS -->
+    <div class="page" id="page-usuarios">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <div style="color:var(--text2);font-size:13px;">Gerencie os acessos ao sistema</div>
+        <button class="btn-primary" id="btn-add-user" onclick="openAddUser()">+ Novo Usuário</button>
+      </div>
+      <div class="card"><div id="user-list"></div></div>
+    </div>
+
+    <!-- REGRAS DE SCORE -->
+    <div class="page" id="page-regras">
+      <div class="grid-2">
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-title">Penalidades</div>
+            <table style="width:100%">
+              <thead><tr><th>Tipo</th><th>Peso base</th><th>Teto/mês</th><th>Progressivo</th></tr></thead>
+              <tbody id="regras-falhas-body"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-title">Bônus disponíveis</div>
+            <table style="width:100%">
+              <thead><tr><th>Tipo</th><th>Valor</th><th>Teto/mês</th></tr></thead>
+              <tbody id="regras-bonus-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-title">Como o score é calculado</div>
+            <div style="font-size:13px;color:var(--text2);line-height:1.9">
+              <div style="font-family:'IBM Plex Mono';background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px">Score = 100 − penalidades + bônus</div>
+              <b style="color:var(--text)">Teto por categoria:</b> cada tipo de falha tem um limite máximo de desconto mensal, evitando que uma semana ruim destrua completamente o score.<br><br>
+              <b style="color:var(--text)">Atraso progressivo:</b> o 1° e 2° atraso valem −3 cada. A partir do 3°, cada atraso vale −6 (dobrado).<br><br>
+              <b style="color:var(--text)">Notificação vs Checklist:</b> não atender chamada vale −7 (urgência operacional), enquanto checklist vale −5.<br><br>
+              <b style="color:var(--text)">Bônus:</b> semana sem falhas gera +1 ponto (máx +5/mês). O gestor também pode conceder bônus manuais limitados a +5/mês.
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Faixas de status</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:12px"><div style="width:40px;font-family:'Syne';font-weight:800;color:var(--green)">≥95</div><span class="badge badge-green">Excelente</span><div style="flex:1;height:4px;background:linear-gradient(90deg,var(--green),rgba(34,211,160,0.2));border-radius:2px"></div></div>
+              <div style="display:flex;align-items:center;gap:12px"><div style="width:40px;font-family:'Syne';font-weight:800;color:var(--yellow)">90–94</div><span class="badge badge-yellow">Atenção</span><div style="flex:1;height:4px;background:linear-gradient(90deg,var(--yellow),rgba(245,200,66,0.2));border-radius:2px"></div></div>
+              <div style="display:flex;align-items:center;gap:12px"><div style="width:40px;font-family:'Syne';font-weight:800;color:var(--red)">&lt;90</div><span class="badge badge-red">Crítico</span><div style="flex:1;height:4px;background:linear-gradient(90deg,var(--red),rgba(245,91,91,0.2));border-radius:2px"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXPORTAR -->
+    <div class="page" id="page-exportar">
+      <div class="card" style="max-width:500px">
+        <div class="card-title">Exportar Dados</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:20px;line-height:1.6;">Exporte todos os dados do sistema em formato JSON para backup ou importação futura.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button class="btn-primary" onclick="exportarJSON()">⬇ Exportar JSON completo</button>
+          <button class="btn-ghost" onclick="importarJSON()">⬆ Importar JSON</button>
+          <button class="btn-ghost" onclick="exportarCSV()">⬇ Exportar CSV (mês atual)</button>
+        </div>
+        <input type="file" id="file-import" accept=".json" style="display:none" onchange="handleImport(event)">
+        <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono';margin-bottom:10px;">ZONA DE PERIGO</div>
+          <button class="btn-danger" onclick="resetarDados()">⚠ Resetar todos os dados</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+<div class="overlay" id="overlay-falha">
+  <div class="modal">
+    <div class="modal-title">Registrar Falha</div>
+    <div class="form-group"><label class="form-label">Funcionário</label><select class="form-control" id="fail-func"></select></div>
+    <div class="form-group"><label class="form-label">Tipo de Falha</label><select class="form-control" id="fail-tipo" onchange="updatePeso()"><option value="">Selecione...</option></select></div>
+    <div id="peso-preview" style="display:none;margin-bottom:16px;">
+      <div style="background:rgba(245,91,91,0.08);border:1px solid rgba(245,91,91,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text2);" id="peso-detail"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-control" id="fail-data"></div>
+    <div class="form-group"><label class="form-label">Motivo (obrigatório)</label><textarea class="form-control" id="fail-motivo" rows="3" placeholder="Descreva o ocorrido..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('overlay-falha')">Cancelar</button>
+      <button class="btn-primary" onclick="salvarFalha()">Salvar Falha</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: BÔNUS -->
+<div class="overlay" id="overlay-bonus">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--green)">✦ Registrar Bônus</div>
+    <div class="form-group"><label class="form-label">Funcionário</label><select class="form-control" id="bon-func"></select></div>
+    <div class="form-group"><label class="form-label">Tipo de Bônus</label><select class="form-control" id="bon-tipo" onchange="updateBonusInfo()"><option value="">Selecione...</option></select></div>
+    <div id="bonus-info" style="display:none;margin-bottom:16px;">
+      <div style="background:rgba(34,211,160,0.08);border:1px solid rgba(34,211,160,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text2);" id="bonus-detail"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-control" id="bon-data"></div>
+    <div class="form-group"><label class="form-label">Motivo / Descrição</label><textarea class="form-control" id="bon-motivo" rows="2" placeholder="Ex: Semana completa sem falhas, cobertura de colega..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('overlay-bonus')">Cancelar</button>
+      <button class="btn-green" onclick="salvarBonus()" style="border-radius:var(--radius2);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">✦ Salvar Bônus</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: FUNCIONÁRIO -->
+<div class="overlay" id="overlay-func">
+  <div class="modal">
+    <div class="modal-title" id="func-modal-title">Novo Funcionário</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nome completo</label><input type="text" class="form-control" id="func-nome" placeholder="Ex: João Silva"></div>
+      <div class="form-group"><label class="form-label">Equipe / Setor</label><input type="text" class="form-control" id="func-equipe" placeholder="Ex: Operações"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Cargo</label><input type="text" class="form-control" id="func-cargo" placeholder="Ex: Motorista"></div>
+      <div class="form-group"><label class="form-label">E-mail (opcional)</label><input type="email" class="form-control" id="func-email" placeholder="email@empresa.com"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Observação</label><input type="text" class="form-control" id="func-obs" placeholder="Ex: contratado em 01/2025"></div>
+    <input type="hidden" id="func-edit-id">
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('overlay-func')">Cancelar</button>
+      <button class="btn-primary" onclick="salvarFuncionario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: USUÁRIO -->
+<div class="overlay" id="overlay-user">
+  <div class="modal">
+    <div class="modal-title" id="user-modal-title">Novo Usuário</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nome</label><input type="text" class="form-control" id="user-nome" placeholder="Ex: Carlos Silva"></div>
+      <div class="form-group"><label class="form-label">Login (único)</label><input type="text" class="form-control" id="user-login" placeholder="Ex: carlos"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Senha <span id="pwd-hint" style="color:var(--text3);font-size:10px">(mín. 6)</span></label><input type="password" class="form-control" id="user-senha" placeholder="••••••"></div>
+      <div class="form-group"><label class="form-label">Perfil</label>
+        <select class="form-control" id="user-role">
+          <option value="admin">Admin — acesso total</option>
+          <option value="manager">Gestor — registra falhas/bônus</option>
+          <option value="viewer">Visualizador — só leitura</option>
+        </select>
+      </div>
+    </div>
+    <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text3);line-height:1.8">
+      <b style="color:var(--text2)">Admin:</b> tudo &nbsp;|&nbsp; <b style="color:var(--text2)">Gestor:</b> falhas, bônus, funcionários, anotações &nbsp;|&nbsp; <b style="color:var(--text2)">Visualizador:</b> somente leitura
+    </div>
+    <input type="hidden" id="user-edit-id">
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)" id="edit-pwd-note"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('overlay-user')">Cancelar</button>
+      <button class="btn-primary" onclick="salvarUser()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SENHA -->
+<div class="overlay" id="overlay-pwd">
+  <div class="modal" style="width:360px">
+    <div class="modal-title">Alterar Senha</div>
+    <div class="form-group"><label class="form-label">Nova Senha</label><input type="password" class="form-control" id="pwd-new" placeholder="Mínimo 6 caracteres"></div>
+    <div class="form-group"><label class="form-label">Confirmar</label><input type="password" class="form-control" id="pwd-confirm" placeholder="Repita a senha"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('overlay-pwd')">Cancelar</button>
+      <button class="btn-primary" onclick="salvarSenha()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+<div class="notif" id="perf-notif"></div>
+</div>`;
+  // Inicializa após render
+  setTimeout(()=>{
+    if(window._perfLoaded){
+      try{
+        // SESSION do performance = usuário logado no sistema principal
+        const pRole=isAdmin1?'admin':(currentProfile?.viewPerformance?'manager':'viewer');
+        window.SESSION={id:currentUser?.uid||'u0',nome:currentProfile?.name||'Usuário',role:pRole};
+        initMonthSelector();
+        renderAll();
+        document.querySelectorAll('#perf-wrap .overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+      }catch(e){console.error('Performance init error:',e);}
+    }
+  },50);
+  return html;
+}
+
 function renderAdminPage(){
   if(!isAdmin()&&!currentProfile?.manageAreas)return"";
   const userList=Object.entries(users).map(([id,u])=>({id,...u}));
@@ -1347,6 +2606,7 @@ function renderAdminPage(){
               ${isAdmin1?`<button class="btn-small toggle-role" data-uid="${u.id}" data-role="${u.role}" style="border:1px solid #2e2e3a;color:#7a7a8a;font-size:11px">${u.role==="admin"?"→ Usuário":"→ Admin"}</button>`:""}
               ${isAdmin1?`<button class="btn-small btn-ghost-link" data-uid="${u.id}" data-name="${esc(u.name||"")}" style="border:1px solid #4ac8e844;color:#4ac8e8;font-size:11px" title="Vincular tarefas de usuário fantasma">🔗 Vincular tarefas</button>`:""}
               ${isAdmin1?`<button class="btn-small toggle-manage-areas" data-uid="${u.id}" style="border:1px solid ${manageOn?"#c8f04e":"#2e2e3a"};color:${manageOn?"#c8f04e":"#7a7a8a"};font-size:10px" title="Permite que este usuário adicione/remova outros das áreas">${manageOn?"✅ Gerencia áreas":"⬜ Gerencia áreas"}</button>`:""}
+              ${isAdmin1?`<button class="btn-small toggle-view-performance" data-uid="${u.id}" style="border:1px solid ${u.viewPerformance?"#4ac8e8":"#2e2e3a"};color:${u.viewPerformance?"#4ac8e8":"#7a7a8a"};font-size:10px" title="Permite acesso ao módulo de Performance">${u.viewPerformance?"📊 Performance":"📊 Performance"}</button>`:""}
               <button class="btn-small del-user" data-uid="${u.id}" style="border:1px solid rgba(255,107,107,.25);color:#ff8080;font-size:11px">Remover</button>
             `:`<span style="font-size:11px;color:#5a5a6a">Você</span>`}
           </div>
@@ -1390,6 +2650,17 @@ function attachContentEvents(){
     const commentAlerts=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="manual_alert");
     for(const k of commentAlerts) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
     toast("Notificações limpas","success");
+  });
+  // Toggle viewPerformance permission
+  document.querySelectorAll(".toggle-view-performance").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      if(!isAdmin1)return;
+      const uid2=btn.dataset.uid;
+      const cur=users[uid2]?.viewPerformance||false;
+      await dbSet(`users/${uid2}/viewPerformance`,!cur);
+      await logAction("permissao","Performance "+(cur?"removida":"concedida")+": "+(users[uid2]?.name||uid2));
+      toast("Permissão de Performance "+(cur?"removida":"concedida"),"success");
+    });
   });
   document.getElementById("btn-export-area")?.addEventListener("click",()=>exportAreaTasks(activeAreaId));
   document.getElementById("btn-full-backup")?.addEventListener("click",exportFullBackup);
