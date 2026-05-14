@@ -47,6 +47,7 @@ function checkRateLimit(key, maxPerMin=60){
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function fmtDate(d){if(!d)return"—";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;}
 function fmtTs(ts){if(!ts)return"";const d=new Date(ts);return`${d.toLocaleDateString("pt-BR")} ${d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`;}
+function timeAgo(ts){if(!ts)return"";const m=Math.floor((Date.now()-new Date(ts))/60000);if(m<1)return"agora";if(m<60)return`há ${m} min`;const h=Math.floor(m/60);if(h<24)return`há ${h}h`;const d=Math.floor(h/24);if(d<30)return`há ${d} dia${d>1?"s":""}`;const mo=Math.floor(d/30);if(mo<12)return`há ${mo} ${mo>1?"meses":"mês"}`;const y=Math.floor(mo/12);return`há ${y} ano${y>1?"s":""}`;}
 function initials(n){return(n||"?").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);}
 function linkify(text){
   if(!text)return"";
@@ -520,7 +521,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.12</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.13</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -734,7 +735,10 @@ function renderAreaPage(){
           <div style="width:20px;height:20px;border-radius:50%;background:${Object.values(users).find(u=>u.name===t.creatorName)?.color||"#4ac8e8"};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f" title="${esc(t.creatorName)}">${initials(t.creatorName)}</div>
         </div>`:""}
       </div>
-      ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:""}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+        ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:"<span></span>"}
+        ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:9px;color:#3a3a4a;cursor:default">${timeAgo(t.createdAt)}</span>`:""}
+      </div>
     </div>`).join(""):`<div style="font-size:12px;color:#4a4a5a;text-align:center;padding:20px 8px">Vazio</div>`;
 
     if(isCollapsed){
@@ -3639,7 +3643,7 @@ function renderMyTasksPage(){
           ${showArea&&ar?`<span style="font-size:10px;color:#7a7a8a">📁 ${esc(ar.name)}</span>`:""}
           ${resps.length?`<span style="font-size:10px;color:#9d93ff">👤 ${resps.join(", ")}</span>`:""}
           ${t.creatorName?`<span style="font-size:10px;color:#5a5a6a">por ${esc(t.creatorName)}</span>`:""}
-          ${t.createdAt?`<span style="font-size:10px;color:#3a3a4a">🕐 ${fmtDate(t.createdAt.slice(0,10))}</span>`:""}
+          ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:10px;color:#3a3a4a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
         </div>
       </div>
       ${t.date?`<span style="font-size:10px;color:${dl?"#f0a832":"#7a7a8a"};white-space:nowrap;flex-shrink:0">${fmtDate(t.date)}</span>`:""}
@@ -5760,6 +5764,7 @@ function openDetailModal(taskId){
     <div style="display:flex;gap:8px;flex-wrap:wrap">${resps.map(r=>personAvatar(r,"#7c6eff","Responsável")).join("")}</div>
   </div>`:"";
   const dateBlock=t.date?'<div><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Prazo</div><div>'+fmtDate(t.date)+'</div></div>':"";
+  const createdAtBlock=t.createdAt?`<div><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Criada em</div><div title="${fmtTs(t.createdAt)}" style="cursor:default">${timeAgo(t.createdAt)}</div></div>`:"";
   const creatorBlock=t.creatorName?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28">
     <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✏ Criada por</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.creatorName,"#4ac8e8","Criador(a)")}</div>
@@ -5800,7 +5805,7 @@ function openDetailModal(taskId){
           ${priorityChip}${areaChip}${deadlineBadge(t.date)}
         </div>
         ${collectiveBlock}${descBlock}${respBlock}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">${dateBlock}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">${dateBlock}${createdAtBlock}</div>
         <div>
           <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Mover para</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">${statusBtns}</div>
