@@ -54,6 +54,34 @@ function linkify(text){
   return escaped.replace(/(https?:\/\/[^\s<>"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:#4ac8e8;text-decoration:underline;word-break:break-all" onclick="event.stopPropagation()">$1</a>');
 }
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function applyAutoHyperlinks(el){
+  const URL_RE=/https?:\/\/[^\s<>"]+/g;
+  const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{
+    acceptNode:n=>n.parentNode.nodeName==="A"?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT
+  });
+  const nodes=[];let node;
+  while((node=walker.nextNode()))nodes.push(node);
+  nodes.forEach(textNode=>{
+    URL_RE.lastIndex=0;
+    if(!URL_RE.test(textNode.nodeValue)){return;}
+    URL_RE.lastIndex=0;
+    const text=textNode.nodeValue;
+    const frag=document.createDocumentFragment();
+    let last=0,m;
+    while((m=URL_RE.exec(text))!==null){
+      if(m.index>last)frag.appendChild(document.createTextNode(text.slice(last,m.index)));
+      const a=document.createElement("a");
+      a.href=m[0];a.target="_blank";a.rel="noopener";
+      a.style.cssText="color:#4ac8e8;text-decoration:underline;word-break:break-all";
+      a.addEventListener("click",e=>e.stopPropagation());
+      a.textContent=m[0];
+      frag.appendChild(a);
+      last=m.index+m[0].length;
+    }
+    if(last<text.length)frag.appendChild(document.createTextNode(text.slice(last)));
+    textNode.parentNode.replaceChild(frag,textNode);
+  });
+}
 
 function deadlineClass(d){if(!d)return null;const diff=new Date(d+"T23:59:59")-new Date();if(diff<=0)return null;if(diff<=10800000)return"warn-now";if(diff<=86400000)return"warn-1";if(diff<=172800000)return"warn-2";if(diff<=259200000)return"warn-3";return null;}
 function deadlineBadge(d){const c=deadlineClass(d);if(!c)return"";const m={"warn-now":"⚠️ <3h","warn-1":"🔴 Amanhã","warn-2":"🟠 2 dias","warn-3":"🟡 3 dias"},mp={"warn-now":"wnow","warn-1":"w1","warn-2":"w2","warn-3":"w3"};return`<span class="deadline-badge ${mp[c]}">${m[c]}</span>`;}
@@ -492,7 +520,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.3</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.7</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -607,6 +635,9 @@ function renderTopbar(){
   }
 }
 document.addEventListener("click",()=>{if(dropdownOpen){dropdownOpen=false;render();}});
+// Auto-hyperlink: runs in capture phase so it completes before save-on-blur handlers read innerText
+document.addEventListener("blur",e=>{if(e.target.isContentEditable)applyAutoHyperlinks(e.target);},true);
+document.addEventListener("paste",e=>{if(e.target.isContentEditable)setTimeout(()=>applyAutoHyperlinks(e.target),0);},true);
 document.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==="z"&&!e.shiftKey){
     const tag=document.activeElement?.tagName;
@@ -745,11 +776,12 @@ function renderAreaPage(){
   <div style="margin:10px 0 4px 0;background:#13131a;border:1px solid #1e1e28;border-radius:8px;padding:10px 14px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#7a7a8a">Detalhes da área</div>
-      ${isAdmin1?`<button class="btn-small" id="btn-save-area-detail" style="border:1px solid ${area.color}44;color:${area.color};font-size:10px;padding:2px 8px">Salvar</button>`:""}
+      ${isAdmin1?`<button class="btn-small" id="btn-edit-area-detail" style="border:1px solid ${area.color}44;color:${area.color};font-size:10px;padding:2px 8px">✏ Editar</button><button class="btn-small" id="btn-save-area-detail" style="display:none;border:1px solid ${area.color}44;color:${area.color};font-size:10px;padding:2px 8px">Salvar</button>`:""}
     </div>
     ${isAdmin1
-      ?`<textarea id="area-detail-text" rows="2" placeholder="Descrição, processos, informações relevantes…" style="width:100%;background:transparent;border:none;color:#a0a0b0;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6;resize:vertical;outline:none">${esc(area.detail||"")}</textarea>`
-      :`<div style="font-size:12px;color:#a0a0b0;line-height:1.6;min-height:18px">${esc(area.detail||"—")}</div>`}
+      ?`<div id="area-detail-view" style="font-size:12px;color:#a0a0b0;line-height:1.6;min-height:18px;white-space:pre-wrap;word-break:break-word">${area.detail?linkify(area.detail):"<span style='color:#3a3a4a'>Sem descrição. Clique em Editar para adicionar.</span>"}</div>
+         <textarea id="area-detail-text" rows="3" style="display:none;width:100%;background:transparent;border:1px solid #2e2e3a;border-radius:6px;color:#a0a0b0;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6;resize:vertical;outline:none;padding:6px 8px;margin-top:4px">${esc(area.detail||"")}</textarea>`
+      :`<div style="font-size:12px;color:#a0a0b0;line-height:1.6;min-height:18px;white-space:pre-wrap;word-break:break-word">${area.detail?linkify(area.detail):"—"}</div>`}
   </div>
 
   ${notesEditorHtml}`;
@@ -2591,15 +2623,23 @@ function attachContentEvents(){
       render();
     });
   });
+  document.getElementById("btn-edit-area-detail")?.addEventListener("click",()=>{
+    document.getElementById("area-detail-view").style.display="none";
+    const ta=document.getElementById("area-detail-text");
+    ta.style.display="block";
+    ta.style.borderColor=(areas[activeAreaId]?.color||"#c8f04e")+"44";
+    document.getElementById("btn-edit-area-detail").style.display="none";
+    document.getElementById("btn-save-area-detail").style.display="";
+    ta.focus();
+  });
   document.getElementById("btn-save-area-detail")?.addEventListener("click",async()=>{
     if(!isAdmin1){toast("Apenas o Super Admin pode editar os detalhes","error");return;}
-    const val=document.getElementById("area-detail-text")?.value||"";
+    const val=(document.getElementById("area-detail-text")?.value||"").trim();
     await dbSet(`areas/${activeAreaId}/detail`,val||null);
     await logAction("editar_area",`Detalhes atualizados: "${areas[activeAreaId]?.name}"`);
     toast("Detalhes salvos!","success");
+    render();
   });
-  document.getElementById("area-detail-text")?.addEventListener("focus",e=>{e.target.style.borderColor=areas[activeAreaId]?.color||"#c8f04e";});
-  document.getElementById("area-detail-text")?.addEventListener("blur",e=>{e.target.style.borderColor="#1e1e28";});
   document.querySelectorAll(".btn-add-task-col").forEach(b=>b.addEventListener("click",()=>openTaskModal({areaId:activeAreaId,status:b.dataset.status,priority:"media"})));
   document.querySelectorAll(".card[data-detail]").forEach(c=>c.addEventListener("click",()=>openDetailModal(c.dataset.detail)));
   document.querySelectorAll(".btn-detail-alert").forEach(b=>b.addEventListener("click",()=>openDetailModal(b.dataset.id)));
@@ -3674,19 +3714,19 @@ function renderCalPage(){
     const evs=eventMap[ds]||[];
     const taskEvs=evs.filter(e=>e.type==="task");
     const calEvs=evs.filter(e=>e.type==="event");
-    const calChips=calEvs.map(e=>`<div class="cal-event-chip ${e.span&&!e.isFirst?"chip-cont":""} ${e.span&&!e.isLast?"chip-start":""}" data-eid="${e.id}" style="background:${e.color}22;border-left:3px solid ${e.color};color:${e.color};font-size:9px;padding:2px 5px;border-radius:3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:100%">${e.isFirst||!e.span?"🗓 "+esc(e.title.slice(0,14)):(e.span?"…"+esc(e.title.slice(0,10)):"")}</div>`).join("");
+    const calChips=calEvs.map(e=>`<div class="cal-event-chip ${e.span&&!e.isFirst?"chip-cont":""} ${e.span&&!e.isLast?"chip-start":""}" data-eid="${e.id}" style="background:${e.color}22;border-left:3px solid ${e.color};color:${e.color};font-size:11px;padding:2px 5px;border-radius:3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:100%">${e.isFirst||!e.span?"🗓 "+esc(e.title.slice(0,14)):(e.span?"…"+esc(e.title.slice(0,10)):"")}</div>`).join("");
     // Single task: show title inline; multiple tasks: show dots + count
     const taskBlock=taskEvs.length===1
       ?`<div class="cal-task-chip" data-date="${ds}" data-tid="${taskEvs[0].id}" style="display:flex;align-items:center;gap:3px;margin-top:3px;padding:2px 4px;border-radius:3px;cursor:pointer;background:${taskEvs[0].color}12;border-left:2px solid ${taskEvs[0].color}">
           <span style="width:5px;height:5px;border-radius:50%;background:${taskEvs[0].color};flex-shrink:0"></span>
-          <span style="font-size:9px;color:${taskEvs[0].color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90%">${esc(taskEvs[0].title.slice(0,16)+(taskEvs[0].title.length>16?"…":""))}</span>
+          <span style="font-size:11px;color:${taskEvs[0].color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90%">${esc(taskEvs[0].title.slice(0,16)+(taskEvs[0].title.length>16?"…":""))}</span>
         </div>`
       :taskEvs.length>1
       ?`<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:1px;padding:0 3px;align-items:center">
           ${taskEvs.slice(0,3).map(e=>`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${e.color};margin:0 1px"></span>`).join("")}
-          ${taskEvs.length>3?`<span style="font-size:9px;color:#7a7a8a">+${taskEvs.length-3}</span>`:""}
+          ${taskEvs.length>3?`<span style="font-size:11px;color:#7a7a8a">+${taskEvs.length-3}</span>`:""}
         </div>
-        <div class="cal-task-count" data-date="${ds}" style="font-size:9px;color:#7a7a8a;padding:0 4px;cursor:pointer">${taskEvs.length} tarefas</div>`
+        <div class="cal-task-count" data-date="${ds}" style="font-size:11px;color:#7a7a8a;padding:0 4px;cursor:pointer">${taskEvs.length} tarefas</div>`
       :"";
     cells+=`<div class="cal-cell ${isToday?"cal-today":""} ${!isCurrentMonth?"cal-other":""} ${isPast&&isCurrentMonth?"cal-past":""}" data-date="${isCurrentMonth?ds:""}" style="min-height:88px">
       <div class="cal-day-num" style="${isToday?"background:#c8f04e;color:#0c0c0f;":""}${!isCurrentMonth?"color:#2e2e3a;":""}">${isCurrentMonth?dayNum:""}</div>
