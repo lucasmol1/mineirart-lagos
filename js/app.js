@@ -3586,6 +3586,12 @@ function renderMyTasksPage(){
   const myName=currentProfile?.name||"";
   const myAreas=visibleAreas().map(a=>a.id);
   const isDone=t=>t.status==="concluido";
+  const STATUS_ORDER={"em-andamento":0,"a-fazer":1,"bloqueado":2,"concluido":3};
+  const byStatusThenDate=(a,b)=>{
+    const so=(STATUS_ORDER[a.status]??9)-(STATUS_ORDER[b.status]??9);
+    if(so!==0)return so;
+    return new Date(a.date||"9999")-new Date(b.date||"9999");
+  };
 
   // Tarefas designadas PARA mim (meu nome nos resps)
   const assignedToMe=Object.entries(tasks)
@@ -3594,13 +3600,13 @@ function renderMyTasksPage(){
       const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
       return resps.some(r=>r===myName);
     })
-    .sort((a,b)=>new Date(a.date||"9999")-new Date(b.date||"9999"));
+    .sort(byStatusThenDate);
 
   // Tarefas que EU criei (e designei a outros)
   const createdByMe=Object.entries(tasks)
     .map(([id,t])=>({id,...t}))
     .filter(t=>t.creatorId===currentUser?.uid)
-    .sort((a,b)=>new Date(a.date||"9999")-new Date(b.date||"9999"));
+    .sort(byStatusThenDate);
 
   // Tarefas das minhas áreas (visibilidade geral da área)
   const areaVisible=Object.entries(tasks)
@@ -3610,7 +3616,7 @@ function renderMyTasksPage(){
       const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
       return!resps.some(r=>r===myName);
     })
-    .sort((a,b)=>new Date(a.date||"9999")-new Date(b.date||"9999"));
+    .sort(byStatusThenDate);
 
   const assignedActive=assignedToMe.filter(t=>!isDone(t));
   const assignedDone=assignedToMe.filter(t=>isDone(t));
