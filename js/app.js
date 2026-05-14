@@ -521,7 +521,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.13</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.14</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -737,7 +737,7 @@ function renderAreaPage(){
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
         ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:"<span></span>"}
-        ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:9px;color:#3a3a4a;cursor:default">${timeAgo(t.createdAt)}</span>`:""}
+        ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:9px;color:#5a5a6a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
       </div>
     </div>`).join(""):`<div style="font-size:12px;color:#4a4a5a;text-align:center;padding:20px 8px">Vazio</div>`;
 
