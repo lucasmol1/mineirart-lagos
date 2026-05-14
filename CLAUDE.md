@@ -7,3 +7,5 @@
 - Faca commit e push sempre na branch main
 
 - Sempre execute git pull antes de iniciar qualquer modificacao
+
+- A versao segue o formato v1.x onde x incrementa de 1 em 1 (ex: v1.9 -> v1.10 -> v1.11). Nunca use v2.0
