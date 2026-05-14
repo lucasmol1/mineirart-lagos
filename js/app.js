@@ -520,7 +520,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.7</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.8</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -4221,7 +4221,7 @@ function renderProspPage(){
     const evs=eventMap[ds]||[];
     const chips=evs.map(e=>`<div class="prosp-chip" data-eid="${e.id}" style="background:${e.color||"#7c6eff"}22;border-left:3px solid ${e.color||"#7c6eff"};color:${e.color||"#7c6eff"};font-size:9px;padding:2px 5px;border-radius:3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:100%">${e.isFirst||!e.span?"🎯 "+esc(e.title.slice(0,15)):"↳ "+esc(e.title.slice(0,12))}</div>`).join("");
     cells+=`<div class="cal-cell ${isToday?"cal-today":""} ${!isCurrentMonth?"cal-other":""} ${isPast&&isCurrentMonth?"cal-past":""}" data-date="${isCurrentMonth?ds:""}">
-      <div class="cal-day-num" style="${isToday?"background:#7c6eff;color:#fff;":""}${!isCurrentMonth?"color:#2e2e3a;":""}">${isCurrentMonth?dayNum:""}</div>
+      <div class="cal-day-num" style="${isToday?"background:#c8f04e;color:#0c0c0f;":""}${!isCurrentMonth?"color:#2e2e3a;":""}">${isCurrentMonth?dayNum:""}</div>
       ${chips}
     </div>`;
   }
