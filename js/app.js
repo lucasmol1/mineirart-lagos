@@ -3585,6 +3585,7 @@ function openRepeatTaskModal(t){
 function renderMyTasksPage(){
   const myName=currentProfile?.name||"";
   const myAreas=visibleAreas().map(a=>a.id);
+  const isDone=t=>t.status==="concluido";
 
   // Tarefas designadas PARA mim (meu nome nos resps)
   const assignedToMe=Object.entries(tasks)
@@ -3607,9 +3608,16 @@ function renderMyTasksPage(){
     .filter(t=>myAreas.includes(t.areaId)&&t.creatorId!==currentUser?.uid)
     .filter(t=>{
       const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
-      return!resps.some(r=>r===myName); // exclude already shown in "to me"
+      return!resps.some(r=>r===myName);
     })
     .sort((a,b)=>new Date(a.date||"9999")-new Date(b.date||"9999"));
+
+  const assignedActive=assignedToMe.filter(t=>!isDone(t));
+  const assignedDone=assignedToMe.filter(t=>isDone(t));
+  const createdActive=createdByMe.filter(t=>!isDone(t));
+  const createdDone=createdByMe.filter(t=>isDone(t));
+  const areaActive=areaVisible.filter(t=>!isDone(t));
+  const areaDone=areaVisible.filter(t=>isDone(t));
 
   function taskRow(t,showArea=true){
     const st=STATUS[t.status];
@@ -3642,10 +3650,22 @@ function renderMyTasksPage(){
       ${list.length?list.map(t=>taskRow(t,showArea)).join(""):`<div style="font-size:12px;color:#4a4a5a;padding:16px;text-align:center;background:#0e0e14;border-radius:8px">${emptyMsg}</div>`}
     </div>`;
 
+  const hasDone=assignedDone.length||createdDone.length||areaDone.length;
+
   return`<div class="page-header"><div><div class="page-title">Minhas Tarefas</div><div class="page-sub">Suas atribuições e tarefas das suas áreas</div></div></div>
-    ${section("Designadas para mim","📥",assignedToMe,"Nenhuma tarefa designada para você")}
-    ${section("Criadas por mim","📤",createdByMe,"Você ainda não criou nenhuma tarefa")}
-    ${section("Outras tarefas nas minhas áreas","📁",areaVisible,"Sem outras tarefas nas suas áreas")}`;
+    ${section("Designadas para mim","📥",assignedActive,"Nenhuma tarefa ativa designada para você")}
+    ${section("Criadas por mim","📤",createdActive,"Você não tem tarefas ativas criadas por você")}
+    ${section("Outras tarefas nas minhas áreas","📁",areaActive,"Sem outras tarefas ativas nas suas áreas")}
+    ${hasDone?`
+    <div style="margin:32px 0 20px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;height:1px;background:#1e1e28"></div>
+      <span style="font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:#4a4a5a;letter-spacing:.06em;white-space:nowrap">CONCLUÍDAS</span>
+      <div style="flex:1;height:1px;background:#1e1e28"></div>
+    </div>
+    ${section("Designadas para mim","📥",assignedDone,"Nenhuma tarefa concluída designada para você")}
+    ${section("Criadas por mim","📤",createdDone,"Nenhuma tarefa concluída criada por você")}
+    ${section("Outras tarefas nas minhas áreas","📁",areaDone,"Sem outras tarefas concluídas nas suas áreas")}
+    `:""}`;
 }
 
 
