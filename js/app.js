@@ -5787,12 +5787,12 @@ function openDetailModal(taskId){
         <span style="font-size:12px;color:${done?"#c8f04e":"#a0a0b0"}">${esc(u.name)}${done?" ✓":""}</span>
       </div>`;}).join("")}
   </div>`:"";  const pinBtn=canPin?'<button id="m-pin" class="btn-small" style="border:1px solid '+(t.pinned?'#c8f04e':'#2e2e3a')+';color:'+(t.pinned?'#c8f04e':'#7a7a8a')+'">'+pinLabel+'</button>':"";
-  openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:860px;width:95vw">
-    <div class="modal-header">
+  openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:860px;width:95vw;overflow:hidden;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
       <div class="modal-title">${pinTitlePrefix}Detalhe</div>
       <button class="icon-btn" id="m-x">✕</button>
     </div>
-    <div style="display:flex;gap:0;min-height:400px">
+    <div style="display:flex;gap:0;flex:1;min-height:0;overflow:hidden">
       <div class="modal-body" style="flex:1;min-width:0;border-right:1px solid #1e1e28;padding-right:20px;display:block;overflow-y:auto">
         <div class="modal-tabs">
           <button class="modal-tab-btn active" id="dtab-detail">📋 Detalhes</button>
@@ -5819,7 +5819,7 @@ function openDetailModal(taskId){
           <div class="members-grid" id="area-members-list"></div>
         </div>
       </div>
-      <div style="width:280px;min-width:240px;display:flex;flex-direction:column;padding-left:18px">
+      <div style="width:280px;min-width:240px;display:flex;flex-direction:column;padding-left:18px;overflow:hidden">
         <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-top:18px">💬 Comentários</div>
         <div id="comments-list" style="flex:1;overflow-y:auto;max-height:340px;display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
           <div style="font-size:12px;color:#3a3a4a;text-align:center;padding:20px 0">Carregando…</div>
@@ -5830,7 +5830,7 @@ function openDetailModal(taskId){
         </div>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-shrink:0">
       ${pinBtn}
       ${canDelete?`<button class="btn-danger" id="m-del" ${delAttrs}>${delLabel}</button>`:""}
       <button class="btn-ghost" id="m-x2">Fechar</button>
