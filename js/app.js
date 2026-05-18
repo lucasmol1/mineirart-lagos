@@ -521,7 +521,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.16</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.17</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1281,6 +1281,7 @@ function renderAlertsPage(){
           <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${isComment?"\ud83d\udcac":"\ud83d\udd14"}</div>
           <div style="flex:1">
             <div style="font-size:13px;color:#d0d0e0;line-height:1.4">${esc(n.msg||"")}</div>
+            ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid #7c6eff">"${esc(n.commentPreview)}"</div>`:""}
             <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
@@ -5927,10 +5928,12 @@ function openDetailModal(taskId){
         if(hasPerm) toNotify.add(uid2);
       });
     });
+    const commentPreview=text.length>80?text.slice(0,80)+"…":text;
     for(const uid2 of toNotify){
       await dbSet(`user_notifs/${uid2}/${uid()}`,{
         type:"new_comment", msg:`💬 ${currentProfile.name} comentou em "${t.title}"`,
-        taskId, ts:new Date().toISOString(), read:false
+        taskId, commentAuthor:currentProfile.name, commentPreview,
+        ts:new Date().toISOString(), read:false
       });
     }
   });

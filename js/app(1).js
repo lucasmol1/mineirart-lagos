@@ -521,7 +521,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.14</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.16</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -2369,7 +2369,12 @@ function salvarNota(fid,mk){
   DB.anotacoes[fid+'_'+mk]=txt;
   const fn=DB.funcionarios.find(f=>f.id===fid);
   addLog('note_save','Anotação salva',\`Funcionário: \${fn?.nome} | Mês: \${monthLabel(mk)}\`);
-  saveDB();notify('Anotação salva');
+  if(_FB_URL&&_FB_TOKEN){
+    fetch(_FB_URL+'/performance/anotacoes/'+encodeURIComponent(fid+'_'+mk)+'.json?auth='+_FB_TOKEN,{
+      method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(txt)
+    }).catch(function(){});
+  }
+  saveDB();notify('Anotação salva');loadFromFirebase(function(){renderFuncionarioDetail(window._did);});
 }
 
 // ============================================================
