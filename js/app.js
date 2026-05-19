@@ -525,7 +525,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.18</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.19</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -6302,9 +6302,11 @@ function renderAreaNotesEditor(areaId){
   function renderBlock(b){
     const color=b.color||"#d0d0e0";
     if(b.type==="image"){
+      const isCollapsedImg=b.collapsed===true;
       return`<div class="note-block" data-bid="${b.id}" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-radius:6px">
+        <span class="block-left-arrow" data-bid="${b.id}" title="Clique: recolher · Arrastar: reordenar" style="font-size:10px;color:#5a5a6a;cursor:grab;user-select:none;display:inline-block;transform:${isCollapsedImg?"rotate(0deg)":"rotate(90deg)"};transition:transform .15s;width:14px;text-align:center;flex-shrink:0;margin-top:4px">▶</span>
         <div class="block-handle" data-bid="${b.id}" style="width:20px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:#3a3a4a;font-size:15px;margin-top:2px">⋮</div>
-        <img src="${b.data}" style="max-width:${b.w||220}px;max-height:200px;border-radius:6px;border:1px solid #2e2e3a;cursor:pointer" onclick="openImgModal(this.src)"/>
+        ${isCollapsedImg?`<span style="font-size:12px;color:#4a4a5a;font-style:italic;margin-top:2px">[imagem recolhida]</span>`:`<img src="${b.data}" style="max-width:${b.w||220}px;max-height:200px;border-radius:6px;border:1px solid #2e2e3a;cursor:pointer" onclick="openImgModal(this.src)"/>`}
         <button class="block-del" data-bid="${b.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:15px;padding:0;margin-top:2px;transition:opacity .15s">✕</button>
       </div>`;
     }
@@ -6347,8 +6349,8 @@ function renderAreaNotesEditor(areaId){
       </div>`:"";
       return`<div class="note-block" data-bid="${b.id}" style="padding:4px 0;border-radius:6px">
         <div style="display:flex;align-items:center;gap:6px">
+          <span class="block-left-arrow toggle-arrow" data-bid="${b.id}" title="Clique: expandir/recolher · Arrastar: reordenar" style="font-size:10px;color:#7a7a8a;cursor:grab;user-select:none;transition:transform .15s;display:inline-block;transform:${isOpen?"rotate(90deg)":"rotate(0deg)"};width:14px;text-align:center;flex-shrink:0">▶</span>
           <div class="block-handle" data-bid="${b.id}" style="width:20px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:#3a3a4a;font-size:15px">⋮</div>
-          <span class="toggle-arrow" data-bid="${b.id}" style="font-size:11px;color:#7a7a8a;cursor:pointer;user-select:none;transition:transform .15s;display:inline-block;transform:${isOpen?"rotate(90deg)":"rotate(0deg)"};width:16px;text-align:center">▶</span>
           <span contenteditable="true" data-bid="${b.id}" class="block-text" spellcheck="false" style="flex:1;font-size:13px;font-weight:600;color:${color};outline:none;word-break:break-word;line-height:1.7;min-height:18px">${esc(b.text||"")}</span>
           <button class="block-del" data-bid="${b.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:15px;padding:0;transition:opacity .15s">✕</button>
         </div>
@@ -6359,9 +6361,11 @@ function renderAreaNotesEditor(areaId){
       </div>`;
     }
     // default: text
+    const isCollapsed=b.collapsed===true;
     return`<div class="note-block" data-bid="${b.id}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-radius:6px">
+      <span class="block-left-arrow" data-bid="${b.id}" title="Clique: recolher · Arrastar: reordenar" style="font-size:10px;color:#5a5a6a;cursor:grab;user-select:none;display:inline-block;transform:${isCollapsed?"rotate(0deg)":"rotate(90deg)"};transition:transform .15s;width:14px;text-align:center;flex-shrink:0">▶</span>
       <div class="block-handle" data-bid="${b.id}" style="width:20px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:#3a3a4a;font-size:15px">⋮</div>
-      <span contenteditable="true" data-bid="${b.id}" class="block-text" spellcheck="false" style="flex:1;font-size:13px;color:${color};outline:none;word-break:break-word;line-height:1.7;min-height:18px">${linkify(b.text||"")}</span>
+      ${isCollapsed?`<span style="flex:1;font-size:12px;color:#4a4a5a;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.text||"")}</span>`:`<span contenteditable="true" data-bid="${b.id}" class="block-text" spellcheck="false" style="flex:1;font-size:13px;color:${color};outline:none;word-break:break-word;line-height:1.7;min-height:18px">${linkify(b.text||"")}</span>`}
       <button class="block-del" data-bid="${b.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:15px;padding:0;transition:opacity .15s">✕</button>
     </div>`;
   }
@@ -6462,11 +6466,22 @@ function attachAreaNotesEditorEvents(areaId){
   wrap?.addEventListener("dragover",e=>e.preventDefault());
   wrap?.addEventListener("drop",e=>{e.preventDefault();[...(e.dataTransfer.files||[])].forEach(processImgFile);});
 
-  // Toggle arrow — open/close
+  // Toggle arrow — open/close (also handles block-left-arrow on toggle blocks)
   document.querySelectorAll(".toggle-arrow").forEach(arrow=>{
     arrow.addEventListener("click",async()=>{
       const bid=arrow.dataset.bid;
       blocks=blocks.map(b=>b.id===bid?{...b,open:b.open===false}:b);
+      await saveBlocks();
+    });
+  });
+
+  // Left arrow click — collapse/expand text and image blocks
+  document.querySelectorAll(".block-left-arrow:not(.toggle-arrow)").forEach(arrow=>{
+    arrow.addEventListener("click",async e=>{
+      e.stopPropagation();
+      const bid=arrow.dataset.bid;
+      const block=blocks.find(b=>b.id===bid); if(!block)return;
+      blocks=blocks.map(b=>b.id===bid?{...b,collapsed:!b.collapsed}:b);
       await saveBlocks();
     });
   });
@@ -6596,6 +6611,49 @@ function attachAreaNotesEditorEvents(areaId){
     const handle=row.querySelector(".block-handle");
     row.addEventListener("mouseenter",()=>{if(del)del.style.opacity="1";if(handle)handle.style.color="#7a7a8a";});
     row.addEventListener("mouseleave",()=>{if(del)del.style.opacity="0";if(handle)handle.style.color="#3a3a4a";});
+  });
+
+  // ── Block drag-to-reorder via left arrow ──
+  let dragBid=null;
+  document.querySelectorAll(".block-left-arrow").forEach(arrow=>{
+    const noteBlock=arrow.closest(".note-block");
+    if(!noteBlock)return;
+    arrow.addEventListener("mousedown",()=>{noteBlock.setAttribute("draggable","true");});
+    arrow.addEventListener("mouseleave",()=>{if(!dragBid)noteBlock.setAttribute("draggable","false");});
+  });
+  document.querySelectorAll(".note-block").forEach(row=>{
+    row.setAttribute("draggable","false");
+    row.addEventListener("dragstart",e=>{
+      dragBid=row.dataset.bid;
+      e.dataTransfer.effectAllowed="move";
+      e.dataTransfer.setData("text/plain",dragBid);
+      setTimeout(()=>{row.style.opacity="0.4";},0);
+    });
+    row.addEventListener("dragend",()=>{
+      row.style.opacity="1";
+      row.style.borderTop="";
+      row.setAttribute("draggable","false");
+      dragBid=null;
+      document.querySelectorAll(".note-block").forEach(r=>r.style.borderTop="");
+    });
+    row.addEventListener("dragover",e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect="move";
+      if(row.dataset.bid!==dragBid)row.style.borderTop="2px solid #c8f04e88";
+    });
+    row.addEventListener("dragleave",()=>{row.style.borderTop="";});
+    row.addEventListener("drop",async e=>{
+      e.preventDefault();
+      row.style.borderTop="";
+      const targetBid=row.dataset.bid;
+      if(!dragBid||dragBid===targetBid)return;
+      const si=blocks.findIndex(b=>b.id===dragBid),ti=blocks.findIndex(b=>b.id===targetBid);
+      if(si<0||ti<0)return;
+      const arr=[...blocks];
+      const[moved]=arr.splice(si,1);arr.splice(ti,0,moved);
+      blocks=arr;
+      await saveBlocks();
+    });
   });
 
   // ⋮ handle — show context menu

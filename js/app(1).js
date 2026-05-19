@@ -1,8 +1,7 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v4
-//  - Canais removidos
-//  - Fluxograma conectado com áreas (clicável)
-//  - Proteções Firebase para evitar cobranças
+//  Mineirart Lagos — App v1.5
+//  - Trava automática: tarefas com data de hoje ou futura
+//    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -201,22 +200,27 @@ async function logAction(action,detail){
   await dbPush("audit",{action,detail,userId:currentUser.uid,userName:currentProfile.name,userEmail:currentProfile.email,ts:new Date().toISOString()});
 }
 
-// ── PURGA SEGURA DE TAREFAS (preserva fixadas e mantém áreas intactas) ────────
+// ── PURGA SEGURA DE TAREFAS (preserva fixadas, datas futuras e áreas intactas) ─
+function taskHasFutureDate(t){
+  if(!t.date) return false;
+  const today=new Date(); today.setHours(0,0,0,0);
+  return new Date(t.date+"T00:00:00")>=today;
+}
 async function safePurgeTasks(){
   const all=Object.entries(tasks);
   if(all.length<LIMITS.MAX_TASKS) return false;
-  // nunca remove tarefas fixadas — só as mais antigas não fixadas
-  const unpinned=all.filter(([,t])=>!t.pinned).sort((a,b)=>new Date(a[1].createdAt)-new Date(b[1].createdAt));
+  // nunca remove tarefas fixadas nem tarefas com data futura no calendário
+  const purgeable=all.filter(([,t])=>!t.pinned && !taskHasFutureDate(t))
+    .sort((a,b)=>new Date(a[1].createdAt)-new Date(b[1].createdAt));
   const removeCount=Math.max(1, all.length - LIMITS.TASK_PURGE_TARGET);
-  const toDelete=unpinned.slice(0, removeCount);
-  if(toDelete.length===0){toast("Todas as tarefas estão fixadas. Desfixe algumas para criar novas.","error");return false;}
+  const toDelete=purgeable.slice(0, removeCount);
+  if(toDelete.length===0){toast("Não há tarefas elegíveis para remoção. Fixadas e tarefas com datas futuras estão protegidas.","error");return false;}
   for(const[id] of toDelete) await dbRemove(`tasks/${id}`);
-  await logAction("purga_tarefas",`${toDelete.length} tarefas antigas removidas (não fixadas). Áreas e fixadas preservadas.`);
-  toast(`${toDelete.length} tarefas antigas removidas. Fixadas e áreas preservadas.`,"warning");
+  await logAction("purga_tarefas",`${toDelete.length} tarefas antigas removidas. Fixadas e tarefas com datas futuras preservadas.`);
+  toast(`${toDelete.length} tarefas antigas removidas. Tarefas com datas futuras e fixadas protegidas.`,"warning");
   return true;
 }
 
-// ── SIDEBAR RESIZE ────────────────────────────────────────────────────────────
 function initSidebarResize(){
   const sidebar=document.querySelector(".sidebar"); if(!sidebar)return;
   if(sidebar.querySelector(".sidebar-resizer"))return; // já inicializado
@@ -521,7 +525,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.17</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.18</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -2569,7 +2573,11 @@ function renderAdminPage(){
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Usuários (máx 100 simultâneos)</div>${usageBar(userList.length,100,"#4ae89c")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Histórico (auto-purga em ${LIMITS.MAX_AUDIT_LOGS})</div>${usageBar(Object.keys(auditLog).length,LIMITS.MAX_AUDIT_LOGS,"#a84ae8")}</div>
       </div>
-      <div style="margin-top:12px;font-size:12px;color:#5a5a6a;display:flex;flex-direction:column;gap:4px">
+      <div style="margin-top:12px;padding:10px 14px;background:rgba(74,200,232,0.07);border:1px solid #4ac8e844;border-radius:8px;font-size:12px;color:#4ac8e8">
+        🛡️ Tarefas protegidas por data (hoje ou futura): <strong>${Object.values(tasks).filter(t=>taskHasFutureDate(t)).length}</strong>
+        <span style="color:#5a5a6a;margin-left:6px">— nunca removidas pela purga automática</span>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:#5a5a6a;display:flex;flex-direction:column;gap:4px">
         <div>📋 <strong style="color:#c8f04e">Tarefas:</strong> ao atingir ${LIMITS.MAX_TASKS}, purga automaticamente as mais antigas não fixadas, mantendo ${LIMITS.TASK_PURGE_TARGET}.</div>
         <div>📜 <strong style="color:#a84ae8">Histórico de ações:</strong> ao atingir ${LIMITS.MAX_AUDIT_LOGS}, purga automaticamente os mais antigos, mantendo ${LIMITS.AUDIT_PURGE_KEEP}.</div>
         <div>🚫 <strong style="color:#7a7a8a">Notas, Áreas, Blocos de fluxograma:</strong> bloqueiam a criação de novos itens com mensagem de erro ao atingir o limite.</div>
