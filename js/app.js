@@ -525,7 +525,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.19</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.20</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -6306,7 +6306,7 @@ function renderAreaNotesEditor(areaId){
       return`<div class="note-block" data-bid="${b.id}" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-radius:6px">
         <span class="block-left-arrow" data-bid="${b.id}" title="Clique: recolher · Arrastar: reordenar" style="font-size:10px;color:#5a5a6a;cursor:grab;user-select:none;display:inline-block;transform:${isCollapsedImg?"rotate(0deg)":"rotate(90deg)"};transition:transform .15s;width:14px;text-align:center;flex-shrink:0;margin-top:4px">▶</span>
         <div class="block-handle" data-bid="${b.id}" style="width:20px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:#3a3a4a;font-size:15px;margin-top:2px">⋮</div>
-        ${isCollapsedImg?`<span style="font-size:12px;color:#4a4a5a;font-style:italic;margin-top:2px">[imagem recolhida]</span>`:`<img src="${b.data}" style="max-width:${b.w||220}px;max-height:200px;border-radius:6px;border:1px solid #2e2e3a;cursor:pointer" onclick="openImgModal(this.src)"/>`}
+        ${isCollapsedImg?`<span style="font-size:12px;color:#8a8a9a;font-style:italic;margin-top:2px">[imagem recolhida]</span>`:`<img src="${b.data}" style="max-width:${b.w||220}px;max-height:200px;border-radius:6px;border:1px solid #2e2e3a;cursor:pointer" onclick="openImgModal(this.src)"/>`}
         <button class="block-del" data-bid="${b.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:15px;padding:0;margin-top:2px;transition:opacity .15s">✕</button>
       </div>`;
     }
@@ -6365,7 +6365,7 @@ function renderAreaNotesEditor(areaId){
     return`<div class="note-block" data-bid="${b.id}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-radius:6px">
       <span class="block-left-arrow" data-bid="${b.id}" title="Clique: recolher · Arrastar: reordenar" style="font-size:10px;color:#5a5a6a;cursor:grab;user-select:none;display:inline-block;transform:${isCollapsed?"rotate(0deg)":"rotate(90deg)"};transition:transform .15s;width:14px;text-align:center;flex-shrink:0">▶</span>
       <div class="block-handle" data-bid="${b.id}" style="width:20px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:#3a3a4a;font-size:15px">⋮</div>
-      ${isCollapsed?`<span style="flex:1;font-size:12px;color:#4a4a5a;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.text||"")}</span>`:`<span contenteditable="true" data-bid="${b.id}" class="block-text" spellcheck="false" style="flex:1;font-size:13px;color:${color};outline:none;word-break:break-word;line-height:1.7;min-height:18px">${linkify(b.text||"")}</span>`}
+      ${isCollapsed?`<span style="flex:1;font-size:13px;color:${color};opacity:0.55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.text||"")}</span>`:`<span contenteditable="true" data-bid="${b.id}" class="block-text" spellcheck="false" style="flex:1;font-size:13px;color:${color};outline:none;word-break:break-word;line-height:1.7;min-height:18px">${linkify(b.text||"")}</span>`}
       <button class="block-del" data-bid="${b.id}" style="opacity:0;background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:15px;padding:0;transition:opacity .15s">✕</button>
     </div>`;
   }
