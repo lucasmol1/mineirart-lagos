@@ -525,7 +525,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.20</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.21</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -739,6 +739,7 @@ function renderAreaPage(){
           <div style="width:20px;height:20px;border-radius:50%;background:${Object.values(users).find(u=>u.name===t.creatorName)?.color||"#4ac8e8"};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f" title="${esc(t.creatorName)}">${initials(t.creatorName)}</div>
         </div>`:""}
       </div>
+      ${t.status==="concluido"&&t.completed_by?`<div style="font-size:9px;color:#c8f04e;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Concluída por ${esc(t.completed_by)}">✓ Concluída por ${esc(t.completed_by)}</div>`:""}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
         ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:"<span></span>"}
         ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:9px;color:#5a5a6a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
@@ -3662,6 +3663,7 @@ function renderMyTasksPage(){
           ${resps.length?`<span style="font-size:10px;color:#9d93ff">👤 ${resps.join(", ")}</span>`:""}
           ${t.creatorName?`<span style="font-size:10px;color:#5a5a6a">por ${esc(t.creatorName)}</span>`:""}
           ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:10px;color:#3a3a4a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
+          ${t.status==="concluido"&&t.completed_by?`<span style="font-size:10px;color:#c8f04e">✓ por ${esc(t.completed_by)}</span>`:""}
         </div>
       </div>
       ${t.date?`<span style="font-size:10px;color:${dl?"#f0a832":"#7a7a8a"};white-space:nowrap;flex-shrink:0">${fmtDate(t.date)}</span>`:""}
@@ -5787,6 +5789,11 @@ function openDetailModal(taskId){
     <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✏ Criada por</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.creatorName,"#4ac8e8","Criador(a)")}</div>
   </div>`:"";
+  const completedByBlock=t.status==="concluido"&&t.completed_by?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28">
+    <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✅ Concluída por</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.completed_by,"#c8f04e","Concluiu")}</div>
+    ${t.completed_at?`<div style="font-size:10px;color:#5a5a6a;margin-top:6px">🕐 ${timeAgo(t.completed_at)}</div>`:""}
+  </div>`:"";
   const statusBtns=Object.entries(STATUS).map(([k,v])=>{
     const sel=t.status===k;
     const s=sel?'background:'+v.color+'22;color:'+v.color+';border:1px solid '+v.color+'60':'border:1px solid #2e2e3a;color:#7a7a8a';
@@ -5829,6 +5836,7 @@ function openDetailModal(taskId){
           <div style="display:flex;gap:6px;flex-wrap:wrap">${statusBtns}</div>
         </div>
         ${creatorBlock}
+        ${completedByBlock}
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid #1a1a22">
           <button id="m-send-alert" class="btn-small" style="border:1px solid #f0a83244;color:#f0a832;font-size:12px">🔔 Enviar alerta aos responsáveis</button>
         </div>
@@ -5992,6 +6000,7 @@ function openDetailModal(taskId){
     const newStatus=b.dataset.status;
     const oldStatus=t.status;
     await dbSet(`tasks/${taskId}/status`,newStatus);
+    if(newStatus==="concluido"){await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());}
     await logAction("editar_tarefa",`Status: "${STATUS[oldStatus]?.label}" → "${STATUS[newStatus]?.label}": ${t.title}`);
     // Notify admin1 when any user marks task complete
     if(newStatus==="concluido"&&!isAdmin1){
@@ -6116,6 +6125,7 @@ async function markUserCompletion(taskId){
   const newStatus=allRespsDone?"concluido":"em-andamento";
   await dbSet(`tasks/${taskId}/completions`,completions);
   await dbSet(`tasks/${taskId}/status`,newStatus);
+  if(allRespsDone){await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());}
   // Notify admin1 that someone completed
   const admin1Id=Object.entries(users).find(([,u])=>u.role==="admin1")?.[0];
   if(admin1Id&&admin1Id!==uid){
