@@ -1,5 +1,14 @@
 # Regras do projeto Mineirart Lagos
 
+## Sobre o negócio
+A Mineirart Lagos é uma empresa de **locação de móveis de alto padrão e artigos decorativos para eventos**.
+
+**Principais clientes:** cerimonialistas, agências de eventos, decoradoras
+
+**Principais eventos atendidos:** corporativos, casamentos, cerimônias em geral, festas
+
+O sistema gerencia o catálogo de produtos, orçamentos, pedidos de locação e controle de disponibilidade do acervo.
+
 - Nunca use worktrees. Edite os arquivos diretamente nesta pasta.
 - Sempre modifique apenas o arquivo js/app.js
 - A cada modificacao, incremente a versao no formato v1.x (atual: v1.18)
