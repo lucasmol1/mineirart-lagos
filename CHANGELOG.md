@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.23
+Corrige dashboard do Performance não aparecer no primeiro clique: impede que listeners Firebase recriem o iframe enquanto ele já está carregando.
+
 ## v1.22
 Contador de alertas não lidos no sidebar (prazos + notificações somados). Notificação só é marcada como lida ao clicar na linha inteira; visual diferenciado para itens não lidos.
 
