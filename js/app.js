@@ -437,10 +437,11 @@ function renderSidebar(){
   }
   const rootAreas=allAreas.filter(a=>!a.parentId).sort((a,b)=>(a.order||0)-(b.order||0));
   const areaTreeHtml=rootAreas.map(a=>areaItem(a,0)).join("");
+  const totalAlertBadge=urgentCount+userNotifsUnread;
 
   sn.innerHTML=`
     ${ni("dashboard","⬡","Dashboard")}
-    ${ni("alertas","🔔","Alertas",urgentCount>0?`<span class="nav-alert-count">${urgentCount}</span>`:"")}
+    ${ni("alertas","🔔","Alertas",totalAlertBadge>0?`<span class="nav-alert-count">${totalAlertBadge}</span>`:"")}
     ${ni("minhas-tarefas","📋","Minhas Tarefas")}
     ${ni("fluxo","⟆","Fluxograma")}
     ${ni("calendario","📅","Calendário")}
@@ -525,7 +526,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.20</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.22</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -739,6 +740,7 @@ function renderAreaPage(){
           <div style="width:20px;height:20px;border-radius:50%;background:${Object.values(users).find(u=>u.name===t.creatorName)?.color||"#4ac8e8"};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f" title="${esc(t.creatorName)}">${initials(t.creatorName)}</div>
         </div>`:""}
       </div>
+      ${t.status==="concluido"&&t.completed_by?`<div style="font-size:9px;color:#c8f04e;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Concluída por ${esc(t.completed_by)}">✓ Concluída por ${esc(t.completed_by)}</div>`:""}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
         ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:"<span></span>"}
         ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:9px;color:#5a5a6a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
@@ -1271,25 +1273,30 @@ function renderAlertsPage(){
   const cl={"warn-now":"\u26a0\ufe0f Menos de 3h","warn-1":"\ud83d\udd34 Amanh\u00e3","warn-2":"\ud83d\udfe0 Em 2 dias","warn-3":"\ud83d\udfe1 Em 3 dias"};
   const bm={"warn-now":"wnow","warn-1":"w1","warn-2":"w2","warn-3":"w3"};
   const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="manual_alert")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const unreadCount=myNotifs.filter(n=>!n.read).length;
   const notifsHtml=myNotifs.length?`
     <div style="margin-bottom:20px">
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-        <span>\ud83d\udcac Notifica\u00e7\u00f5es (${myNotifs.length})</span>
+        <span>\ud83d\udcac Notifica\u00e7\u00f5es (${myNotifs.length})${unreadCount>0?` <span style="font-size:10px;background:#c8f04e;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${unreadCount} n\u00e3o lidas</span>`:""}
+        </span>
         <button id="btn-clear-notifs" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
       </div>
       ${myNotifs.map(n=>{
         const isComment=n.type==="new_comment";
         const borderColor=isComment?"#7c6eff":"#f0a832";
         const task=n.taskId?tasks[n.taskId]:null;
-        return`<div class="alert-card" style="border-left:3px solid ${borderColor};margin-bottom:8px">
+        const isUnread=!n.read;
+        return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isUnread?'background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;':''}transition:background .12s">
+          ${isUnread?`<span title="N\u00e3o lida" style="width:7px;height:7px;border-radius:50%;background:#c8f04e;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
           <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${isComment?"\ud83d\udcac":"\ud83d\udd14"}</div>
           <div style="flex:1">
-            <div style="font-size:13px;color:#d0d0e0;line-height:1.4">${esc(n.msg||"")}</div>
+            <div style="font-size:13px;color:${isUnread?"#f0eff5":"#d0d0e0"};line-height:1.4;${isUnread?"font-weight:500":""}">${esc(n.msg||"")}</div>
             ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid #7c6eff">"${esc(n.commentPreview)}"</div>`:""}
             <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
-            ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a">Ver tarefa</button>`:""}
+            ${isUnread?`<span style="font-size:10px;color:#c8f04e;border:1px solid #c8f04e44;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
+            ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a;pointer-events:none">Ver tarefa</button>`:""}
             <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">\u2715</button>
           </div>
         </div>`;
@@ -2666,8 +2673,19 @@ function attachContentEvents(){
   document.querySelectorAll(".btn-add-task-col").forEach(b=>b.addEventListener("click",()=>openTaskModal({areaId:activeAreaId,status:b.dataset.status,priority:"media"})));
   document.querySelectorAll(".card[data-detail]").forEach(c=>c.addEventListener("click",()=>openDetailModal(c.dataset.detail)));
   document.querySelectorAll(".btn-detail-alert").forEach(b=>b.addEventListener("click",()=>openDetailModal(b.dataset.id)));
-  document.querySelectorAll(".btn-del-notif").forEach(b=>b.addEventListener("click",async()=>{
+  document.querySelectorAll(".btn-del-notif").forEach(b=>b.addEventListener("click",async(e)=>{
+    e.stopPropagation();
     await dbRemove(`user_notifs/${currentUser.uid}/${b.dataset.nid}`);
+  }));
+  // Clique na linha inteira: marca como lida e abre tarefa se houver
+  document.querySelectorAll(".notif-row[data-nid]").forEach(row=>row.addEventListener("click",async(e)=>{
+    if(e.target.closest(".btn-del-notif")) return;
+    const nid=row.dataset.nid;
+    const taskId=row.dataset.taskid;
+    if(window._myNotifs?.[nid]&&!window._myNotifs[nid].read){
+      await dbSet(`user_notifs/${currentUser.uid}/${nid}/read`,true);
+    }
+    if(taskId) openDetailModal(taskId);
   }));
   document.getElementById("btn-clear-notifs")?.addEventListener("click",async()=>{
     const notifs=window._myNotifs||{};
@@ -3662,6 +3680,7 @@ function renderMyTasksPage(){
           ${resps.length?`<span style="font-size:10px;color:#9d93ff">👤 ${resps.join(", ")}</span>`:""}
           ${t.creatorName?`<span style="font-size:10px;color:#5a5a6a">por ${esc(t.creatorName)}</span>`:""}
           ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:10px;color:#3a3a4a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
+          ${t.status==="concluido"&&t.completed_by?`<span style="font-size:10px;color:#c8f04e">✓ por ${esc(t.completed_by)}</span>`:""}
         </div>
       </div>
       ${t.date?`<span style="font-size:10px;color:${dl?"#f0a832":"#7a7a8a"};white-space:nowrap;flex-shrink:0">${fmtDate(t.date)}</span>`:""}
@@ -5787,6 +5806,11 @@ function openDetailModal(taskId){
     <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✏ Criada por</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.creatorName,"#4ac8e8","Criador(a)")}</div>
   </div>`:"";
+  const completedByBlock=t.status==="concluido"&&t.completed_by?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28">
+    <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✅ Concluída por</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.completed_by,"#c8f04e","Concluiu")}</div>
+    ${t.completed_at?`<div style="font-size:10px;color:#5a5a6a;margin-top:6px">🕐 ${timeAgo(t.completed_at)}</div>`:""}
+  </div>`:"";
   const statusBtns=Object.entries(STATUS).map(([k,v])=>{
     const sel=t.status===k;
     const s=sel?'background:'+v.color+'22;color:'+v.color+';border:1px solid '+v.color+'60':'border:1px solid #2e2e3a;color:#7a7a8a';
@@ -5829,6 +5853,7 @@ function openDetailModal(taskId){
           <div style="display:flex;gap:6px;flex-wrap:wrap">${statusBtns}</div>
         </div>
         ${creatorBlock}
+        ${completedByBlock}
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid #1a1a22">
           <button id="m-send-alert" class="btn-small" style="border:1px solid #f0a83244;color:#f0a832;font-size:12px">🔔 Enviar alerta aos responsáveis</button>
         </div>
@@ -5992,6 +6017,7 @@ function openDetailModal(taskId){
     const newStatus=b.dataset.status;
     const oldStatus=t.status;
     await dbSet(`tasks/${taskId}/status`,newStatus);
+    if(newStatus==="concluido"){await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());}
     await logAction("editar_tarefa",`Status: "${STATUS[oldStatus]?.label}" → "${STATUS[newStatus]?.label}": ${t.title}`);
     // Notify admin1 when any user marks task complete
     if(newStatus==="concluido"&&!isAdmin1){
@@ -6116,6 +6142,7 @@ async function markUserCompletion(taskId){
   const newStatus=allRespsDone?"concluido":"em-andamento";
   await dbSet(`tasks/${taskId}/completions`,completions);
   await dbSet(`tasks/${taskId}/status`,newStatus);
+  if(allRespsDone){await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());}
   // Notify admin1 that someone completed
   const admin1Id=Object.entries(users).find(([,u])=>u.role==="admin1")?.[0];
   if(admin1Id&&admin1Id!==uid){
@@ -6249,9 +6276,10 @@ function listenUserNotifs(){
   onValue(dbRef(`user_notifs/${currentUser.uid}`),snap=>{
     const notifs=snap.val()||{};
     window._myNotifs=notifs;
-    userNotifsUnread=Object.values(notifs).filter(n=>!n.read).length;
+    // Conta apenas os tipos visíveis na página de Alertas (new_comment e manual_alert)
+    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="manual_alert")).length;
     // Mostra banner apenas uma vez por notificação nova, sem marcar como lida
-    // (o usuário lê na aba Alertas e clica em Limpar para remover)
+    // (o usuário lê na aba Alertas e clica na linha para marcar como lida)
     Object.entries(notifs).filter(([nid,n])=>!n.read&&!_shownBanners.has(nid)).forEach(([nid,n])=>{
       _shownBanners.add(nid);
       showCalBanner(n.msg,"#c8f04e","Atualização");
