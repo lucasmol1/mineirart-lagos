@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.24
+Performance: dashboard exibe dados do localStorage imediatamente ao abrir, sem esperar resposta do Firebase. Firebase atualiza em seguida em background.
+
 ## v1.23
 Corrige dashboard do Performance não aparecer no primeiro clique: impede que listeners Firebase recriem o iframe enquanto ele já está carregando.
 
