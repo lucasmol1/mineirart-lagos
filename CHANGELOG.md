@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.25
+Fluxograma/organograma: macroprocessos expansíveis, seleção múltipla, criação de grupos, ordenação automática e arestas visíveis mesmo com macro recolhido.
+
 ## v1.24
 Performance: dashboard exibe dados do localStorage imediatamente ao abrir, sem esperar resposta do Firebase. Firebase atualiza em seguida em background.
 

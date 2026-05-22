@@ -526,7 +526,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.23</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.24</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -2490,25 +2490,31 @@ function resetarDados(){
   if(s.dbUrl) _FB_URL=s.dbUrl;
   if(s.token) _FB_TOKEN=s.token;
 
+  // Renderiza imediatamente com dados do localStorage (sem esperar Firebase)
+  var u0=DB.users.find(function(us){return us.id===s.id;});
+  if(!u0){u0={id:s.id,nome:s.nome,login:s.login,senha:'__ext__',role:s.role,cor:s.cor||'#5b6ef5'};DB.users.push(u0);}
+  else{u0.role=s.role;u0.nome=s.nome;}
+  SESSION=u0;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  var _un=document.getElementById('sidebar-uname'),_ur=document.getElementById('sidebar-urole');
+  if(_un)_un.textContent=u0.nome;
+  if(_ur)_ur.textContent=({admin:'Admin',manager:'Gestor',viewer:'Visualizador'})[u0.role]||u0.role;
+  initMonthSelector(); renderAll();
+
   function afterLoad(){
-    // Garante que usuário existe no DB
+    // Atualiza com dados frescos do Firebase
     var u=DB.users.find(function(us){return us.id===s.id;});
     if(!u){
       u={id:s.id,nome:s.nome,login:s.login,senha:'__ext__',role:s.role,cor:s.cor||'#5b6ef5'};
       DB.users.push(u); saveDB();
     } else { u.role=s.role; u.nome=s.nome; saveDB(); }
     SESSION=u;
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='block';
-    var uname=document.getElementById('sidebar-uname');
-    var urole=document.getElementById('sidebar-urole');
-    if(uname) uname.textContent=u.nome;
-    if(urole) urole.textContent=({admin:'Admin',manager:'Gestor',viewer:'Visualizador'})[u.role]||u.role;
     document.getElementById('nav-users').style.display='none';
     initMonthSelector(); renderAll();
   }
 
-  // Carrega dados do Firebase antes de renderizar
+  // Carrega dados frescos do Firebase e re-renderiza
   loadFromFirebase(afterLoad);
 })();
 </script>
