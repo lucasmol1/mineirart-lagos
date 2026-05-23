@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.28
+Nova aba "Atualizações" na sidebar (abaixo de Alertas) para notificações de comentários e alertas manuais; pop-ups restritos a alertas críticos (prazo próximo somente para responsável direto, alertas de colegas no carregamento).
+
 ## v1.27
 Movimentação sincronizada de Macros no fluxograma: ao arrastar um bloco Macro, todos os filhos se movem em conjunto preservando posições relativas.
 

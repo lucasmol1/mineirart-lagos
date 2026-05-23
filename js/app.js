@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.27
+//  Mineirart Lagos — App v1.28
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -380,12 +380,19 @@ function nav(p,extra){
 let alertInterval=null;
 function startAlertWatcher(){alertInterval=setInterval(checkDeadlineAlerts,10*60*1000);setInterval(checkCalAlerts,60*60*1000);setTimeout(checkCalAlerts,3000);listenUserNotifs();}
 async function checkDeadlineAlerts(){
+  const dlColors={"warn-now":"#ff2020","warn-1":"#e85030","warn-2":"#f09030","warn-3":"#e8c84a"};
+  const dlLabels={"warn-now":"⚠️ Menos de 3h","warn-1":"🔴 Amanhã","warn-2":"🟠 Em 2 dias","warn-3":"🟡 Em 3 dias"};
   for(const[id,t]of Object.entries(tasks)){
     if(!t.date||t.status==="concluido")continue;
     const cls=deadlineClass(t.date);if(!cls)continue;
     const key=`${id}-${cls}`;if(alertsSent[key])continue;
     alertsSent[key]=true;
     if(t.resp){const found=Object.values(users).find(u=>u.name===t.resp);if(found?.email)await dbPush("email_queue",{to:found.email,subject:`[Mineirart] Prazo: ${t.title}`,body:`Olá ${t.resp},\n\nPrazo próximo!\nTarefa: ${t.title}\nPrazo: ${fmtDate(t.date)}\n\n— Mineirart Lagos`,sentAt:new Date().toISOString()});}
+    // Pop-up de prazo SOMENTE para o responsável direto da tarefa
+    const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
+    if(currentProfile&&resps.some(r=>r===currentProfile.name)){
+      showCalBanner(`${dlLabels[cls]}: ${t.title}`,dlColors[cls],"Prazo Próximo");
+    }
   }
 }
 
@@ -435,11 +442,10 @@ function renderSidebar(){
   }
   const rootAreas=allAreas.filter(a=>!a.parentId).sort((a,b)=>(a.order||0)-(b.order||0));
   const areaTreeHtml=rootAreas.map(a=>areaItem(a,0)).join("");
-  const totalAlertBadge=urgentCount+userNotifsUnread;
-
   sn.innerHTML=`
     ${ni("dashboard","⬡","Dashboard")}
-    ${ni("alertas","🔔","Alertas",totalAlertBadge>0?`<span class="nav-alert-count">${totalAlertBadge}</span>`:"")}
+    ${ni("alertas","🔔","Alertas",urgentCount>0?`<span class="nav-alert-count">${urgentCount}</span>`:"")}
+    ${ni("atualizacoes","📬","Atualizações",userNotifsUnread>0?`<span class="nav-alert-count">${userNotifsUnread}</span>`:"")}
     ${ni("minhas-tarefas","📋","Minhas Tarefas")}
     ${ni("fluxo","⟆","Fluxograma")}
     ${ni("calendario","📅","Calendário")}
@@ -513,7 +519,7 @@ function renderSidebar(){
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 function renderTopbar(){
   const tb=document.getElementById("topbar");if(!tb)return;
-  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",admin:"Administração",historico:"Histórico de Ações",performance:"Performance"};
+  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",atualizacoes:"Atualizações",admin:"Administração",historico:"Histórico de Ações",performance:"Performance"};
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
   tb.innerHTML=`<button id="hamburger-btn" aria-label="Menu">☰</button>
     <div class="topbar-title">${esc(label)}</div>
@@ -524,7 +530,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.27</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.28</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -664,7 +670,7 @@ document.addEventListener("keydown",e=>{
 function renderContent(){
   const mc=document.getElementById("main-content");if(!mc)return;
   if(!window._myNotifs)window._myNotifs={};
-  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage};
+  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage};
   if(page==="performance"&&!isAdmin1&&!currentProfile?.viewPerformance){navigate("dashboard");return;}
   if(page==="performance"&&mc.querySelector("#perf-iframe"))return;
   try{
@@ -1299,6 +1305,16 @@ function renderAlertsPage(){
   const cc={"warn-now":"#ff2020","warn-1":"#e85030","warn-2":"#f09030","warn-3":"#e8c84a"};
   const cl={"warn-now":"\u26a0\ufe0f Menos de 3h","warn-1":"\ud83d\udd34 Amanh\u00e3","warn-2":"\ud83d\udfe0 Em 2 dias","warn-3":"\ud83d\udfe1 Em 3 dias"};
   const bm={"warn-now":"wnow","warn-1":"w1","warn-2":"w2","warn-3":"w3"};
+  const deadlineHtml=urgent.length?`
+    <div>
+      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">\u23f0 Prazos pr\u00f3ximos (${urgent.length})</div>
+      ${urgent.map(t=>{const c=deadlineClass(t.date),ar=areas[t.areaId];return`<div class="alert-card" style="border-left:3px solid ${cc[c]};margin-bottom:8px"><div class="alert-dot" style="background:${cc[c]}"></div><div style="flex:1"><div style="font-size:14px;font-weight:500;margin-bottom:4px">${esc(t.title)}</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#7a7a8a">${ar?`<span>\ud83d\udcc1 ${esc(ar.name)}</span>`:""}${t.resp?`<span>\ud83d\udc64 ${esc(t.resp)}</span>`:""}<span>\ud83d\udcc5 ${fmtDate(t.date)}</span></div></div><span class="deadline-badge ${bm[c]}">${cl[c]}</span><button class="btn-small btn-detail-alert" data-id="${t.id}" style="border:1px solid #2e2e3a;color:#7a7a8a">Ver</button></div>`;}).join("")}
+    </div>`:"";
+  return`<div class="page-header"><div><div class="page-title">Alertas</div><div class="page-sub">${urgent.length} prazo${urgent.length!==1?"s":""} cr\u00edtico${urgent.length!==1?"s":""}</div></div></div>
+    ${!urgent.length?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\u2705</div><div class="empty-title">Nenhum prazo cr\u00edtico!</div></div>`:deadlineHtml}`;
+}
+
+function renderAtualizacoesPage(){
   const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="manual_alert")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
   const unreadCount=myNotifs.filter(n=>!n.read).length;
   const notifsHtml=myNotifs.length?`
@@ -1328,15 +1344,8 @@ function renderAlertsPage(){
           </div>
         </div>`;
       }).join("")}
-    </div>`:"";
-  const deadlineHtml=urgent.length?`
-    <div>
-      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">\u23f0 Prazos pr\u00f3ximos (${urgent.length})</div>
-      ${urgent.map(t=>{const c=deadlineClass(t.date),ar=areas[t.areaId];return`<div class="alert-card" style="border-left:3px solid ${cc[c]};margin-bottom:8px"><div class="alert-dot" style="background:${cc[c]}"></div><div style="flex:1"><div style="font-size:14px;font-weight:500;margin-bottom:4px">${esc(t.title)}</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#7a7a8a">${ar?`<span>\ud83d\udcc1 ${esc(ar.name)}</span>`:""}${t.resp?`<span>\ud83d\udc64 ${esc(t.resp)}</span>`:""}<span>\ud83d\udcc5 ${fmtDate(t.date)}</span></div></div><span class="deadline-badge ${bm[c]}">${cl[c]}</span><button class="btn-small btn-detail-alert" data-id="${t.id}" style="border:1px solid #2e2e3a;color:#7a7a8a">Ver</button></div>`;}).join("")}
-    </div>`:"";
-  const empty=!urgent.length&&!myNotifs.length;
-  return`<div class="page-header"><div><div class="page-title">Alertas</div><div class="page-sub">${urgent.length} prazo${urgent.length!==1?"s":""} \u00b7 ${myNotifs.length} notifica\u00e7${myNotifs.length!==1?"\u00f5es":"\u00e3o"}</div></div></div>
-    ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\u2705</div><div class="empty-title">Tudo em dia!</div></div>`:`${notifsHtml}${deadlineHtml}`}`;
+    </div>`:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\ud83d\udced</div><div class="empty-title">Nenhuma atualiza\u00e7\u00e3o</div></div>`;
+  return`<div class="page-header"><div><div class="page-title">Atualiza\u00e7\u00f5es</div><div class="page-sub">${myNotifs.length} notifica\u00e7${myNotifs.length!==1?"\u00f5es":"\u00e3o"} \u00b7 ${unreadCount} n\u00e3o lida${unreadCount!==1?"s":""}</div></div></div>${notifsHtml}`;
 }
 
 
@@ -6271,9 +6280,11 @@ function listenUserNotifs(){
     userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="manual_alert")).length;
     // Mostra banner apenas uma vez por notificação nova, sem marcar como lida
     // (o usuário lê na aba Alertas e clica na linha para marcar como lida)
-    Object.entries(notifs).filter(([nid,n])=>!n.read&&!_shownBanners.has(nid)).forEach(([nid,n])=>{
+    // Banner pop-up apenas para alertas manuais enviados por outros usuários (cobranças de tarefas atrasadas)
+    // Comentários vão silenciosamente para a aba Atualizações
+    Object.entries(notifs).filter(([nid,n])=>!n.read&&!_shownBanners.has(nid)&&n.type==="manual_alert").forEach(([nid,n])=>{
       _shownBanners.add(nid);
-      showCalBanner(n.msg,"#c8f04e","Atualização");
+      showCalBanner(n.msg,"#f0a832","Alerta de Colega");
     });
     render();
   });

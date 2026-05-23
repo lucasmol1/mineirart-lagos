@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.26
+//  Mineirart Lagos — App v1.27
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -524,7 +524,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.26</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.27</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -2916,7 +2916,8 @@ function attachFlowEvents(){
       } else {
         selectedNodes.clear();render();
         // ox/oy com zoom e pan — igual ao organograma
-        dragging={id:nid,ox:(e.clientX-r.left-flowPan.x)/flowZoom-n.x,oy:(e.clientY-r.top-flowPan.y)/flowZoom-n.y};
+        const macroChildren=n.type==="root"?Object.fromEntries(Object.entries(flowData.nodes||{}).filter(([,cn])=>cn.flowParent===nid).map(([cid,cn])=>[cid,{x:cn.x,y:cn.y}])):null;
+        dragging={id:nid,ox:(e.clientX-r.left-flowPan.x)/flowZoom-n.x,oy:(e.clientY-r.top-flowPan.y)/flowZoom-n.y,startX:n.x,startY:n.y,children:macroChildren};
       }
     });
   });
@@ -2963,8 +2964,17 @@ function attachFlowEvents(){
     if(!dragging)return;
     // Update local state only during drag
     if(flowData.nodes[dragging.id]){
-      flowData.nodes[dragging.id].x=Math.max(0,cx-dragging.ox);
-      flowData.nodes[dragging.id].y=Math.max(0,cy-dragging.oy);
+      const newX=Math.max(0,cx-dragging.ox);
+      const newY=Math.max(0,cy-dragging.oy);
+      const dx=newX-dragging.startX;
+      const dy=newY-dragging.startY;
+      flowData.nodes[dragging.id].x=newX;
+      flowData.nodes[dragging.id].y=newY;
+      if(dragging.children){
+        Object.entries(dragging.children).forEach(([cid,orig])=>{
+          if(flowData.nodes[cid]){flowData.nodes[cid].x=Math.max(0,orig.x+dx);flowData.nodes[cid].y=Math.max(0,orig.y+dy);}
+        });
+      }
     }
     render();
   });
@@ -3023,6 +3033,12 @@ function attachFlowEvents(){
       const n=flowData.nodes[dragging.id];
       dbSet(`flow/nodes/${dragging.id}/x`,n.x);
       dbSet(`flow/nodes/${dragging.id}/y`,n.y);
+      // Salva posições dos filhos do macro junto com o macro pai
+      if(dragging.children){
+        Object.keys(dragging.children).forEach(cid=>{
+          if(flowData.nodes[cid]){dbSet(`flow/nodes/${cid}/x`,flowData.nodes[cid].x);dbSet(`flow/nodes/${cid}/y`,flowData.nodes[cid].y);}
+        });
+      }
       // Verifica se o bloco foi solto dentro de um macro expandido
       if(n.type!=="root"){
         const cx2=n.x+(n.w||150)/2, cy2=n.y+(n.h||48)/2;
