@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.5
+//  Mineirart Lagos — App v1.25
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -526,7 +526,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.24</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.25</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -802,14 +802,39 @@ function renderAreaPage(){
 // ── FLUXOGRAMA ────────────────────────────────────────────────────────────────
 function renderFlowPage(){
   const allFlowNodes=Object.entries(flowData.nodes||{}).map(([id,n])=>({id,...n}));
+  const flowNodeW=n=>n.w||(n.type==="root"?190:150);
+  const flowNodeH=n=>n.h||(n.type==="root"?58:48);
   // Bloco-raiz: filhos só visíveis se o pai estiver expandido
   const nodes=allFlowNodes.filter(n=>{
     if(!n.flowParent)return true;
     return flowContainerExpanded[n.flowParent]===true;
   });
-  const edges=Object.entries(flowData.edges||{}).map(([id,e])=>({id,...e}));
+  const visibleFlowIds=new Set(nodes.map(n=>n.id));
+  const flowNodeMap=new Map(allFlowNodes.map(n=>[n.id,n]));
+  function visibleFlowEndpoint(id){
+    let n=flowNodeMap.get(id);
+    const seen=new Set();
+    while(n&&!visibleFlowIds.has(n.id)){
+      if(!n.flowParent||seen.has(n.id))return null;
+      seen.add(n.id);
+      n=flowNodeMap.get(n.flowParent);
+    }
+    return n?.id||null;
+  }
+  const collapsedEdgeKeys=new Set();
+  const edges=Object.entries(flowData.edges||{}).map(([id,e])=>{
+    const from=visibleFlowEndpoint(e.from), to=visibleFlowEndpoint(e.to);
+    if(!from||!to||from===to)return null;
+    const collapsed=from!==e.from||to!==e.to;
+    return{id,...e,from,to,_rawFrom:e.from,_rawTo:e.to,_collapsed:collapsed};
+  }).filter(Boolean).filter(e=>{
+    const key=`${e.from}|${e.to}|${e.label||""}|${e.detail?"d":""}`;
+    if(e._collapsed&&collapsedEdgeKeys.has(key))return false;
+    collapsedEdgeKeys.add(key);
+    return true;
+  });
   const myAreas=visibleAreas();
-  const nodeCount=nodes.length;
+  const nodeCount=allFlowNodes.length;
 
   // Fundo de grupo para blocos-raiz expandidos
   const svgContainers=allFlowNodes.filter(n=>n.type==="root"&&flowContainerExpanded[n.id]===true).map(c=>{
@@ -818,35 +843,19 @@ function renderFlowPage(){
     const cColor=c.color||"#7c6eff";
     const xs=[c.x,...children.map(n=>n.x)];
     const ys=[c.y,...children.map(n=>n.y)];
-    const ws=[c.w||150,...children.map(n=>n.w||150)];
-    const hs=[c.h||48,...children.map(n=>n.h||48)];
+    const ws=[flowNodeW(c),...children.map(n=>flowNodeW(n))];
+    const hs=[flowNodeH(c),...children.map(n=>flowNodeH(n))];
     const bx=Math.min(...xs)-18, by=Math.min(...ys)-18;
     const br=Math.max(...xs.map((x,i)=>x+ws[i]))+18;
     const bb=Math.max(...ys.map((y,i)=>y+hs[i]))+18;
     return`<rect x="${bx}" y="${by}" width="${br-bx}" height="${bb-by}" rx="14" fill="${cColor}08" stroke="${cColor}30" stroke-width="1.5" stroke-dasharray="6,4" style="pointer-events:none"/>`;
   }).join("");
 
-  // SVG group backgrounds (nodes that are parents of other nodes)
-  const groupParents=new Map();
-  nodes.forEach(n=>{if(n.groupParent){if(!groupParents.has(n.groupParent))groupParents.set(n.groupParent,[]);groupParents.get(n.groupParent).push(n);}});
-  const svgGroups=Array.from(groupParents.entries()).map(([pid,kids])=>{
-    const pn=nodes.find(n=>n.id===pid);if(!pn)return"";
-    const allInGroup=[pn,...kids];
-    const xs=allInGroup.map(n=>n.x); const ys=allInGroup.map(n=>n.y);
-    const pW=pn.w||150, pH=pn.h||48;
-    const ws=allInGroup.map(n=>n.w||150), hs=allInGroup.map(n=>n.h||48);
-    const bx=Math.min(...xs)-16, by=Math.min(...ys)-16;
-    const br=Math.max(...allInGroup.map((n,i)=>n.x+ws[i]))+16;
-    const bb=Math.max(...allInGroup.map((n,i)=>n.y+hs[i]))+16;
-    const bc2=pn.areaId&&areas[pn.areaId]?areas[pn.areaId].color:(pn.color||"#7c6eff");
-    return`<rect x="${bx}" y="${by}" width="${br-bx}" height="${bb-by}" rx="14" fill="${bc2}08" stroke="${bc2}30" stroke-width="1.5" stroke-dasharray="6,4" style="pointer-events:none"/>
-    <text x="${bx+10}" y="${by+14}" fill="${bc2}" font-size="10" font-family="DM Sans,sans-serif" style="pointer-events:none;opacity:.6">${esc(pn.label||"")}</text>`;
-  }).join("");
 
   // SVG edges
   const svgEdges=edges.map(e=>{
     const fn=nodes.find(n=>n.id===e.from),tn=nodes.find(n=>n.id===e.to);if(!fn||!tn)return"";
-    const fW=fn.w||150,fH=fn.h||48,tW=tn.w||150,tH=tn.h||48;
+    const fW=flowNodeW(fn),fH=flowNodeH(fn),tW=flowNodeW(tn),tH=flowNodeH(tn);
     const fs=e.fromSide||"right",ts=e.toSide||"left";
     const fx=fs==="right"?fn.x+fW:fs==="left"?fn.x:fn.x+fW/2;
     const fy=fs==="bottom"?fn.y+fH:fs==="top"?fn.y:fn.y+fH/2;
@@ -855,7 +864,7 @@ function renderFlowPage(){
     const mx=(fx+tx)/2,my=(fy+ty)/2;
     const isSel=selEdge===e.id;
     const hasLabel=!!e.label, hasDetail=!!e.detail;
-    const strokeColor=isSel?"#c8f04e":hasLabel||hasDetail?"#7c6eff":"#3e3e52";
+    const strokeColor=isSel?"#c8f04e":hasLabel||hasDetail?"#7c6eff":e._collapsed?"#6a6a7a":"#3e3e52";
     const markerSuffix=isSel?"Sel":hasLabel||hasDetail?"Det":"";
     const labelBg=hasLabel?`<rect x="${mx-46}" y="${my-11}" width="92" height="20" rx="5" fill="#13131a" stroke="${strokeColor}" stroke-width="1" style="pointer-events:none"/><text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="middle" fill="${strokeColor}" font-size="10" font-family="DM Sans,sans-serif" style="pointer-events:none">${esc(e.label.slice(0,18)+(e.label.length>18?"...":""))}</text>`:"";
     const detailDot=hasDetail&&!isSel?`<circle cx="${mx+(hasLabel?52:0)}" cy="${my-(hasLabel?0:0)}" r="4" fill="#7c6eff" style="pointer-events:none"/>`:"";
@@ -866,7 +875,7 @@ function renderFlowPage(){
       <text x="${mx+29}" y="${my+25}" text-anchor="middle" dominant-baseline="middle" fill="#9d93ff" font-size="10" font-family="DM Sans,sans-serif" style="pointer-events:none">Editar</text>
     `:"";
     return`<g>
-      <path d="M${fx},${fy} C${fx+60},${fy} ${tx-60},${ty} ${tx},${ty}" fill="none" stroke="${strokeColor}" stroke-width="${isSel?2.5:1.8}" marker-end="url(#arrow${markerSuffix})" ${isSel?'stroke-dasharray="5,3"':""}/>
+      <path d="M${fx},${fy} C${fx+60},${fy} ${tx-60},${ty} ${tx},${ty}" fill="none" stroke="${strokeColor}" stroke-width="${isSel?2.5:1.8}" marker-end="url(#arrow${markerSuffix})" ${isSel||e._collapsed?'stroke-dasharray="5,3"':""}/>
       <path d="M${fx},${fy} C${fx+60},${fy} ${tx-60},${ty} ${tx},${ty}" fill="none" stroke="transparent" stroke-width="20" class="edge-hit" data-edge-id="${e.id}" style="cursor:pointer"/>
       ${labelBg}${detailDot}${selBtns}
     </g>`;}).join("");
@@ -875,7 +884,7 @@ function renderFlowPage(){
   const liveEdge=(()=>{
     if(!connecting)return"";
     const fn=nodes.find(n=>n.id===connecting.fromId);if(!fn)return"";
-    const W2=fn.w||150,H2=fn.h||48;
+    const W2=flowNodeW(fn),H2=flowNodeH(fn);
     const side=connecting.side||"right";
     const sx=side==="right"?fn.x+W2:side==="left"?fn.x:fn.x+W2/2;
     const sy=side==="bottom"?fn.y+H2:side==="top"?fn.y:fn.y+H2/2;
@@ -894,8 +903,8 @@ function renderFlowPage(){
 
   // SVG nodes
   const svgNodes=nodes.map(n=>{
-    const W=n.w||150, H=n.h||48;
-    const fsize=n.fontSize||18, ffam="Syne";
+    const W=flowNodeW(n), H=flowNodeH(n);
+    const fsize=n.fsize||n.fontSize||(n.type==="root"?15:18), ffam=n.ffam||"Syne";
     // Multi-area support
     const areaIdList=Array.isArray(n.areaIds)&&n.areaIds.length>0?n.areaIds:(n.areaId?[n.areaId]:[]);
     const hasArea=areaIdList.length>0&&areas[areaIdList[0]];
@@ -913,14 +922,16 @@ function renderFlowPage(){
       :n.shape==="pill"
       ?`<rect x="0" y="0" width="${W}" height="${H}" rx="${H/2}" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:1.5}"/>`
       :`<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`;
-    const textY=detail?(hasArea?H/2-14:H/2-8):(hasArea?H/2-9:H/2);
-    const childCountFlow=allFlowNodes.filter(n=>n.flowParent===n.id).length;
     const isRootNode=n.type==="root";
+    const childNodesFlow=allFlowNodes.filter(ch=>ch.flowParent===n.id);
+    const childCountFlow=childNodesFlow.length;
     const isExpRoot=isRootNode&&flowContainerExpanded[n.id]===true;
+    const textY=isRootNode?(childCountFlow?H/2-10:H/2):(detail?(hasArea?H/2-14:H/2-8):(hasArea?H/2-9:H/2));
+    const rootMeta=isRootNode?`${isExpRoot?"expandido":"minimizado"} · ${childCountFlow} micro${childCountFlow===1?"":"s"}`:"";
     const expandBtnFlow=isRootNode?`
       <g class="flow-root-toggle" data-nid="${n.id}" style="cursor:pointer">
-        <rect x="${W/2-22}" y="${H+4}" width="44" height="18" rx="9" fill="${isExpRoot?"#c8f04e22":"#1e1e28"}" stroke="${isExpRoot?"#c8f04e":"#3e3e52"}" stroke-width="1.2"/>
-        <text x="${W/2}" y="${H+13}" text-anchor="middle" dominant-baseline="middle" fill="${isExpRoot?"#c8f04e":"#7a7a8a"}" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${isExpRoot?`▲ ${childCountFlow}`:`▼ ${childCountFlow}`}</text>
+        <rect x="${W/2-36}" y="${H+5}" width="72" height="20" rx="10" fill="${isExpRoot?"#c8f04e22":"#1e1e28"}" stroke="${isExpRoot?"#c8f04e":"#3e3e52"}" stroke-width="1.2"/>
+        <text x="${W/2}" y="${H+15}" text-anchor="middle" dominant-baseline="middle" fill="${isExpRoot?"#c8f04e":"#7a7a8a"}" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${isExpRoot?"Recolher":"Abrir"} ${childCountFlow}</text>
       </g>`:"";
     const addChildBtnFlow=isAdmin1&&isRootNode?`
       <g class="flow-add-child" data-nid="${n.id}" style="cursor:pointer" title="Adicionar bloco filho">
@@ -929,8 +940,9 @@ function renderFlowPage(){
       </g>`:"";
     return`<g class="flow-node${isRootNode?" flow-root-node":""}" data-node-id="${n.id}" data-area-id="${areaIdList[0]||""}" transform="translate(${n.x},${n.y})" style="cursor:${hasArea&&!connecting?"pointer":"grab"}">
       ${shape}
+      ${isRootNode?`<rect x="8" y="7" width="42" height="14" rx="7" fill="${bc}22" stroke="${bc}55" stroke-width="1"/><text x="29" y="14" text-anchor="middle" dominant-baseline="middle" fill="${bc}" font-size="8" font-weight="700" font-family="DM Sans,sans-serif" style="pointer-events:none">MACRO</text>`:""}
       <text x="${W/2}" y="${textY}" text-anchor="middle" dominant-baseline="middle" fill="#f0eff5" font-size="${fsize}" font-weight="700" font-family="${ffam},sans-serif" style="pointer-events:none;user-select:none">${esc(lbl)}</text>
-      ${detail?`<text x="${W/2}" y="${textY+fsize+4}" text-anchor="middle" dominant-baseline="middle" fill="${bc}" font-size="${Math.max(9,fsize-4)}" font-weight="400" font-family="DM Sans,sans-serif" style="pointer-events:none;opacity:.85">${esc(detail.slice(0,28)+(detail.length>28?"…":""))}</text>`:""}
+      ${isRootNode?`<text x="${W/2}" y="${textY+fsize+5}" text-anchor="middle" dominant-baseline="middle" fill="${bc}" font-size="10" font-weight="500" font-family="DM Sans,sans-serif" style="pointer-events:none;opacity:.9">${esc(rootMeta)}</text>`:detail?`<text x="${W/2}" y="${textY+fsize+4}" text-anchor="middle" dominant-baseline="middle" fill="${bc}" font-size="${Math.max(9,fsize-4)}" font-weight="400" font-family="DM Sans,sans-serif" style="pointer-events:none;opacity:.85">${esc(detail.slice(0,28)+(detail.length>28?"…":""))}</text>`:""}
       ${hasArea?`<text x="${W/2}" y="${H-6}" text-anchor="middle" dominant-baseline="middle" fill="#f0eff5" font-size="9" font-weight="400" style="pointer-events:none;opacity:.7">↗ ${esc(areaLabel)}</text>`:""}
       ${expandBtnFlow}
       ${addChildBtnFlow}
@@ -950,21 +962,21 @@ function renderFlowPage(){
 
   return`
     <div class="page-header">
-      <div><div class="page-title">Fluxograma</div><div class="page-sub">Conecte áreas e processos — clique num bloco de área para abrí-la</div></div>
+      <div><div class="page-title">Fluxograma</div><div class="page-sub">Modele macroprocessos e microprocessos na mesma cadeia</div></div>
       ${connecting?`<div class="connecting-hint">Clique em outro bloco para conectar <span id="cancel-connect" style="cursor:pointer;text-decoration:underline;margin-left:8px">cancelar</span></div>`:""}
     </div>
     ${limitWarn}
     ${isAdmin1?`
     <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
       <div class="flow-toolbar">
-        <input id="node-label" placeholder="Nome do bloco…" style="flex:1;min-width:120px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
+        <input id="node-label" placeholder="Nome do processo…" style="flex:1;min-width:120px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
         <select id="node-shape" style="background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none;width:116px">
-          <option value="rect">Retângulo</option><option value="diamond">Decisão ◇</option><option value="pill">Pílula</option>
+          <option value="rect">Processo</option><option value="diamond">Decisão ◇</option><option value="pill">Início/Fim</option>
         </select>
         <input type="color" id="node-color" value="#c8f04e" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
-        <button class="btn-primary" id="btn-add-node" ${nodeCount>=LIMITS.MAX_FLOW_NODES?"disabled":""}>+ Bloco</button>
-        <button class="btn-small" id="btn-add-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">📝 Nota</button>
-        <button class="btn-small" id="btn-add-root-node" style="border:1px solid #7c6eff44;color:#9d93ff;background:#7c6eff12">🌿 Bloco Raiz</button>
+        <button class="btn-primary" id="btn-add-node" ${nodeCount>=LIMITS.MAX_FLOW_NODES?"disabled":""}>+ Processo</button>
+        <button class="btn-small" id="btn-add-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">Nota</button>
+        <button class="btn-small" id="btn-add-root-node" style="border:1px solid #7c6eff44;color:#9d93ff;background:#7c6eff12">+ Macro</button>
         <button class="btn-small" id="btn-flow-select-mode" style="border:1px solid ${flowSelectMode?"#c8f04e":"#2e2e3a"};color:${flowSelectMode?"#c8f04e":"#7a7a8a"};background:${flowSelectMode?"#c8f04e12":"transparent"}">${flowSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
       </div>
       ${areaButtons?`<div style="display:flex;gap:6px;flex-wrap:wrap">${areaButtons}</div>`:""}
@@ -988,28 +1000,39 @@ function renderFlowPage(){
           </marker>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)"/>
-        <g id="flow-zoom-group" transform="translate(${flowPan.x},${flowPan.y}) scale(${flowZoom})">${svgContainers}${svgGroups}${svgEdges}${liveEdge}${svgNodes}${selBox?`<rect x="${Math.min(selBox.x1,selBox.x2)}" y="${Math.min(selBox.y1,selBox.y2)}" width="${Math.abs(selBox.x2-selBox.x1)}" height="${Math.abs(selBox.y2-selBox.y1)}" fill="#c8f04e08" stroke="#c8f04e" stroke-width="1" stroke-dasharray="5,3" style="pointer-events:none"/>`:""}</g>
+        <g id="flow-zoom-group" transform="translate(${flowPan.x},${flowPan.y}) scale(${flowZoom})">${svgContainers}${svgEdges}${liveEdge}${svgNodes}${selBox?`<rect x="${Math.min(selBox.x1,selBox.x2)}" y="${Math.min(selBox.y1,selBox.y2)}" width="${Math.abs(selBox.x2-selBox.x1)}" height="${Math.abs(selBox.y2-selBox.y1)}" fill="#c8f04e08" stroke="#c8f04e" stroke-width="1" stroke-dasharray="5,3" style="pointer-events:none"/>`:""}</g>
         ${nodes.length===0?`<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="#2e2e42" font-size="15" font-family="DM Sans,sans-serif">Use os botões acima para adicionar blocos e conectar áreas</text>`:""}
       </svg>
     </div>
     ${selectedNodes.size>1?`
     <div id="flow-group-bar" style="margin-top:10px;background:#1a1a22;border:1px solid #c8f04e33;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span style="font-size:12px;color:#c8f04e;font-weight:700">${selectedNodes.size} blocos selecionados</span>
-      <span style="font-size:12px;color:#7a7a8a">Adicionar ao bloco raiz:</span>
+      <span style="font-size:12px;color:#c8f04e;font-weight:700">${selectedNodes.size} processos selecionados</span>
+      <input id="flow-macro-label" placeholder="Nome do macroprocesso…" style="width:190px;background:#13131a;border:1px solid #2e2e3a;border-radius:7px;padding:6px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none"/>
+      <button id="flow-create-macro" class="btn-primary" style="font-size:12px;padding:6px 14px;background:#7c6eff;color:#fff">Criar macro</button>
+      <button id="flow-layout-selected" class="btn-small" style="font-size:12px;padding:6px 10px;border-color:#4ac8e844;color:#4ac8e8;background:#4ac8e812">Ordenar seleção</button>
+      <span style="font-size:12px;color:#7a7a8a">Mover para macro:</span>
       <select id="flow-group-parent" style="background:#13131a;border:1px solid #2e2e3a;border-radius:7px;padding:6px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none;min-width:160px">
-        <option value="">— Escolher bloco raiz —</option>
-        <option value="__remove__">✕ Remover de bloco raiz</option>
-        ${nodes.filter(n=>n.type==="root"&&!selectedNodes.has(n.id)).map(n=>`<option value="${n.id}">🌿 ${esc(n.label||"?")}</option>`).join("")}
+        <option value="">— Escolher macro —</option>
+        <option value="__remove__">Remover de macro</option>
+        ${nodes.filter(n=>n.type==="root"&&!selectedNodes.has(n.id)).map(n=>`<option value="${n.id}">${esc(n.label||"?")}</option>`).join("")}
       </select>
       <button id="flow-group-apply" class="btn-primary" style="font-size:12px;padding:6px 14px">Aplicar</button>
       <button id="flow-group-clear" class="btn-ghost" style="font-size:12px;padding:6px 10px">Limpar seleção</button>
     </div>`:""}
-    <div style="font-size:11px;color:#4a4a5a;margin-top:8px;display:flex;gap:20px;flex-wrap:wrap">
-      <span>🖱 Arraste no fundo para mover a tela</span>
-      <span>⬜ Botão "Selecionar" para selecionar vários blocos</span>
-      <span>⭕ Círculo nas bordas para conectar blocos</span>
-      <span>🔗 Clique na seta para editar/excluir</span>
-      <span>📁 Blocos de área redirecionam ao clicar</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px">
+    <div style="font-size:11px;color:#4a4a5a;display:flex;gap:16px;flex-wrap:wrap">
+      <span>Arraste no fundo para mover a tela</span>
+      <span>Selecionar: arraste uma área e crie macro</span>
+      <span>Círculos conectam processos</span>
+      <span>Macros recolhidos mantêm a cadeia visível</span>
+      <span>Blocos de área abrem a área</span>
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="flow-zoom-out">−</button>
+      <span id="flow-zoom-label" style="font-size:11px;color:#7a7a8a;min-width:38px;text-align:center">${Math.round(flowZoom*100)}%</span>
+      <button class="zoom-btn" id="flow-zoom-in">+</button>
+      <button class="zoom-btn" id="flow-zoom-reset" style="font-size:10px;padding:0 8px">Reset</button>
+    </div>
     </div>`;
 }
 
@@ -3057,8 +3080,48 @@ function attachFlowEvents(){
       if(parentId==="__remove__") await dbSet(`flow/nodes/${id}/flowParent`,null);
       else{ await dbSet(`flow/nodes/${id}/flowParent`,parentId); flowContainerExpanded[parentId]=true; }
     }
-    toast(parentId==="__remove__"?"Blocos removidos do bloco raiz":`${selectedNodes.size} bloco(s) adicionado(s) ao raiz`,"success");
+    toast(parentId==="__remove__"?"Processos removidos do macro":`${selectedNodes.size} processo(s) movido(s) para o macro`,"success");
     selectedNodes.clear(); render();
+  });
+  document.getElementById("flow-create-macro")?.addEventListener("click",async()=>{
+    const ids=[...selectedNodes].filter(id=>flowData.nodes?.[id]&&flowData.nodes[id].type!=="root");
+    if(ids.length<2){toast("Selecione ao menos dois microprocessos","error");return;}
+    if(Object.keys(flowData.nodes||{}).length>=LIMITS.MAX_FLOW_NODES){toast(`Limite de ${LIMITS.MAX_FLOW_NODES} blocos atingido`,"error");return;}
+    const selected=ids.map(id=>({id,...flowData.nodes[id]}));
+    const minX=Math.min(...selected.map(n=>n.x));
+    const minY=Math.min(...selected.map(n=>n.y));
+    const maxX=Math.max(...selected.map(n=>n.x+(n.w||150)));
+    const first=selected[0];
+    const color=first.areaId&&areas[first.areaId]?areas[first.areaId].color:(first.color||"#7c6eff");
+    const label=document.getElementById("flow-macro-label")?.value.trim()||"Macroprocesso";
+    const parentId=uid();
+    await dbSet(`flow/nodes/${parentId}`,{
+      label,color,shape:"rect",type:"root",
+      x:Math.max(0,minX-28),y:Math.max(0,minY-86),
+      w:Math.max(190,Math.min(280,maxX-minX+56)),h:58
+    });
+    for(const id of ids) await dbSet(`flow/nodes/${id}/flowParent`,parentId);
+    flowContainerExpanded[parentId]=true;
+    selectedNodes.clear();
+    toast("Macroprocesso criado com a seleção","success");
+    render();
+  });
+  document.getElementById("flow-layout-selected")?.addEventListener("click",async()=>{
+    const ids=[...selectedNodes].filter(id=>flowData.nodes?.[id]);
+    if(ids.length<2){toast("Selecione ao menos dois processos","error");return;}
+    const selected=ids.map(id=>({id,...flowData.nodes[id]})).sort((a,b)=>(a.x-b.x)||(a.y-b.y));
+    const startX=Math.min(...selected.map(n=>n.x));
+    const startY=Math.min(...selected.map(n=>n.y));
+    const sameParent=selected.every(n=>(n.flowParent||"")===(selected[0].flowParent||""));
+    const gap=36;
+    let x=startX;
+    for(const n of selected){
+      await dbSet(`flow/nodes/${n.id}/x`,x);
+      await dbSet(`flow/nodes/${n.id}/y`,startY);
+      x+=(n.w||150)+gap;
+    }
+    toast(sameParent?"Microprocessos ordenados":"Processos ordenados","success");
+    render();
   });
   document.getElementById("flow-group-clear")?.addEventListener("click",()=>{selectedNodes.clear();render();});
 
@@ -3070,10 +3133,10 @@ function attachFlowEvents(){
   });
   // ── Bloco Raiz (substitui container) ──
   document.getElementById("btn-add-root-node")?.addEventListener("click",()=>{
-    const label=document.getElementById("node-label")?.value.trim()||"Bloco Raiz";
+    const label=document.getElementById("node-label")?.value.trim()||"Macroprocesso";
     const color=document.getElementById("node-color")?.value||"#7c6eff";
     const id=uid();
-    dbSet(`flow/nodes/${id}`,{label,color,shape:"rect",type:"root",x:80+Math.random()*200,y:60+Math.random()*150});
+    dbSet(`flow/nodes/${id}`,{label,color,shape:"rect",type:"root",x:80+Math.random()*200,y:60+Math.random()*150,w:190,h:58});
     if(document.getElementById("node-label"))document.getElementById("node-label").value="";
   });
   // Toggle expand/collapse do bloco raiz
@@ -3090,17 +3153,20 @@ function attachFlowEvents(){
     el.addEventListener("click",e=>{
       e.stopPropagation();
       const parentId=el.dataset.nid;
-      const label=prompt("Nome do bloco filho:");
+      let label=document.getElementById("node-label")?.value.trim();
+      if(!label)label=prompt("Nome do microprocesso:")?.trim();
       if(!label)return;
       if(Object.keys(flowData.nodes||{}).length>=LIMITS.MAX_FLOW_NODES){toast("Limite de blocos atingido","error");return;}
       const pn=flowData.nodes[parentId];
+      const childCount=Object.values(flowData.nodes||{}).filter(n=>n.flowParent===parentId).length;
       const nid=uid();
       dbSet(`flow/nodes/${nid}`,{
         label,color:pn?.color||"#c8f04e",shape:"rect",
         flowParent:parentId,
-        x:(pn?.x||80)+80+Math.random()*100,
-        y:(pn?.y||60)+80+Math.random()*80
+        x:(pn?.x||80)+40+(childCount%3)*186,
+        y:(pn?.y||60)+95+Math.floor(childCount/3)*86
       });
+      if(document.getElementById("node-label"))document.getElementById("node-label").value="";
       flowContainerExpanded[parentId]=true;
       render();
     });
@@ -4824,7 +4890,28 @@ function renderOrgPage(){
 
   const nodes=allNodes.filter(n=>isVisible(n));
   const nodeIds=new Set(nodes.map(n=>n.id));
-  const edges=allEdges.filter(e=>nodeIds.has(e.from)&&nodeIds.has(e.to));
+  const orgNodeMap=new Map(allNodes.map(n=>[n.id,n]));
+  function visibleOrgEndpoint(id){
+    let n=orgNodeMap.get(id);
+    const seen=new Set();
+    while(n&&!nodeIds.has(n.id)){
+      if(!n.parentId||seen.has(n.id))return null;
+      seen.add(n.id);
+      n=orgNodeMap.get(n.parentId);
+    }
+    return n?.id||null;
+  }
+  const orgEdgeKeys=new Set();
+  const edges=allEdges.map(e=>{
+    const from=visibleOrgEndpoint(e.from), to=visibleOrgEndpoint(e.to);
+    if(!from||!to||from===to)return null;
+    return{...e,from,to,_rawFrom:e.from,_rawTo:e.to,_collapsed:from!==e.from||to!==e.to};
+  }).filter(Boolean).filter(e=>{
+    const key=`${e.from}|${e.to}|${e.label||""}`;
+    if(e._collapsed&&orgEdgeKeys.has(key))return false;
+    orgEdgeKeys.add(key);
+    return true;
+  });
 
   // For each node, count direct children
   function childCount(nid){return allNodes.filter(c=>c.parentId===nid).length;}
@@ -4848,7 +4935,7 @@ function renderOrgPage(){
     }
     const mx=(fx+tx2)/2,my=(fy+ty)/2;
     const isSel=orgSelEdge===e.id;
-    const sc=isSel?"#c8f04e":"#3e3e52";
+    const sc=isSel?"#c8f04e":e._collapsed?"#6a6a7a":"#3e3e52";
     const path=mode==="hierarchy"
       ?`M${fx},${fy} C${fx},${fy+40} ${tx2},${ty-40} ${tx2},${ty}`
       :`M${fx},${fy} C${fx+50},${fy} ${tx2-50},${ty} ${tx2},${ty}`;
@@ -4860,7 +4947,7 @@ function renderOrgPage(){
       <text x="${mx+30}" y="${my+24}" text-anchor="middle" dominant-baseline="middle" fill="#9d93ff" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">Editar</text>
     `:"";
     return`<g>
-      <path d="${path}" fill="none" stroke="${sc}" stroke-width="${isSel?2.2:1.5}"/>
+      <path d="${path}" fill="none" stroke="${sc}" stroke-width="${isSel?2.2:1.5}" ${isSel||e._collapsed?'stroke-dasharray="5,3"':""}/>
       <path d="${path}" fill="none" stroke="transparent" stroke-width="18" class="org-edge-hit" data-eid="${e.id}" style="cursor:pointer"/>
       ${labelHtml}${selBtns}
     </g>`;}).join("");
@@ -4925,6 +5012,7 @@ function renderOrgPage(){
       <rect x="0" y="0" width="${nW}" height="${nH}" rx="10" fill="${orgFill}" stroke="${orgStroke}" stroke-width="${n.parentId?"1.2":"1.8"}"/>
       <rect x="0" y="0" width="6" height="${H}" rx="3" fill="${aColor}"/>
       ${parentBadge}
+      ${hasChildren?`<rect x="${W-54}" y="7" width="42" height="14" rx="7" fill="${aColor}22" stroke="${aColor}55" stroke-width="1"/><text x="${W-33}" y="14" text-anchor="middle" dominant-baseline="middle" fill="${aColor}" font-size="8" font-weight="700" font-family="DM Sans,sans-serif" style="pointer-events:none">GRUPO</text>`:""}
       ${nameTxt?`<text x="16" y="22" fill="#f0eff5" font-size="${n.parentId?"11":"12"}" font-weight="700" font-family="Syne,sans-serif" style="pointer-events:none">${esc(nameTxt)}</text>`:""}
       ${roleTxt?`<text x="16" y="38" fill="${aColor}" font-size="10" font-weight="500" font-family="DM Sans,sans-serif" style="pointer-events:none">${esc(roleTxt)}</text>`:""}
       ${areaTxt?`<text x="16" y="54" fill="#7a7a8a" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${esc(areaTxt)}</text>`:""}
@@ -4943,7 +5031,7 @@ function renderOrgPage(){
   const limitWarn=nodeCount>=LIMITS.MAX_ORG_NODES?`<div style="background:rgba(240,168,50,.12);border:1px solid rgba(240,168,50,.3);color:#f0a832;padding:8px 14px;border-radius:8px;font-size:12px;margin-bottom:12px">Limite de ${LIMITS.MAX_ORG_NODES} blocos atingido.</div>`:"";
 
   return`<div class="page-header">
-    <div><div class="page-title">Organograma</div><div class="page-sub">Estrutura da equipe — grupos expansíveis, hierarquias visuais</div></div>
+    <div><div class="page-title">Organograma</div><div class="page-sub">Organize pessoas, funções e grupos recolhíveis</div></div>
     ${orgConnecting?`<div class="connecting-hint">Clique em outro bloco para conectar <span id="org-cancel-connect" style="cursor:pointer;text-decoration:underline;margin-left:8px">cancelar</span></div>`:""}
   </div>
   ${limitWarn}
@@ -4957,8 +5045,8 @@ function renderOrgPage(){
         <option value="__new__">+ Criar nova área…</option>
       </select>
       <input type="color" id="org-color" value="#7c6eff" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
-      <button class="btn-primary" id="btn-add-org-node" ${nodeCount>=LIMITS.MAX_ORG_NODES?"disabled":""}>+ Bloco raiz</button>
-      <button class="btn-small" id="btn-add-org-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">📝 Nota</button>
+      <button class="btn-primary" id="btn-add-org-node" ${nodeCount>=LIMITS.MAX_ORG_NODES?"disabled":""}>+ Pessoa/Grupo</button>
+      <button class="btn-small" id="btn-add-org-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">Nota</button>
       <button class="btn-small" id="btn-org-select-mode" style="border:1px solid ${orgSelectMode?"#c8f04e":"#2e2e3a"};color:${orgSelectMode?"#c8f04e":"#7a7a8a"};background:${orgSelectMode?"#c8f04e12":"transparent"}">${orgSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
     </div>
   </div>`:""}
@@ -4979,6 +5067,9 @@ function renderOrgPage(){
   ${orgSelectedNodes.size>1?`
   <div id="org-group-bar" style="margin-top:10px;background:#1a1a22;border:1px solid #7c6eff33;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <span style="font-size:12px;color:#9d93ff;font-weight:700">${orgSelectedNodes.size} blocos selecionados</span>
+    <input id="org-group-label" placeholder="Nome do grupo…" style="width:170px;background:#13131a;border:1px solid #2e2e3a;border-radius:7px;padding:6px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none"/>
+    <button id="org-create-group" class="btn-primary" style="font-size:12px;padding:6px 14px;background:#7c6eff;color:#fff">Criar grupo</button>
+    <button id="org-layout-selected" class="btn-small" style="font-size:12px;padding:6px 10px;border-color:#4ac8e844;color:#4ac8e8;background:#4ac8e812">Ordenar seleção</button>
     <span style="font-size:12px;color:#7a7a8a">Mover para dentro de:</span>
     <select id="org-group-parent" style="background:#13131a;border:1px solid #2e2e3a;border-radius:7px;padding:6px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none;min-width:140px">
       <option value="">— Escolher bloco pai —</option>
@@ -4990,11 +5081,11 @@ function renderOrgPage(){
   </div>`:""}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px">
     <div style="font-size:11px;color:#4a4a5a;display:flex;gap:16px;flex-wrap:wrap">
-      <span>🖱 Arraste no fundo para mover a tela</span>
-      <span>⬜ Botão "Selecionar" para selecionar vários blocos</span>
-      <span>▼ N = expandir grupo (N filhos)</span>
-      <span>⭕ Círculo = conectar com linha</span>
-      <span>✏ Lápis = editar bloco</span>
+      <span>Arraste no fundo para mover a tela</span>
+      <span>Selecionar: crie grupos por lote</span>
+      <span>Abrir/Recolher mostra filhos</span>
+      <span>Círculos conectam blocos</span>
+      <span>Lápis edita bloco</span>
     </div>
     <div class="zoom-controls">
       <button class="zoom-btn" id="org-zoom-out">−</button>
@@ -5167,6 +5258,43 @@ function attachOrgEvents(){
       toast(`${orgSelectedNodes.size} bloco(s) agrupado(s)`,"success");
     }
     orgSelectedNodes.clear(); render();
+  });
+  document.getElementById("org-create-group")?.addEventListener("click",async()=>{
+    const ids=[...orgSelectedNodes].filter(id=>orgData.nodes?.[id]);
+    if(ids.length<2){toast("Selecione ao menos dois blocos","error");return;}
+    if(Object.keys(orgData.nodes||{}).length>=LIMITS.MAX_ORG_NODES){toast("Limite de blocos atingido","error");return;}
+    const selected=ids.map(id=>({id,...orgData.nodes[id]}));
+    const minX=Math.min(...selected.map(n=>n.x));
+    const minY=Math.min(...selected.map(n=>n.y));
+    const first=selected[0];
+    const sameParent=selected.every(n=>(n.parentId||"")===(first.parentId||""));
+    const parentId=uid();
+    const name=document.getElementById("org-group-label")?.value.trim()||"Grupo";
+    await dbSet(`org/nodes/${parentId}`,{
+      name,role:"Grupo",areaName:first.areaName||"",areaIds:first.areaIds||null,areaId:first.areaId||null,
+      color:first.color||"#7c6eff",parentId:sameParent?(first.parentId||null):null,
+      x:Math.max(0,minX),y:Math.max(0,minY-110),w:190,h:68
+    });
+    for(const id of ids) await dbSet(`org/nodes/${id}/parentId`,parentId);
+    orgExpanded[parentId]=true;
+    orgSelectedNodes.clear();
+    toast("Grupo criado com a seleção","success");
+    render();
+  });
+  document.getElementById("org-layout-selected")?.addEventListener("click",async()=>{
+    const ids=[...orgSelectedNodes].filter(id=>orgData.nodes?.[id]);
+    if(ids.length<2){toast("Selecione ao menos dois blocos","error");return;}
+    const selected=ids.map(id=>({id,...orgData.nodes[id]})).sort((a,b)=>(a.x-b.x)||(a.y-b.y));
+    const startX=Math.min(...selected.map(n=>n.x));
+    const startY=Math.min(...selected.map(n=>n.y));
+    let x=startX;
+    for(const n of selected){
+      await dbSet(`org/nodes/${n.id}/x`,x);
+      await dbSet(`org/nodes/${n.id}/y`,startY);
+      x+=(n.w||170)+36;
+    }
+    toast("Seleção ordenada","success");
+    render();
   });
   document.getElementById("org-group-clear")?.addEventListener("click",()=>{orgSelectedNodes.clear();render();});
 

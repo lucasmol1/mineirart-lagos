@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.26
+Remove notas (stickies) do fluxo e organograma; drag-drop de processo único em macro expandido; macros expandidos renderizados na frente dos demais blocos.
+
 ## v1.25
 Fluxograma/organograma: macroprocessos expansíveis, seleção múltipla, criação de grupos, ordenação automática e arestas visíveis mesmo com macro recolhido.
 
