@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.29
+Alertas reúne cobranças de colegas (manual_alert) + prazos críticos; Atualizações fica exclusivo para comentários; badges e botões "Limpar" separados por tipo.
+
 ## v1.28
 Nova aba "Atualizações" na sidebar (abaixo de Alertas) para notificações de comentários e alertas manuais; pop-ups restritos a alertas críticos (prazo próximo somente para responsável direto, alertas de colegas no carregamento).
 
