@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.31
+Corrige badge de Alertas zerado: passa a contar todos os níveis de prazo (warn-1 a warn-3), não só os críticos de 24h.
+
 ## v1.30
 Badge numérico em "Minhas Tarefas" na sidebar para novas tarefas designadas ao usuário; some ao abrir a tarefa (clique no modal).
 
