@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.27
+Movimentação sincronizada de Macros no fluxograma: ao arrastar um bloco Macro, todos os filhos se movem em conjunto preservando posições relativas.
+
 ## v1.26
 Remove notas (stickies) do fluxo e organograma; drag-drop de processo único em macro expandido; macros expandidos renderizados na frente dos demais blocos.
 

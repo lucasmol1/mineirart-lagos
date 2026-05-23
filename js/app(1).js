@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.25
+//  Mineirart Lagos — App v1.26
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -100,7 +100,7 @@ let flowContainerExpanded={}; // {containerId: true/false}
 let expandedAreas=new Set(); // sidebar subarea toggle
 let areaNotesListeners={};
 let alertsSent={}, calAlertsSent={};
-let flowStickies={}, orgStickies={}, fyiNotes={};
+let fyiNotes={};
 let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
 let freelaEvents={}, prospEvents={};
 let areaCalCollapsed={};
@@ -278,8 +278,6 @@ function initListeners(){
   dbListen("notes",        v=>{notes=v||{};        checkReady(); render();});
   dbListen("users",        v=>{users=v||{};        checkReady(); render();});
   dbListen("flow",         v=>{flowData=v||{nodes:{},edges:{}}; checkReady(); render();});
-  dbListen("flow/stickies",v=>{flowStickies=v||{}; if(page==="fluxo")renderStickies();});
-  dbListen("org/stickies", v=>{orgStickies=v||{}; if(page==="organograma")renderOrgStickies();});
   // Re-render when own profile changes (catches manageAreas grant)
   dbListen(`users/${currentUser?.uid||'__none__'}`, v=>{ if(v&&currentProfile){const hadMA=currentProfile.manageAreas; currentProfile={...currentProfile,...v}; if(!!v.manageAreas!==!!hadMA)render();}});
   dbListen("fyi_notes", v=>{fyiNotes=v||{}; render();});
@@ -526,7 +524,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.25</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.26</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -901,8 +899,15 @@ function renderFlowPage(){
     return`<linearGradient id="grad-${n.id}" x1="0%" y1="0%" x2="100%" y2="0%">${stops}</linearGradient>`;
   }).join("");
 
-  // SVG nodes
-  const svgNodes=nodes.map(n=>{
+  // SVG nodes — macros expandidos e seus filhos renderizados por último (ficam na frente)
+  const sortedNodes=[...nodes].sort((a,b)=>{
+    const aExp=a.type==="root"&&flowContainerExpanded[a.id]===true;
+    const bExp=b.type==="root"&&flowContainerExpanded[b.id]===true;
+    const aChild=!!a.flowParent&&flowContainerExpanded[a.flowParent]===true;
+    const bChild=!!b.flowParent&&flowContainerExpanded[b.flowParent]===true;
+    return (aExp?2:aChild?1:0)-(bExp?2:bChild?1:0);
+  });
+  const svgNodes=sortedNodes.map(n=>{
     const W=flowNodeW(n), H=flowNodeH(n);
     const fsize=n.fsize||n.fontSize||(n.type==="root"?15:18), ffam=n.ffam||"Syne";
     // Multi-area support
@@ -975,14 +980,12 @@ function renderFlowPage(){
         </select>
         <input type="color" id="node-color" value="#c8f04e" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
         <button class="btn-primary" id="btn-add-node" ${nodeCount>=LIMITS.MAX_FLOW_NODES?"disabled":""}>+ Processo</button>
-        <button class="btn-small" id="btn-add-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">Nota</button>
         <button class="btn-small" id="btn-add-root-node" style="border:1px solid #7c6eff44;color:#9d93ff;background:#7c6eff12">+ Macro</button>
         <button class="btn-small" id="btn-flow-select-mode" style="border:1px solid ${flowSelectMode?"#c8f04e":"#2e2e3a"};color:${flowSelectMode?"#c8f04e":"#7a7a8a"};background:${flowSelectMode?"#c8f04e12":"transparent"}">${flowSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
       </div>
       ${areaButtons?`<div style="display:flex;gap:6px;flex-wrap:wrap">${areaButtons}</div>`:""}
     </div>`:""}
     <div class="flow-canvas" style="position:relative">
-      <div id="stickies-layer" style="position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden"></div>
       <svg id="flow-svg" width="100%" height="560" style="display:block;cursor:${connecting?"crosshair":flowSelectMode?"crosshair":"grab"}">
         <defs>
           ${flowGradDefs}
@@ -3020,6 +3023,24 @@ function attachFlowEvents(){
       const n=flowData.nodes[dragging.id];
       dbSet(`flow/nodes/${dragging.id}/x`,n.x);
       dbSet(`flow/nodes/${dragging.id}/y`,n.y);
+      // Verifica se o bloco foi solto dentro de um macro expandido
+      if(n.type!=="root"){
+        const cx2=n.x+(n.w||150)/2, cy2=n.y+(n.h||48)/2;
+        const roots2=Object.entries(flowData.nodes||{}).filter(([,rn])=>rn.type==="root"&&flowContainerExpanded[rn.id]===true);
+        for(const[rid,rn] of roots2){
+          if(rid===dragging.id)continue;
+          const rch=Object.values(flowData.nodes||{}).filter(ch=>ch.flowParent===rid);
+          const allX=[rn.x,...rch.map(ch=>ch.x)], allY=[rn.y,...rch.map(ch=>ch.y)];
+          const allW=[rn.w||150,...rch.map(ch=>ch.w||150)], allH=[rn.h||48,...rch.map(ch=>ch.h||48)];
+          const bx=Math.min(...allX)-30, by=Math.min(...allY)-30;
+          const br=Math.max(...allX.map((x,i)=>x+allW[i]))+30;
+          const bb=Math.max(...allY.map((y,i)=>y+allH[i]))+50;
+          if(cx2>=bx&&cx2<=br&&cy2>=by&&cy2<=bb){
+            if(n.flowParent!==rid){dbSet(`flow/nodes/${dragging.id}/flowParent`,rid);toast("Processo adicionado ao macro","success");}
+            break;
+          }
+        }
+      }
     }
     if(flowPanning){flowPanning=false; return;}
     selBox=null; flowSelecting=false;
@@ -3176,11 +3197,6 @@ function attachFlowEvents(){
   // When dragging ends, check if node center is over a container
   // This is handled in mouseup after dragging
 
-  // ── Sticky notes ──
-  document.getElementById("btn-add-sticky")?.addEventListener("click",()=>{
-    const id=uid();
-    dbSet(`flow/stickies/${id}`,{id,text:"",color:"#f0a832",x:80+Math.random()*300,y:60+Math.random()*200,expanded:true,createdAt:new Date().toISOString()});
-  });
   // ── Touch events mobile — Fluxograma (só visualização + clique nos blocos) ──
   (function attachFlowTouch(){
     const svg=document.getElementById("flow-svg"); if(!svg)return;
@@ -3404,93 +3420,6 @@ function openContainerDrawer(cid){
 }
 
 
-function renderStickies(){
-  const layer=document.getElementById("stickies-layer"); if(!layer)return;
-  layer.innerHTML="";
-  Object.entries(flowStickies).forEach(([sid,s])=>{
-    const div=document.createElement("div");
-    div.dataset.sid=sid;
-    div.style.cssText=`position:absolute;left:${s.x}px;top:${s.y}px;width:200px;pointer-events:all;z-index:20;`;
-    const color=s.color||"#f0a832";
-    const expanded=s.expanded!==false;
-    div.innerHTML=`
-      <div class="sticky-note" style="background:${color}18;border:1.5px solid ${color}55;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.35);overflow:hidden;user-select:none">
-        <!-- Header bar -->
-        <div class="sticky-header" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:${color}30;cursor:grab;border-bottom:1px solid ${color}33">
-          <span style="font-size:13px">📝</span>
-          <span style="flex:1;font-size:11px;font-weight:700;color:${color};font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.text?s.text.slice(0,28)+(s.text.length>28?"…":""):"Nova nota"}</span>
-          <div style="display:flex;gap:4px">
-            ${isAdmin()?`<div class="sticky-color-btn" data-sid="${sid}" title="Cor" style="width:14px;height:14px;border-radius:50%;background:${color};cursor:pointer;border:2px solid ${color}88"></div>`:""}
-            <div class="sticky-toggle" data-sid="${sid}" title="${expanded?"Minimizar":"Expandir"}" style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:${color};font-size:12px;border-radius:4px">${expanded?"▲":"▼"}</div>
-            ${isAdmin()?`<div class="sticky-del" data-sid="${sid}" title="Excluir" style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ff6b6b;font-size:12px;border-radius:4px">✕</div>`:""}
-          </div>
-        </div>
-        <!-- Body -->
-        ${expanded?`<div style="padding:10px">
-          <div class="sticky-body" data-sid="${sid}" contenteditable="${isAdmin()||true}" spellcheck="false" style="font-size:12px;color:#d0d0d8;line-height:1.7;min-height:60px;outline:none;word-break:break-word;white-space:pre-wrap;font-family:'DM Sans',sans-serif">${esc(s.text||"")}</div>
-        </div>`:""}
-      </div>`;
-    layer.appendChild(div);
-
-    // Drag the sticky
-    const header=div.querySelector(".sticky-header");
-    let dsx=0,dsy=0,startX=0,startY=0,isDragging=false;
-    header.addEventListener("mousedown",e=>{
-      if(e.target.classList.contains("sticky-toggle")||e.target.classList.contains("sticky-del")||e.target.classList.contains("sticky-color-btn"))return;
-      e.preventDefault(); e.stopPropagation();
-      isDragging=true;
-      startX=e.clientX; startY=e.clientY;
-      dsx=s.x; dsy=s.y;
-      header.style.cursor="grabbing";
-      function onMove(ev){
-        if(!isDragging)return;
-        const nx=Math.max(0,dsx+(ev.clientX-startX));
-        const ny=Math.max(0,dsy+(ev.clientY-startY));
-        div.style.left=nx+"px"; div.style.top=ny+"px";
-      }
-      function onUp(ev){
-        isDragging=false; header.style.cursor="grab";
-        const nx=Math.max(0,dsx+(ev.clientX-startX));
-        const ny=Math.max(0,dsy+(ev.clientY-startY));
-        dbSet(`flow/stickies/${sid}/x`,nx);
-        dbSet(`flow/stickies/${sid}/y`,ny);
-        document.removeEventListener("mousemove",onMove);
-        document.removeEventListener("mouseup",onUp);
-      }
-      document.addEventListener("mousemove",onMove);
-      document.addEventListener("mouseup",onUp);
-    });
-
-    // Toggle expand/collapse
-    div.querySelector(".sticky-toggle")?.addEventListener("click",e=>{
-      e.stopPropagation();
-      dbSet(`flow/stickies/${sid}/expanded`,!expanded);
-    });
-
-    // Delete
-    div.querySelector(".sticky-del")?.addEventListener("click",e=>{
-      e.stopPropagation();
-      if(confirm("Excluir esta nota?")) dbRemove(`flow/stickies/${sid}`);
-    });
-
-    // Save text on blur
-    div.querySelector(".sticky-body")?.addEventListener("blur",e=>{
-      dbSet(`flow/stickies/${sid}/text`,e.target.innerText.trim());
-    });
-    div.querySelector(".sticky-body")?.addEventListener("click",e=>e.stopPropagation());
-
-    // Color picker
-    div.querySelector(".sticky-color-btn")?.addEventListener("click",e=>{
-      e.stopPropagation();
-      const STICKY_COLORS=["#f0a832","#c8f04e","#7c6eff","#4ac8e8","#ff6b6b","#4ae89c","#e84ab8"];
-      showCtxMenu(e.clientX,e.clientY,STICKY_COLORS.map(c=>({
-        action:c,icon:`<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${c};margin-right:2px;vertical-align:middle"></span>`,
-        label:["Laranja","Verde","Roxo","Azul","Vermelho","Verde-água","Rosa"][STICKY_COLORS.indexOf(c)],
-        fn:()=>dbSet(`flow/stickies/${sid}/color`,c)
-      })));
-    });
-  });
-}
 
 
 // ── FLOW NODE EDIT MODAL ──────────────────────────────────────────────────────
@@ -4867,7 +4796,7 @@ function _orgMouseUp(){
 // Registra UMA VEZ — nunca dentro de render/attachOrgEvents
 document.addEventListener("mousemove",_orgMouseMove);
 document.addEventListener("mouseup",_orgMouseUp);
-// (orgStickies, fyiNotes, flowZoom, flowPan, flowStickies, orgExpanded declared at top)
+// (fyiNotes, flowZoom, flowPan, orgExpanded declared at top)
 
 // ── ORGANOGRAMA ───────────────────────────────────────────────────────────────
 function renderOrgPage(){
@@ -5046,12 +4975,10 @@ function renderOrgPage(){
       </select>
       <input type="color" id="org-color" value="#7c6eff" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
       <button class="btn-primary" id="btn-add-org-node" ${nodeCount>=LIMITS.MAX_ORG_NODES?"disabled":""}>+ Pessoa/Grupo</button>
-      <button class="btn-small" id="btn-add-org-sticky" style="border:1px solid #f0a83244;color:#f0a832;background:#f0a83212">Nota</button>
       <button class="btn-small" id="btn-org-select-mode" style="border:1px solid ${orgSelectMode?"#c8f04e":"#2e2e3a"};color:${orgSelectMode?"#c8f04e":"#7a7a8a"};background:${orgSelectMode?"#c8f04e12":"transparent"}">${orgSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
     </div>
   </div>`:""}
   <div class="flow-canvas" style="position:relative">
-    <div id="org-stickies-layer" style="position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden"></div>
     <svg id="org-svg" width="100%" height="650" style="display:block;cursor:${orgConnecting?"crosshair":orgSelectMode?"crosshair":"grab"}">
       <defs>
         ${orgGradDefs}
@@ -5304,12 +5231,6 @@ function attachOrgEvents(){
     if(!orgSelectMode){orgSelectedNodes.clear();}
     render();
   });
-  document.getElementById("btn-add-org-sticky")?.addEventListener("click",()=>{
-    const id=uid();
-    dbSet(`org/stickies/${id}`,{id,text:"",color:"#f0a832",x:80+Math.random()*300,y:60+Math.random()*200,expanded:true,createdAt:new Date().toISOString()});
-  });
-  renderOrgStickies();
-
   // ── Touch events mobile — Organograma (só visualização + clique nos blocos) ──
   (function attachOrgTouch(){
     const svg=document.getElementById("org-svg"); if(!svg)return;
@@ -5348,87 +5269,6 @@ function attachOrgEvents(){
   })();
 } // fim attachOrgEvents
 
-function renderOrgStickies(){
-  const layer=document.getElementById("org-stickies-layer"); if(!layer)return;
-  layer.innerHTML="";
-  Object.entries(orgStickies).forEach(([sid,s])=>{
-    const div=document.createElement("div");
-    div.dataset.sid=sid;
-    div.style.cssText=`position:absolute;left:${s.x}px;top:${s.y}px;width:200px;pointer-events:all;z-index:20;`;
-    const color=s.color||"#f0a832";
-    const expanded=s.expanded!==false;
-    div.innerHTML=`
-      <div class="sticky-note" style="background:${color}18;border:1.5px solid ${color}55;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.35);overflow:hidden;user-select:none">
-        <div class="sticky-header" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:${color}30;cursor:grab;border-bottom:1px solid ${color}33">
-          <span style="font-size:13px">📝</span>
-          <span style="flex:1;font-size:11px;font-weight:700;color:${color};font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.text?s.text.slice(0,28)+(s.text.length>28?"…":""):"Nova nota"}</span>
-          <div style="display:flex;gap:4px">
-            ${isAdmin()?`<div class="org-sticky-color-btn" data-sid="${sid}" title="Cor" style="width:14px;height:14px;border-radius:50%;background:${color};cursor:pointer;border:2px solid ${color}88"></div>`:""}
-            <div class="org-sticky-toggle" data-sid="${sid}" title="${expanded?"Minimizar":"Expandir"}" style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:${color};font-size:12px;border-radius:4px">${expanded?"▲":"▼"}</div>
-            ${isAdmin()?`<div class="org-sticky-del" data-sid="${sid}" title="Excluir" style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ff6b6b;font-size:12px;border-radius:4px">✕</div>`:""}
-          </div>
-        </div>
-        ${expanded?`<div style="padding:10px">
-          <div class="org-sticky-body" data-sid="${sid}" contenteditable="true" spellcheck="false" style="font-size:12px;color:#d0d0d8;line-height:1.7;min-height:60px;outline:none;word-break:break-word;white-space:pre-wrap;font-family:'DM Sans',sans-serif">${esc(s.text||"")}</div>
-        </div>`:""}
-      </div>`;
-    layer.appendChild(div);
-
-    // Drag
-    const header=div.querySelector(".sticky-header");
-    let dsx=0,dsy=0,startX=0,startY=0,draggingS=false;
-    header.addEventListener("mousedown",e=>{
-      if(e.target.classList.contains("org-sticky-toggle")||e.target.classList.contains("org-sticky-del")||e.target.classList.contains("org-sticky-color-btn"))return;
-      e.preventDefault(); e.stopPropagation();
-      draggingS=true; startX=e.clientX; startY=e.clientY; dsx=s.x; dsy=s.y;
-      header.style.cursor="grabbing";
-      function onMove(ev){
-        if(!draggingS)return;
-        div.style.left=Math.max(0,dsx+(ev.clientX-startX))+"px";
-        div.style.top=Math.max(0,dsy+(ev.clientY-startY))+"px";
-      }
-      function onUp(ev){
-        draggingS=false; header.style.cursor="grab";
-        dbSet(`org/stickies/${sid}/x`,Math.max(0,dsx+(ev.clientX-startX)));
-        dbSet(`org/stickies/${sid}/y`,Math.max(0,dsy+(ev.clientY-startY)));
-        document.removeEventListener("mousemove",onMove);
-        document.removeEventListener("mouseup",onUp);
-      }
-      document.addEventListener("mousemove",onMove);
-      document.addEventListener("mouseup",onUp);
-    });
-
-    // Toggle expand/collapse
-    div.querySelector(".org-sticky-toggle")?.addEventListener("click",e=>{
-      e.stopPropagation();
-      dbSet(`org/stickies/${sid}/expanded`,!expanded);
-    });
-
-    // Delete
-    div.querySelector(".org-sticky-del")?.addEventListener("click",e=>{
-      e.stopPropagation();
-      if(confirm("Excluir esta nota?")) dbRemove(`org/stickies/${sid}`);
-    });
-
-    // Save text on blur
-    div.querySelector(".org-sticky-body")?.addEventListener("blur",e=>{
-      dbSet(`org/stickies/${sid}/text`,e.target.innerText.trim());
-    });
-    div.querySelector(".org-sticky-body")?.addEventListener("click",e=>e.stopPropagation());
-
-    // Color picker
-    div.querySelector(".org-sticky-color-btn")?.addEventListener("click",e=>{
-      e.stopPropagation();
-      const STICKY_COLORS=["#f0a832","#c8f04e","#7c6eff","#4ac8e8","#ff6b6b","#4ae89c","#e84ab8"];
-      showCtxMenu(e.clientX,e.clientY,STICKY_COLORS.map((c,i)=>({
-        action:c,
-        icon:`<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${c};margin-right:2px;vertical-align:middle"></span>`,
-        label:["Laranja","Verde","Roxo","Azul","Vermelho","Verde-água","Rosa"][i],
-        fn:()=>dbSet(`org/stickies/${sid}/color`,c)
-      })));
-    });
-  });
-}
 
 function openOrgNodeModal(nodeId, parentId=null){
   const n=nodeId?{id:nodeId,...orgData.nodes[nodeId]}:{};
