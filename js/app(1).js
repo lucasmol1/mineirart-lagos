@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.28
+//  Mineirart Lagos — App v1.29
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -444,7 +444,7 @@ function renderSidebar(){
   const areaTreeHtml=rootAreas.map(a=>areaItem(a,0)).join("");
   sn.innerHTML=`
     ${ni("dashboard","⬡","Dashboard")}
-    ${ni("alertas","🔔","Alertas",urgentCount>0?`<span class="nav-alert-count">${urgentCount}</span>`:"")}
+    ${ni("alertas","🔔","Alertas",(urgentCount+manualAlertUnread)>0?`<span class="nav-alert-count">${urgentCount+manualAlertUnread}</span>`:"")}
     ${ni("atualizacoes","📬","Atualizações",userNotifsUnread>0?`<span class="nav-alert-count">${userNotifsUnread}</span>`:"")}
     ${ni("minhas-tarefas","📋","Minhas Tarefas")}
     ${ni("fluxo","⟆","Fluxograma")}
@@ -530,7 +530,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.28</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.29</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1305,17 +1305,40 @@ function renderAlertsPage(){
   const cc={"warn-now":"#ff2020","warn-1":"#e85030","warn-2":"#f09030","warn-3":"#e8c84a"};
   const cl={"warn-now":"\u26a0\ufe0f Menos de 3h","warn-1":"\ud83d\udd34 Amanh\u00e3","warn-2":"\ud83d\udfe0 Em 2 dias","warn-3":"\ud83d\udfe1 Em 3 dias"};
   const bm={"warn-now":"wnow","warn-1":"w1","warn-2":"w2","warn-3":"w3"};
+  const manualAlerts=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&n.type==="manual_alert").sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const manualUnread=manualAlerts.filter(n=>!n.read).length;
+  const manualHtml=manualAlerts.length?`
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>\ud83d\udd14 Cobran\u00e7as de colegas (${manualAlerts.length})${manualUnread>0?` <span style="font-size:10px;background:#f0a832;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${manualUnread} n\u00e3o lidas</span>`:""}</span>
+        <button id="btn-clear-manual-alerts" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
+      </div>
+      ${manualAlerts.map(n=>{const isUnread=!n.read;const task=n.taskId?tasks[n.taskId]:null;return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid #f0a832;margin-bottom:8px;cursor:pointer;${isUnread?'background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;':''}transition:background .12s">
+        ${isUnread?`<span style="width:7px;height:7px;border-radius:50%;background:#f0a832;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
+        <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">\ud83d\udd14</div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:${isUnread?"#f0eff5":"#d0d0e0"};line-height:1.4;${isUnread?"font-weight:500":""}">${esc(n.msg||"")}</div>
+          <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+          ${isUnread?`<span style="font-size:10px;color:#f0a832;border:1px solid #f0a83244;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
+          ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a;pointer-events:none">Ver tarefa</button>`:""}
+          <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">\u2715</button>
+        </div>
+      </div>`;}).join("")}
+    </div>`:"";
   const deadlineHtml=urgent.length?`
     <div>
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">\u23f0 Prazos pr\u00f3ximos (${urgent.length})</div>
       ${urgent.map(t=>{const c=deadlineClass(t.date),ar=areas[t.areaId];return`<div class="alert-card" style="border-left:3px solid ${cc[c]};margin-bottom:8px"><div class="alert-dot" style="background:${cc[c]}"></div><div style="flex:1"><div style="font-size:14px;font-weight:500;margin-bottom:4px">${esc(t.title)}</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#7a7a8a">${ar?`<span>\ud83d\udcc1 ${esc(ar.name)}</span>`:""}${t.resp?`<span>\ud83d\udc64 ${esc(t.resp)}</span>`:""}<span>\ud83d\udcc5 ${fmtDate(t.date)}</span></div></div><span class="deadline-badge ${bm[c]}">${cl[c]}</span><button class="btn-small btn-detail-alert" data-id="${t.id}" style="border:1px solid #2e2e3a;color:#7a7a8a">Ver</button></div>`;}).join("")}
     </div>`:"";
-  return`<div class="page-header"><div><div class="page-title">Alertas</div><div class="page-sub">${urgent.length} prazo${urgent.length!==1?"s":""} cr\u00edtico${urgent.length!==1?"s":""}</div></div></div>
-    ${!urgent.length?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\u2705</div><div class="empty-title">Nenhum prazo cr\u00edtico!</div></div>`:deadlineHtml}`;
+  const empty=!urgent.length&&!manualAlerts.length;
+  return`<div class="page-header"><div><div class="page-title">Alertas</div><div class="page-sub">${manualAlerts.length} cobran\u00e7a${manualAlerts.length!==1?"s":""} \u00b7 ${urgent.length} prazo${urgent.length!==1?"s":""} cr\u00edtico${urgent.length!==1?"s":""}</div></div></div>
+    ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\u2705</div><div class="empty-title">Nenhum alerta!</div></div>`:`${manualHtml}${deadlineHtml}`}`;
 }
 
 function renderAtualizacoesPage(){
-  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="manual_alert")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&n.type==="new_comment").sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
   const unreadCount=myNotifs.filter(n=>!n.read).length;
   const notifsHtml=myNotifs.length?`
     <div style="margin-bottom:20px">
@@ -2731,9 +2754,15 @@ function attachContentEvents(){
   }));
   document.getElementById("btn-clear-notifs")?.addEventListener("click",async()=>{
     const notifs=window._myNotifs||{};
-    const commentAlerts=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="manual_alert");
-    for(const k of commentAlerts) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
-    toast("Notificações limpas","success");
+    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment");
+    for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
+    toast("Comentários limpos","success");
+  });
+  document.getElementById("btn-clear-manual-alerts")?.addEventListener("click",async()=>{
+    const notifs=window._myNotifs||{};
+    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="manual_alert");
+    for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
+    toast("Cobranças limpas","success");
   });
   document.querySelectorAll(".toggle-view-performance").forEach(btn=>{
     btn.addEventListener("click",async()=>{
@@ -6270,14 +6299,15 @@ function removeCtxMenu(){if(ctxMenu){ctxMenu.remove();ctxMenu=null;}}
 
 // ── USER NOTIFICATIONS LISTENER ──────────────────────────────────────────────
 let userNotifsUnread=0;
+let manualAlertUnread=0;
 function listenUserNotifs(){
   if(!currentUser)return;
   let _shownBanners=new Set();
   onValue(dbRef(`user_notifs/${currentUser.uid}`),snap=>{
     const notifs=snap.val()||{};
     window._myNotifs=notifs;
-    // Conta apenas os tipos visíveis na página de Alertas (new_comment e manual_alert)
-    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="manual_alert")).length;
+    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="new_comment").length;
+    manualAlertUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="manual_alert").length;
     // Mostra banner apenas uma vez por notificação nova, sem marcar como lida
     // (o usuário lê na aba Alertas e clica na linha para marcar como lida)
     // Banner pop-up apenas para alertas manuais enviados por outros usuários (cobranças de tarefas atrasadas)

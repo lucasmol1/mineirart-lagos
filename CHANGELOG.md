@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.30
+Badge numérico em "Minhas Tarefas" na sidebar para novas tarefas designadas ao usuário; some ao abrir a tarefa (clique no modal).
+
 ## v1.29
 Alertas reúne cobranças de colegas (manual_alert) + prazos críticos; Atualizações fica exclusivo para comentários; badges e botões "Limpar" separados por tipo.
 

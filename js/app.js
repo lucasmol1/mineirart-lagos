@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.29
+//  Mineirart Lagos — App v1.30
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -378,7 +378,24 @@ function nav(p,extra){
 
 // ── ALERT WATCHER ─────────────────────────────────────────────────────────────
 let alertInterval=null;
-function startAlertWatcher(){alertInterval=setInterval(checkDeadlineAlerts,10*60*1000);setInterval(checkCalAlerts,60*60*1000);setTimeout(checkCalAlerts,3000);listenUserNotifs();}
+function markTaskSeen(taskId){
+  if(!currentUser)return;
+  const key=`seen_tasks_${currentUser.uid}`;
+  let seen;try{seen=new Set(JSON.parse(localStorage.getItem(key)||"[]"));}catch(e){seen=new Set();}
+  if(seen.has(taskId))return;
+  seen.add(taskId);
+  try{localStorage.setItem(key,JSON.stringify([...seen]));}catch(e){}
+  renderSidebar();
+}
+function initMyTasksBadge(){
+  if(!currentUser||!currentProfile)return;
+  const key=`seen_tasks_${currentUser.uid}`;
+  if(localStorage.getItem(key)!==null)return;
+  const myName=currentProfile.name||"";
+  const ids=Object.entries(tasks).filter(([,t])=>{const rs=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);return rs.some(r=>r===myName);}).map(([id])=>id);
+  try{localStorage.setItem(key,JSON.stringify(ids));}catch(e){}
+}
+function startAlertWatcher(){alertInterval=setInterval(checkDeadlineAlerts,10*60*1000);setInterval(checkCalAlerts,60*60*1000);setTimeout(checkCalAlerts,3000);listenUserNotifs();initMyTasksBadge();}
 async function checkDeadlineAlerts(){
   const dlColors={"warn-now":"#ff2020","warn-1":"#e85030","warn-2":"#f09030","warn-3":"#e8c84a"};
   const dlLabels={"warn-now":"⚠️ Menos de 3h","warn-1":"🔴 Amanhã","warn-2":"🟠 Em 2 dias","warn-3":"🟡 Em 3 dias"};
@@ -446,7 +463,7 @@ function renderSidebar(){
     ${ni("dashboard","⬡","Dashboard")}
     ${ni("alertas","🔔","Alertas",(urgentCount+manualAlertUnread)>0?`<span class="nav-alert-count">${urgentCount+manualAlertUnread}</span>`:"")}
     ${ni("atualizacoes","📬","Atualizações",userNotifsUnread>0?`<span class="nav-alert-count">${userNotifsUnread}</span>`:"")}
-    ${ni("minhas-tarefas","📋","Minhas Tarefas")}
+    ${(()=>{const _mn=currentProfile?.name||"";let _sv;try{_sv=new Set(JSON.parse(localStorage.getItem(`seen_tasks_${currentUser?.uid}`)||"[]"));}catch(e){_sv=new Set();}const _mc=Object.entries(tasks).filter(([id,t])=>{if(t.status==="concluido")return false;const rs=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);return rs.some(r=>r===_mn)&&!_sv.has(id);}).length;return ni("minhas-tarefas","📋","Minhas Tarefas",_mc>0?`<span class="nav-alert-count">${_mc}</span>`:"");})()}
     ${ni("fluxo","⟆","Fluxograma")}
     ${ni("calendario","📅","Calendário")}
     ${ni("prospecção","🎯","Cal. Prospecção")}
@@ -530,7 +547,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.29</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.30</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -5811,6 +5828,7 @@ function openDetailModal(taskId){
   const t={id:taskId,...tasks[taskId]};if(!t.title)return;
   const area=areas[t.areaId],st=STATUS[t.status];
   const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
+  if(currentProfile&&resps.some(r=>r===currentProfile.name))markTaskSeen(taskId);
   const canPin=isAdmin();
   const canDelete=isAdmin()||(t.creatorId===currentUser?.uid);
   const priorityChip=t.priority?'<span class="chip" style="background:'+PRIORITY[t.priority].color+'18;color:'+PRIORITY[t.priority].color+';border:1px solid '+PRIORITY[t.priority].color+'30;padding:4px 12px;text-transform:capitalize">'+t.priority+'</span>':"";
