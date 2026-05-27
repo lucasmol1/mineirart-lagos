@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.35
+Handle de resize `<>` (22×22) no canto inferior direito de blocos do organograma e fluxograma; drop de grupo/bloco em container root funciona mesmo sem expandir antes; permissões de área viram somente leitura para usuários com manageAreas.
+
 ## v1.34
 Avatar do criador exibido no canto inferior direito de cada nota (Notas, FYI global e FYI de área): bolinha com inicial + cor do usuário, tooltip com nome completo ao hover.
 
