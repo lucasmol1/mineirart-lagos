@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.33
+Membros da área: linha clicável "👥 Membros (N)" abaixo dos detalhes da área — expande/recolhe painel inline com avatar + nome de cada membro.
+
 ## v1.32
 Exibe todos os responsáveis que concluíram no card e no modal: para tarefas multi-responsável, "Concluída por" lista todos os que marcaram como feito (via completions), não só o último.
 
