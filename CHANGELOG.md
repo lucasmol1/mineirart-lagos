@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.37
+Calendário filtra por áreas onde o usuário é membro; push de eventos de calendário atrasados na aba Atualizações (⏰ throttle 5h); fluxograma: select "Macro" na toolbar para criar processos já dentro de um macroprocesso.
+
 ## v1.36
 Notificação de tarefa atrasada na aba Atualizações: ao abrir o app, tarefas vencidas onde o usuário é responsável geram notificação ⏰ com borda vermelha, com throttle de 5h por tarefa via localStorage.
 

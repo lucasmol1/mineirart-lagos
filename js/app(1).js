@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.36
+//  Mineirart Lagos — App v1.37
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -396,7 +396,7 @@ function initMyTasksBadge(){
   const ids=Object.entries(tasks).filter(([,t])=>{const rs=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);return rs.some(r=>r===myName);}).map(([id])=>id);
   try{localStorage.setItem(key,JSON.stringify(ids));}catch(e){}
 }
-function startAlertWatcher(){alertInterval=setInterval(checkDeadlineAlerts,10*60*1000);setInterval(checkCalAlerts,60*60*1000);setTimeout(checkCalAlerts,3000);listenUserNotifs();initMyTasksBadge();}
+function startAlertWatcher(){alertInterval=setInterval(checkDeadlineAlerts,10*60*1000);setInterval(checkCalAlerts,60*60*1000);setTimeout(checkCalAlerts,3000);setTimeout(checkOverdueCalEvents,5000);setInterval(checkOverdueCalEvents,5*60*60*1000);listenUserNotifs();initMyTasksBadge();}
 async function checkDeadlineAlerts(){
   const dlColors={"warn-now":"#ff2020","warn-1":"#e85030","warn-2":"#f09030","warn-3":"#e8c84a"};
   const dlLabels={"warn-now":"⚠️ Menos de 3h","warn-1":"🔴 Amanhã","warn-2":"🟠 Em 2 dias","warn-3":"🟡 Em 3 dias"};
@@ -563,7 +563,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.36</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.37</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1018,6 +1018,7 @@ function renderFlowPage(){
     </g>`;}).join("");
 
   const areaButtons=myAreas.map(a=>`<button class="btn-small btn-add-area-node" data-area-id="${a.id}" style="background:${a.color}22;color:${a.color};border:1px solid ${a.color}44;white-space:nowrap">+ ${esc(a.name)}</button>`).join("");
+  const rootNodeOpts=Object.entries(flowData.nodes||{}).filter(([,n])=>n.type==="root").map(([id,n])=>`<option value="${id}">${esc(n.label||"Macro")}</option>`).join("");
 
   const limitWarn=nodeCount>=LIMITS.MAX_FLOW_NODES?`<div style="background:rgba(240,168,50,.12);border:1px solid rgba(240,168,50,.3);color:#f0a832;padding:8px 14px;border-radius:8px;font-size:12px">⚠️ Limite de ${LIMITS.MAX_FLOW_NODES} blocos atingido.</div>`:"";
 
@@ -1034,6 +1035,7 @@ function renderFlowPage(){
         <select id="node-shape" style="background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none;width:116px">
           <option value="rect">Processo</option><option value="diamond">Decisão ◇</option><option value="pill">Início/Fim</option>
         </select>
+        ${rootNodeOpts?`<select id="node-parent-root" style="background:#1a1a22;border:1px solid #7c6eff44;border-radius:7px;padding:8px 10px;color:#9d93ff;font-family:inherit;font-size:12px;outline:none;max-width:140px" title="Adicionar dentro de um Macro"><option value="">— Macro —</option>${rootNodeOpts}</select>`:""}
         <input type="color" id="node-color" value="#c8f04e" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
         <button class="btn-primary" id="btn-add-node" ${nodeCount>=LIMITS.MAX_FLOW_NODES?"disabled":""}>+ Processo</button>
         <button class="btn-small" id="btn-add-root-node" style="border:1px solid #7c6eff44;color:#9d93ff;background:#7c6eff12">+ Macro</button>
@@ -1391,7 +1393,7 @@ function renderAlertsPage(){
 }
 
 function renderAtualizacoesPage(){
-  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task"||n.type==="overdue_event")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
   const unreadCount=myNotifs.filter(n=>!n.read).length;
   const notifsHtml=myNotifs.length?`
     <div style="margin-bottom:20px">
@@ -1403,8 +1405,9 @@ function renderAtualizacoesPage(){
       ${myNotifs.map(n=>{
         const isComment=n.type==="new_comment";
         const isOverdue=n.type==="overdue_task";
-        const borderColor=isComment?"#7c6eff":isOverdue?"#ff6b6b":"#f0a832";
-        const icon=isComment?"\ud83d\udcac":isOverdue?"\u23f0":"\ud83d\udd14";
+        const isOverdueEv=n.type==="overdue_event";
+        const borderColor=isComment?"#7c6eff":isOverdue?"#ff6b6b":isOverdueEv?"#f0a832":"#f0a832";
+        const icon=isComment?"\ud83d\udcac":isOverdue?"\u23f0":isOverdueEv?"\ud83d\udcc5":"\ud83d\udd14";
         const task=n.taskId?tasks[n.taskId]:null;
         const isUnread=!n.read;
         return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isUnread?'background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;':''}transition:background .12s">
@@ -3632,8 +3635,18 @@ function openFlowNodeEditModal(nodeId){
 function addFlowNode(){
   if(Object.keys(flowData.nodes||{}).length>=LIMITS.MAX_FLOW_NODES){toast(`Limite de ${LIMITS.MAX_FLOW_NODES} blocos atingido`,"error");return;}
   const l=document.getElementById("node-label")?.value.trim(),s=document.getElementById("node-shape")?.value||"rect",c=document.getElementById("node-color")?.value||"#c8f04e";
+  const parentId=document.getElementById("node-parent-root")?.value||"";
   if(!l)return;
-  dbSet(`flow/nodes/${uid()}`,{label:l,color:c,shape:s,areaId:null,x:60+Math.random()*380,y:60+Math.random()*280});
+  const nodeData={label:l,color:c,shape:s,areaId:null,x:60+Math.random()*380,y:60+Math.random()*280};
+  if(parentId&&flowData.nodes?.[parentId]){
+    const pn=flowData.nodes[parentId];
+    const childCount=Object.values(flowData.nodes).filter(n=>n.flowParent===parentId).length;
+    nodeData.x=(pn.x||80)+24+Math.floor(childCount%3)*74;
+    nodeData.y=(pn.y||60)+60+Math.floor(childCount/3)*72;
+    nodeData.flowParent=parentId;
+    flowContainerExpanded[parentId]=true;
+  }
+  dbSet(`flow/nodes/${uid()}`,nodeData);
   if(document.getElementById("node-label"))document.getElementById("node-label").value="";
 }
 
@@ -3851,9 +3864,16 @@ function renderCalPage(){
 
   // Build map: dateStr -> [events]
   const eventMap={};
-  const myVisibleAreaIds=visibleAreas().map(a=>a.id);
-  // Filtro de área — se vazio mostra todas as áreas visíveis
-  const activeAreaIds=calAreaFilter.length?calAreaFilter.filter(id=>myVisibleAreaIds.includes(id)):myVisibleAreaIds;
+  // Áreas onde o usuário é membro (admins veem tudo)
+  const myMemberAreas=isAdmin()
+    ?Object.entries(areas).map(([id,a])=>({id,...a}))
+    :Object.entries(areas).map(([id,a])=>({id,...a})).filter(a=>{
+        const mbrs=Array.isArray(a.members)?a.members:(typeof a.members==="object"&&a.members?Object.values(a.members):[]);
+        return mbrs.includes(currentProfile?.name||"");
+      });
+  const myMemberAreaIds=myMemberAreas.map(a=>a.id);
+  // Filtro adicional por chip — se vazio mostra todas as áreas de membro
+  const activeAreaIds=calAreaFilter.length?calAreaFilter.filter(id=>myMemberAreaIds.includes(id)):myMemberAreaIds;
   Object.entries(tasks).forEach(([tid,t])=>{
     if(!t.date)return;
     if(!activeAreaIds.includes(t.areaId))return;
@@ -3861,15 +3881,14 @@ function renderCalPage(){
     const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
     eventMap[t.date].push({type:"task",id:tid,title:t.title,color:STATUS[t.status]?.color||"#7c6eff",status:t.status,area:areas[t.areaId]?.name||"",resps});
   });
-  // Calendar events + freela events (unified) — filtrados pela área se ativo
+  // Calendar events + freela events (unified) — filtrados pela área de membro
   const allCalEvents={...calEvents,...freelaEvents};
   Object.entries(allCalEvents).forEach(([eid,e])=>{
     if(!e.dateStart)return;
-    // Filtrar por área se houver filtro ativo
+    // Filtrar por área: chip ativo → usa chip; sem chip → restringe às áreas de membro
     if(calAreaFilter.length){
-      // Evento sem área vinculada: ocultar quando filtro ativo
       if(!e.areaId||!calAreaFilter.includes(e.areaId))return;
-    }
+    } else if(e.areaId&&!myMemberAreaIds.includes(e.areaId))return;
     const start=new Date(e.dateStart+"T00:00:00");
     const end=e.dateEnd?new Date(e.dateEnd+"T00:00:00"):start;
     for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
@@ -3920,7 +3939,8 @@ function renderCalPage(){
   const nowMs=today.getTime();
   Object.entries({...calEvents,...freelaEvents}).forEach(([eid,e])=>{
     if(!e.dateStart)return;
-    if(calAreaFilter.length&&(!e.areaId||!calAreaFilter.includes(e.areaId)))return;
+    if(calAreaFilter.length){if(!e.areaId||!calAreaFilter.includes(e.areaId))return;}
+    else if(e.areaId&&!myMemberAreaIds.includes(e.areaId))return;
     const ms=new Date(e.dateStart+"T00:00:00").getTime();
     const diffDays=Math.round((ms-nowMs)/86400000);
     if(diffDays>=0&&diffDays<=3)upcoming.push({...e,id:eid,diffDays});
@@ -3945,7 +3965,7 @@ function renderCalPage(){
     </div>`;
   }).join(""):`<div style="font-size:12px;color:#5a5a6a;text-align:center;padding:20px 0">Nenhum evento nos próximos 3 dias</div>`;
 
-  const filterChips=visibleAreas().map(a=>{
+  const filterChips=myMemberAreas.map(a=>{
     const on=calAreaFilter.includes(a.id);
     return`<button class="cal-area-filter" data-aid="${a.id}" style="border:1px solid ${on?a.color:"#2e2e3a"};color:${on?a.color:"#7a7a8a"};background:${on?a.color+"18":"transparent"};border-radius:20px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap">${esc(a.name)}</button>`;
   }).join("");
@@ -4766,6 +4786,30 @@ function openCalDayModal(dateStr){
 }
 
 // ── CALENDAR ALERTS (in-app notifications) ────────────────────────────────────
+async function checkOverdueCalEvents(){
+  if(!currentUser||!currentProfile)return;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const fiveH=5*60*60*1000;
+  // Áreas de membro do usuário
+  const myMbAreaIds=isAdmin()
+    ?Object.keys(areas)
+    :Object.entries(areas).filter(([,a])=>{
+        const mbrs=Array.isArray(a.members)?a.members:(typeof a.members==="object"&&a.members?Object.values(a.members):[]);
+        return mbrs.includes(currentProfile.name||"");
+      }).map(([id])=>id);
+  for(const[eid,e]of Object.entries({...calEvents,...freelaEvents})){
+    if(!e.dateStart)continue;
+    const evDate=new Date(e.dateStart+"T00:00:00");
+    if(evDate>=today)continue; // ainda não passou
+    if(e.areaId&&!myMbAreaIds.includes(e.areaId))continue; // não pertence ao usuário
+    const lsKey=`overdue_calevent_${eid}`;
+    const last=localStorage.getItem(lsKey);
+    if(last&&Date.now()-parseInt(last)<fiveH)continue;
+    localStorage.setItem(lsKey,Date.now().toString());
+    await dbSet(`user_notifs/${currentUser.uid}/${uid()}`,{type:"overdue_event",msg:`📅 Evento passado: "${e.title}"`,eventId:eid,ts:new Date().toISOString(),read:false});
+  }
+}
+
 function checkCalAlerts(){
   const today=new Date(); today.setHours(0,0,0,0);
   const alerts=[];
@@ -6360,7 +6404,7 @@ function listenUserNotifs(){
   onValue(dbRef(`user_notifs/${currentUser.uid}`),snap=>{
     const notifs=snap.val()||{};
     window._myNotifs=notifs;
-    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="overdue_task")).length;
+    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="overdue_task"||n.type==="overdue_event")).length;
     manualAlertUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="manual_alert").length;
     // Mostra banner apenas uma vez por notificação nova, sem marcar como lida
     // (o usuário lê na aba Alertas e clica na linha para marcar como lida)
