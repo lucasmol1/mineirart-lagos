@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.32
+//  Mineirart Lagos — App v1.33
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -104,6 +104,7 @@ let fyiNotes={};
 let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
 let freelaEvents={}, prospEvents={};
 let areaCalCollapsed={};
+let areaMembersExpanded={};
 let orgExpanded={};
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
@@ -547,7 +548,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.32</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.33</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -814,6 +815,22 @@ function renderAreaPage(){
          <textarea id="area-detail-text" rows="3" style="display:none;width:100%;background:transparent;border:1px solid #2e2e3a;border-radius:6px;color:#a0a0b0;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6;resize:vertical;outline:none;padding:6px 8px;margin-top:4px">${esc(area.detail||"")}</textarea>`
       :`<div style="font-size:12px;color:#a0a0b0;line-height:1.6;min-height:18px;white-space:pre-wrap;word-break:break-word">${area.detail?linkify(area.detail):"—"}</div>`}
   </div>
+
+  ${(()=>{
+    const _mbrs=Array.isArray(area.members)?area.members:(typeof area.members==="object"&&area.members?Object.values(area.members):[]);
+    const _aUsers=Object.values(users).filter(u=>u.name&&_mbrs.includes(u.name));
+    const _exp=!!areaMembersExpanded[activeAreaId];
+    const _arrow=_exp?"▲":"▼";
+    const _chips=_exp&&_aUsers.length?`<div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:10px">${_aUsers.map(u=>`<div style="display:flex;align-items:center;gap:7px;background:${u.color||"#7c6eff"}14;border:1px solid ${u.color||"#7c6eff"}33;border-radius:20px;padding:5px 12px 5px 6px"><div style="width:26px;height:26px;border-radius:50%;background:${u.color||"#7c6eff"};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0c0c0f;flex-shrink:0">${initials(u.name)}</div><span style="font-size:12px;font-weight:600;color:#d0d0e0">${esc(u.name)}</span></div>`).join("")}</div>`:(_exp?`<div style="padding-top:8px;font-size:12px;color:#4a4a5a">Nenhum membro nesta área.</div>`:"");
+    return`<div style="margin:8px 0 4px 0;background:#13131a;border:1px solid #1e1e28;border-radius:8px;padding:10px 14px">
+      <button id="btn-toggle-members" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;padding:0;text-align:left">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#7a7a8a">👥 Membros</span>
+        <span style="font-size:11px;color:#7a7a8a;background:#1e1e28;border-radius:10px;padding:1px 7px;font-weight:700">${_aUsers.length}</span>
+        <span style="font-size:10px;color:#4a4a5a;margin-left:auto">${_arrow}</span>
+      </button>
+      ${_chips}
+    </div>`;
+  })()}
 
   ${notesEditorHtml}
 
@@ -2752,6 +2769,7 @@ function attachContentEvents(){
     toast("Detalhes salvos!","success");
     render();
   });
+  document.getElementById("btn-toggle-members")?.addEventListener("click",()=>{areaMembersExpanded[activeAreaId]=!areaMembersExpanded[activeAreaId];render();});
   document.querySelectorAll(".btn-add-task-col").forEach(b=>b.addEventListener("click",()=>openTaskModal({areaId:activeAreaId,status:b.dataset.status,priority:"media"})));
   document.querySelectorAll(".card[data-detail]").forEach(c=>c.addEventListener("click",()=>openDetailModal(c.dataset.detail)));
   document.querySelectorAll(".btn-detail-alert").forEach(b=>b.addEventListener("click",()=>openDetailModal(b.dataset.id)));

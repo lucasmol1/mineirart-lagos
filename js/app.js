@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.33
+//  Mineirart Lagos — App v1.34
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -548,7 +548,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.33</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.34</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1086,12 +1086,12 @@ function renderNotesPage(){
     ${noteList.length===0?`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">📌</div><div class="empty-title">Nenhuma nota ainda</div></div>`
     :`<div class="notes-grid">${noteList.map(n=>{
       const links=(n.links||[]).map(l=>`<a class="note-link" href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.label||l.url)}</a>`).join("");
-      const uColor=Object.values(users).find(u=>u.name===n.authorName)?.color||"#7c6eff";
-      const avatar=n.authorName?`<div title="${esc(n.authorName)}" style="width:22px;height:22px;border-radius:50%;background:${uColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f;flex-shrink:0">${initials(n.authorName)}</div>`:"";
-      return`<div class="note-card">${n.tag?`<span class="note-tag" style="background:${n.color||"#c8f04e"}18;color:${n.color||"#c8f04e"};border:1px solid ${n.color||"#c8f04e"}30">${esc(n.tag)}</span>`:""}
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px"><div class="note-title">${esc(n.title)}</div><div style="display:flex;align-items:center;gap:6px">${avatar}${isAdmin()||n.authorId===currentUser?.uid?`<button class="icon-btn btn-edit-note" data-id="${n.id}">✏</button><button class="icon-btn btn-del-note" data-id="${n.id}">✕</button>`:""}</div></div>
+      const uColor=(users[n.authorId]||Object.values(users).find(u=>u.name===n.authorName))?.color||"#7c6eff";
+      const cornerAvatar=n.authorName?`<div title="${esc(n.authorName)}" style="position:absolute;bottom:10px;right:10px;width:22px;height:22px;border-radius:50%;background:${uColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f">${initials(n.authorName)}</div>`:"";
+      return`<div class="note-card"${cornerAvatar?` style="padding-bottom:36px"`:""}>${n.tag?`<span class="note-tag" style="background:${n.color||"#c8f04e"}18;color:${n.color||"#c8f04e"};border:1px solid ${n.color||"#c8f04e"}30">${esc(n.tag)}</span>`:""}
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px"><div class="note-title">${esc(n.title)}</div><div style="display:flex;align-items:center;gap:6px">${isAdmin()||n.authorId===currentUser?.uid?`<button class="icon-btn btn-edit-note" data-id="${n.id}">✏</button><button class="icon-btn btn-del-note" data-id="${n.id}">✕</button>`:""}</div></div>
         ${n.body?`<div class="note-body">${esc(n.body)}</div>`:""}${links?`<div class="note-links">${links}</div>`:""}
-      </div>`;}).join("")}</div>`}`;
+      ${cornerAvatar}</div>`;}).join("")}</div>`}`;
 }
 
 function renderPersonalNotesPage(){
@@ -1166,7 +1166,9 @@ function renderFYIPage(){
   const noteCards=notes.map(n=>{
     const color=n.color||"#c8f04e";
     const syncBadge=n.syncCal?`<span style="font-size:10px;background:#7c6eff22;color:#9d93ff;border:1px solid #7c6eff44;border-radius:10px;padding:1px 7px">📅 no calendário</span>`:"";
-    return`<div class="fyi-card" draggable="true" data-fyi-id="${n.id}" style="background:${color}10;border:1.5px solid ${color}33;border-radius:10px;padding:14px 16px;margin-bottom:12px;position:relative;cursor:grab" data-fyi-open="${n.id}">
+    const fyiUColor=(users[n.authorId]||Object.values(users).find(u=>u.name===n.authorName))?.color||"#7c6eff";
+    const fyiCornerAvatar=n.authorName?`<div title="${esc(n.authorName)}" style="position:absolute;bottom:10px;right:12px;width:22px;height:22px;border-radius:50%;background:${fyiUColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f">${initials(n.authorName)}</div>`:"";
+    return`<div class="fyi-card" draggable="true" data-fyi-id="${n.id}" style="background:${color}10;border:1.5px solid ${color}33;border-radius:10px;padding:14px 16px${fyiCornerAvatar?";padding-bottom:36px":""};margin-bottom:12px;position:relative;cursor:grab" data-fyi-open="${n.id}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
         <div style="font-size:14px;font-weight:700;color:#f0eff5;font-family:'Syne',sans-serif">${esc(n.title||"")}</div>
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -1176,7 +1178,8 @@ function renderFYIPage(){
       </div>
       ${n.body?`<div style="font-size:13px;color:#a0a0b0;line-height:1.7;white-space:pre-wrap">${esc(n.body)}</div>`:""}
       ${n.syncCal&&n.date?`<div style="margin-top:8px;font-size:11px;color:#7c6eff">📅 ${fmtDate(n.date)}</div>`:""}
-      <div style="margin-top:8px;font-size:10px;color:#3a3a4a">${n.authorName||""} · ${fmtDate(n.createdAt?.slice(0,10)||"")}</div>
+      <div style="margin-top:8px;font-size:10px;color:#3a3a4a">${fmtDate(n.createdAt?.slice(0,10)||"")}</div>
+      ${fyiCornerAvatar}
     </div>`;
   }).join("");
 
@@ -6361,17 +6364,22 @@ function listenUserNotifs(){
 function renderAreaFYI(areaId){
   const aFyi=Object.values(fyiNotes).filter(n=>n.areaId===areaId).sort((a,b)=>(a.order||0)-(b.order||0));
   const color_=n=>n.color||"#c8f04e";
-  const cards=aFyi.map(n=>`<div class="fyi-card area-fyi-card" data-fyi-open="${n.id}" draggable="true" data-fyi-id="${n.id}" data-area-id="${areaId}"
-    style="background:${color_(n)}10;border:1.5px solid ${color_(n)}33;border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer;position:relative">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-      <div style="font-size:14px;font-weight:700;color:${color_(n)}">${esc(n.title||"")}</div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
-        ${n.authorId===currentUser?.uid||isAdmin1?`<button class="btn-area-fyi-edit" data-id="${n.id}" style="background:none;border:none;color:#7a7a8a;cursor:pointer;font-size:13px">✏</button><button class="btn-area-fyi-del" data-id="${n.id}" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:13px">✕</button>`:""}
+  const cards=aFyi.map(n=>{
+    const aUColor=(users[n.authorId]||Object.values(users).find(u=>u.name===n.authorName))?.color||"#7c6eff";
+    const aCornerAvatar=n.authorName?`<div title="${esc(n.authorName)}" style="position:absolute;bottom:10px;right:10px;width:22px;height:22px;border-radius:50%;background:${aUColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f">${initials(n.authorName)}</div>`:"";
+    return`<div class="fyi-card area-fyi-card" data-fyi-open="${n.id}" draggable="true" data-fyi-id="${n.id}" data-area-id="${areaId}"
+      style="background:${color_(n)}10;border:1.5px solid ${color_(n)}33;border-radius:10px;padding:12px 14px${aCornerAvatar?";padding-bottom:36px":""};margin-bottom:10px;cursor:pointer;position:relative">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="font-size:14px;font-weight:700;color:${color_(n)}">${esc(n.title||"")}</div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          ${n.authorId===currentUser?.uid||isAdmin1?`<button class="btn-area-fyi-edit" data-id="${n.id}" style="background:none;border:none;color:#7a7a8a;cursor:pointer;font-size:13px">✏</button><button class="btn-area-fyi-del" data-id="${n.id}" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:13px">✕</button>`:""}
+        </div>
       </div>
-    </div>
-    ${n.body?`<div style="font-size:13px;color:#a0a0b0;margin-top:6px;line-height:1.6;white-space:pre-wrap">${linkify(n.body)}</div>`:""}
-    ${n.syncCal&&n.date?`<div style="margin-top:8px;font-size:11px;color:#7c6eff">📅 ${fmtDate(n.date)}</div>`:""}
-  </div>`).join("");
+      ${n.body?`<div style="font-size:13px;color:#a0a0b0;margin-top:6px;line-height:1.6;white-space:pre-wrap">${linkify(n.body)}</div>`:""}
+      ${n.syncCal&&n.date?`<div style="margin-top:8px;font-size:11px;color:#7c6eff">📅 ${fmtDate(n.date)}</div>`:""}
+      ${aCornerAvatar}
+    </div>`;
+  }).join("");
   return`<div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div style="font-size:12px;color:#5a5a6a">${aFyi.length} nota${aFyi.length!==1?"s":""} nesta área</div>

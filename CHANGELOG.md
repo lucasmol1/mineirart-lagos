@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.34
+Avatar do criador exibido no canto inferior direito de cada nota (Notas, FYI global e FYI de área): bolinha com inicial + cor do usuário, tooltip com nome completo ao hover.
+
 ## v1.33
 Membros da área: linha clicável "👥 Membros (N)" abaixo dos detalhes da área — expande/recolhe painel inline com avatar + nome de cada membro.
 
