@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.31
+//  Mineirart Lagos — App v1.32
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -547,7 +547,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.31</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.32</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -762,7 +762,7 @@ function renderAreaPage(){
           <div style="width:20px;height:20px;border-radius:50%;background:${Object.values(users).find(u=>u.name===t.creatorName)?.color||"#4ac8e8"};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f" title="${esc(t.creatorName)}">${initials(t.creatorName)}</div>
         </div>`:""}
       </div>
-      ${t.status==="concluido"&&t.completed_by?`<div style="font-size:9px;color:#c8f04e;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Concluída por ${esc(t.completed_by)}">✓ Concluída por ${esc(t.completed_by)}</div>`:""}
+      ${(()=>{if(t.status!=="concluido")return"";const _cn=Object.values(t.completions||{}).map(c=>c.name).filter(Boolean);const _nm=_cn.length?_cn.join(", "):t.completed_by;if(!_nm)return"";return`<div style="font-size:9px;color:#c8f04e;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Concluída por ${esc(_nm)}">✓ Concluída por ${esc(_nm)}</div>`;})()}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
         ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:"<span></span>"}
         ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:9px;color:#5a5a6a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
@@ -5853,11 +5853,7 @@ function openDetailModal(taskId){
     <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✏ Criada por</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.creatorName,"#4ac8e8","Criador(a)")}</div>
   </div>`:"";
-  const completedByBlock=t.status==="concluido"&&t.completed_by?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28">
-    <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✅ Concluída por</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.completed_by,"#c8f04e","Concluiu")}</div>
-    ${t.completed_at?`<div style="font-size:10px;color:#5a5a6a;margin-top:6px">🕐 ${timeAgo(t.completed_at)}</div>`:""}
-  </div>`:"";
+  const completedByBlock=(()=>{if(t.status!=="concluido")return"";const _cn=Object.values(t.completions||{}).map(c=>c.name).filter(Boolean);const _names=_cn.length?_cn:[t.completed_by].filter(Boolean);if(!_names.length)return"";return`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✅ Concluída por</div><div style="display:flex;gap:8px;flex-wrap:wrap">${_names.map(n=>personAvatar(n,"#c8f04e","Concluiu")).join("")}</div>${t.completed_at?`<div style="font-size:10px;color:#5a5a6a;margin-top:6px">🕐 ${timeAgo(t.completed_at)}</div>`:""}</div>`;})();
   const statusBtns=Object.entries(STATUS).map(([k,v])=>{
     const sel=t.status===k;
     const s=sel?'background:'+v.color+'22;color:'+v.color+';border:1px solid '+v.color+'60':'border:1px solid #2e2e3a;color:#7a7a8a';

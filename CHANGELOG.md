@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.32
+Exibe todos os responsáveis que concluíram no card e no modal: para tarefas multi-responsável, "Concluída por" lista todos os que marcaram como feito (via completions), não só o último.
+
 ## v1.31
 Corrige badge de Alertas zerado: passa a contar todos os níveis de prazo (warn-1 a warn-3), não só os críticos de 24h.
 
