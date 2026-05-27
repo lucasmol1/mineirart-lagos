@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.34
+//  Mineirart Lagos — App v1.36
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -412,6 +412,21 @@ async function checkDeadlineAlerts(){
       showCalBanner(`${dlLabels[cls]}: ${t.title}`,dlColors[cls],"Prazo Próximo");
     }
   }
+  // Notificações de tarefa atrasada (prazo passado) — throttle 5h por tarefa via localStorage
+  if(!currentUser||!currentProfile)return;
+  const myName=currentProfile.name||"";
+  const fiveH=5*60*60*1000;
+  for(const[id,t]of Object.entries(tasks)){
+    if(!t.date||t.status==="concluido")continue;
+    if(new Date(t.date+"T23:59:59")>=new Date())continue; // não vencida
+    const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
+    if(!resps.some(r=>r===myName))continue; // usuário não é responsável
+    const lsKey=`overdue_notif_${id}`;
+    const last=localStorage.getItem(lsKey);
+    if(last&&Date.now()-parseInt(last)<fiveH)continue;
+    localStorage.setItem(lsKey,Date.now().toString());
+    await dbSet(`user_notifs/${currentUser.uid}/${uid()}`,{type:"overdue_task",msg:`⏰ Tarefa atrasada: "${t.title}"`,taskId:id,ts:new Date().toISOString(),read:false});
+  }
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -548,7 +563,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.34</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.36</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -998,7 +1013,8 @@ function renderFlowPage(){
       <circle cx="0" cy="${H/2}" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="left" style="cursor:crosshair"/>
       ${isAdmin1?`<circle cx="${W+4}" cy="-4" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2" class="del-node" data-node-id="${n.id}" style="cursor:pointer"/><text x="${W+4}" y="-4" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text>`:""}
       ${isAdmin1?`<circle cx="-4" cy="${H+4}" r="8" fill="#7c6eff1a" stroke="#7c6eff" stroke-width="1.2" class="edit-flow-node" data-node-id="${n.id}" style="cursor:pointer"/><text x="-4" y="${H+4}" text-anchor="middle" dominant-baseline="middle" fill="#9d93ff" font-size="10" style="pointer-events:none">✏</text>`:""}
-      <rect x="${W-6}" y="${H-6}" width="10" height="10" rx="2" fill="${bc}44" stroke="${bc}" stroke-width="1" class="flow-resize-handle" data-node-id="${n.id}" style="cursor:se-resize"/>
+      <rect x="${W-18}" y="${H-18}" width="22" height="22" rx="4" fill="${bc}18" stroke="${bc}55" stroke-width="1" class="flow-resize-handle" data-node-id="${n.id}" style="cursor:se-resize"/>
+      <text x="${W-7}" y="${H-4}" text-anchor="middle" dominant-baseline="auto" fill="${bc}" font-size="9" font-weight="800" font-family="monospace" style="pointer-events:none;user-select:none">&lt;&gt;</text>
     </g>`;}).join("");
 
   const areaButtons=myAreas.map(a=>`<button class="btn-small btn-add-area-node" data-area-id="${a.id}" style="background:${a.color}22;color:${a.color};border:1px solid ${a.color}44;white-space:nowrap">+ ${esc(a.name)}</button>`).join("");
@@ -1375,7 +1391,7 @@ function renderAlertsPage(){
 }
 
 function renderAtualizacoesPage(){
-  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&n.type==="new_comment").sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
   const unreadCount=myNotifs.filter(n=>!n.read).length;
   const notifsHtml=myNotifs.length?`
     <div style="margin-bottom:20px">
@@ -1386,12 +1402,14 @@ function renderAtualizacoesPage(){
       </div>
       ${myNotifs.map(n=>{
         const isComment=n.type==="new_comment";
-        const borderColor=isComment?"#7c6eff":"#f0a832";
+        const isOverdue=n.type==="overdue_task";
+        const borderColor=isComment?"#7c6eff":isOverdue?"#ff6b6b":"#f0a832";
+        const icon=isComment?"\ud83d\udcac":isOverdue?"\u23f0":"\ud83d\udd14";
         const task=n.taskId?tasks[n.taskId]:null;
         const isUnread=!n.read;
         return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isUnread?'background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;':''}transition:background .12s">
           ${isUnread?`<span title="N\u00e3o lida" style="width:7px;height:7px;border-radius:50%;background:#c8f04e;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
-          <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${isComment?"\ud83d\udcac":"\ud83d\udd14"}</div>
+          <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${icon}</div>
           <div style="flex:1">
             <div style="font-size:13px;color:${isUnread?"#f0eff5":"#d0d0e0"};line-height:1.4;${isUnread?"font-weight:500":""}">${esc(n.msg||"")}</div>
             ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid #7c6eff">"${esc(n.commentPreview)}"</div>`:""}
@@ -2650,17 +2668,17 @@ function renderAdminPage(){
 
   // manageAreas users only see the permissions section
   if(!isAdmin()&&currentProfile?.manageAreas){
-    return`<div class="page-header"><div><div class="page-title">Permissões de Área</div><div class="page-sub">Você pode adicionar e remover usuários das áreas</div></div></div>
+    return`<div class="page-header"><div><div class="page-title">Permissões de Área</div><div class="page-sub">Visão das permissões — somente administradores podem modificar</div></div></div>
     <div class="admin-section">
       <div class="admin-section-title">👥 Usuários & Áreas</div>
-      <div style="font-size:12px;color:#7a7a8a;margin-bottom:16px">Clique nos chips coloridos para liberar ou restringir o acesso de cada usuário às áreas.</div>
+      <div style="font-size:12px;color:#7a7a8a;margin-bottom:16px">Áreas de acesso de cada usuário. Apenas administradores podem adicionar ou remover membros de uma área.</div>
       ${userList.filter(u=>u.role!=="admin1").map(u=>`<div class="user-row" style="flex-wrap:wrap;gap:12px">
         <div class="user-row-avatar" style="background:${u.color||"linear-gradient(135deg,#7c6eff,#4ac8e8)"}">${initials(u.name)}</div>
         <div class="user-row-info" style="flex:1;min-width:200px">
           <div class="user-row-name">${esc(u.name)}</div>
           <div class="user-row-email">${esc(u.email)}</div>
           <div class="permission-grid">
-            ${areaList.map(a=>{const on=(u.permissions||[]).includes(a.id);return`<button class="perm-chip ${on?"on":""} perm-toggle" data-uid="${u.id}" data-area="${a.id}" style="${on?`border-color:${a.color};color:${a.color};background:${a.color}12`:""}">${esc(a.name)}</button>`;}).join("")}
+            ${areaList.map(a=>{const on=(u.permissions||[]).includes(a.id);return`<div class="perm-chip ${on?"on":""}" style="cursor:default;pointer-events:none;${on?`border-color:${a.color};color:${a.color};background:${a.color}12`:""}">${esc(a.name)}</div>`;}).join("")}
           </div>
         </div>
       </div>`).join("")}
@@ -3080,7 +3098,7 @@ function attachFlowEvents(){
         dbSet(`flow/nodes/${sid}/y`,Math.max(0,orig.y+groupDragging.lastDy));
       });
       // Verificar se o grupo foi solto sobre um bloco-raiz expandido
-      const roots=Object.entries(flowData.nodes||{}).filter(([,n])=>n.type==="root"&&flowContainerExpanded[n.id]===true);
+      const roots=Object.entries(flowData.nodes||{}).filter(([,n])=>n.type==="root");
       if(roots.length){
         let anyAdopted=false;
         Object.entries(groupDragging.nodes).forEach(([sid])=>{
@@ -3089,15 +3107,15 @@ function attachFlowEvents(){
           const cy2=Math.max(0,sn.y)+(sn.h||48)/2;
           for(const [rid,rn] of roots){
             if(rid===sid)continue;
-            // bounding box do raiz + filhos atuais
+            // bounding box do raiz + filhos atuais (ou só o raiz se sem filhos)
             const rChildren=Object.values(flowData.nodes||{}).filter(n=>n.flowParent===rid);
             const allX=[rn.x,...rChildren.map(n=>n.x)], allY=[rn.y,...rChildren.map(n=>n.y)];
-            const allW=[rn.w||150,...rChildren.map(n=>n.w||150)], allH=[rn.h||48,...rChildren.map(n=>n.h||48)];
+            const allW=[rn.w||190,...rChildren.map(n=>n.w||150)], allH=[rn.h||58,...rChildren.map(n=>n.h||48)];
             const bx=Math.min(...allX)-30, by=Math.min(...allY)-30;
             const br=Math.max(...allX.map((x,i)=>x+allW[i]))+30;
             const bb=Math.max(...allY.map((y,i)=>y+allH[i]))+50;
             if(cx2>=bx&&cx2<=br&&cy2>=by&&cy2<=bb){
-              if(sn.flowParent!==rid){ dbSet(`flow/nodes/${sid}/flowParent`,rid); anyAdopted=true; }
+              if(sn.flowParent!==rid){ dbSet(`flow/nodes/${sid}/flowParent`,rid); anyAdopted=true; flowContainerExpanded[rid]=true; }
               break;
             }
           }
@@ -3118,17 +3136,17 @@ function attachFlowEvents(){
       // Verifica se o bloco foi solto dentro de um macro expandido
       if(n.type!=="root"){
         const cx2=n.x+(n.w||150)/2, cy2=n.y+(n.h||48)/2;
-        const roots2=Object.entries(flowData.nodes||{}).filter(([,rn])=>rn.type==="root"&&flowContainerExpanded[rn.id]===true);
+        const roots2=Object.entries(flowData.nodes||{}).filter(([,rn])=>rn.type==="root");
         for(const[rid,rn] of roots2){
           if(rid===dragging.id)continue;
           const rch=Object.values(flowData.nodes||{}).filter(ch=>ch.flowParent===rid);
           const allX=[rn.x,...rch.map(ch=>ch.x)], allY=[rn.y,...rch.map(ch=>ch.y)];
-          const allW=[rn.w||150,...rch.map(ch=>ch.w||150)], allH=[rn.h||48,...rch.map(ch=>ch.h||48)];
+          const allW=[rn.w||190,...rch.map(ch=>ch.w||150)], allH=[rn.h||58,...rch.map(ch=>ch.h||48)];
           const bx=Math.min(...allX)-30, by=Math.min(...allY)-30;
           const br=Math.max(...allX.map((x,i)=>x+allW[i]))+30;
           const bb=Math.max(...allY.map((y,i)=>y+allH[i]))+50;
           if(cx2>=bx&&cx2<=br&&cy2>=by&&cy2<=bb){
-            if(n.flowParent!==rid){dbSet(`flow/nodes/${dragging.id}/flowParent`,rid);toast("Processo adicionado ao macro","success");}
+            if(n.flowParent!==rid){dbSet(`flow/nodes/${dragging.id}/flowParent`,rid);flowContainerExpanded[rid]=true;toast("Processo adicionado ao macro","success");}
             break;
           }
         }
@@ -5045,7 +5063,8 @@ function renderOrgPage(){
       <circle cx="0" cy="${H/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="left" style="cursor:crosshair"/>
       ${isAdmin1?`<g class="org-edit-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="${W-10}" cy="10" r="9" fill="#1e1e28" stroke="${aColor}" stroke-width="1"/><text x="${W-10}" y="10" text-anchor="middle" dominant-baseline="middle" fill="${aColor}" font-size="10" style="pointer-events:none">✏</text></g>`:""}
       ${isAdmin1?`<g class="org-del-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="-8" cy="-8" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2"/><text x="-8" y="-8" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text></g>`:""}
-      <rect x="${nW-6}" y="${nH-6}" width="10" height="10" rx="2" fill="${aColor}44" stroke="${aColor}" stroke-width="1" class="org-resize-handle" data-nid="${n.id}" style="cursor:se-resize"/>
+      <rect x="${nW-18}" y="${nH-18}" width="22" height="22" rx="4" fill="${aColor}18" stroke="${aColor}55" stroke-width="1" class="org-resize-handle" data-nid="${n.id}" style="cursor:se-resize"/>
+      <text x="${nW-7}" y="${nH-4}" text-anchor="middle" dominant-baseline="auto" fill="${aColor}" font-size="9" font-weight="800" font-family="monospace" style="pointer-events:none;user-select:none">&lt;&gt;</text>
     </g>`;}).join("");
 
   const nodeCount=allNodes.length;
@@ -6341,7 +6360,7 @@ function listenUserNotifs(){
   onValue(dbRef(`user_notifs/${currentUser.uid}`),snap=>{
     const notifs=snap.val()||{};
     window._myNotifs=notifs;
-    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="new_comment").length;
+    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="overdue_task")).length;
     manualAlertUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="manual_alert").length;
     // Mostra banner apenas uma vez por notificação nova, sem marcar como lida
     // (o usuário lê na aba Alertas e clica na linha para marcar como lida)

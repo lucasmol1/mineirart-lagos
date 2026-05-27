@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.36
+Notificação de tarefa atrasada na aba Atualizações: ao abrir o app, tarefas vencidas onde o usuário é responsável geram notificação ⏰ com borda vermelha, com throttle de 5h por tarefa via localStorage.
+
 ## v1.35
 Handle de resize `<>` (22×22) no canto inferior direito de blocos do organograma e fluxograma; drop de grupo/bloco em container root funciona mesmo sem expandir antes; permissões de área viram somente leitura para usuários com manageAreas.
 

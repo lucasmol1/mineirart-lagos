@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.35
+//  Mineirart Lagos — App v1.36
 //  - Trava automática: tarefas com data de hoje ou futura
 //    nunca são removidas pela purga, em qualquer área
 // ════════════════════════════════════════════════════════
@@ -412,6 +412,21 @@ async function checkDeadlineAlerts(){
       showCalBanner(`${dlLabels[cls]}: ${t.title}`,dlColors[cls],"Prazo Próximo");
     }
   }
+  // Notificações de tarefa atrasada (prazo passado) — throttle 5h por tarefa via localStorage
+  if(!currentUser||!currentProfile)return;
+  const myName=currentProfile.name||"";
+  const fiveH=5*60*60*1000;
+  for(const[id,t]of Object.entries(tasks)){
+    if(!t.date||t.status==="concluido")continue;
+    if(new Date(t.date+"T23:59:59")>=new Date())continue; // não vencida
+    const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
+    if(!resps.some(r=>r===myName))continue; // usuário não é responsável
+    const lsKey=`overdue_notif_${id}`;
+    const last=localStorage.getItem(lsKey);
+    if(last&&Date.now()-parseInt(last)<fiveH)continue;
+    localStorage.setItem(lsKey,Date.now().toString());
+    await dbSet(`user_notifs/${currentUser.uid}/${uid()}`,{type:"overdue_task",msg:`⏰ Tarefa atrasada: "${t.title}"`,taskId:id,ts:new Date().toISOString(),read:false});
+  }
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -548,7 +563,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.35</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.36</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1376,7 +1391,7 @@ function renderAlertsPage(){
 }
 
 function renderAtualizacoesPage(){
-  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&n.type==="new_comment").sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
   const unreadCount=myNotifs.filter(n=>!n.read).length;
   const notifsHtml=myNotifs.length?`
     <div style="margin-bottom:20px">
@@ -1387,12 +1402,14 @@ function renderAtualizacoesPage(){
       </div>
       ${myNotifs.map(n=>{
         const isComment=n.type==="new_comment";
-        const borderColor=isComment?"#7c6eff":"#f0a832";
+        const isOverdue=n.type==="overdue_task";
+        const borderColor=isComment?"#7c6eff":isOverdue?"#ff6b6b":"#f0a832";
+        const icon=isComment?"\ud83d\udcac":isOverdue?"\u23f0":"\ud83d\udd14";
         const task=n.taskId?tasks[n.taskId]:null;
         const isUnread=!n.read;
         return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isUnread?'background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;':''}transition:background .12s">
           ${isUnread?`<span title="N\u00e3o lida" style="width:7px;height:7px;border-radius:50%;background:#c8f04e;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
-          <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${isComment?"\ud83d\udcac":"\ud83d\udd14"}</div>
+          <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${icon}</div>
           <div style="flex:1">
             <div style="font-size:13px;color:${isUnread?"#f0eff5":"#d0d0e0"};line-height:1.4;${isUnread?"font-weight:500":""}">${esc(n.msg||"")}</div>
             ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid #7c6eff">"${esc(n.commentPreview)}"</div>`:""}
@@ -6343,7 +6360,7 @@ function listenUserNotifs(){
   onValue(dbRef(`user_notifs/${currentUser.uid}`),snap=>{
     const notifs=snap.val()||{};
     window._myNotifs=notifs;
-    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="new_comment").length;
+    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="overdue_task")).length;
     manualAlertUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="manual_alert").length;
     // Mostra banner apenas uma vez por notificação nova, sem marcar como lida
     // (o usuário lê na aba Alertas e clica na linha para marcar como lida)
