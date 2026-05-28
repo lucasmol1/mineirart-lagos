@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.38
+Módulo Prospecção & Follow-up Comercial: nova aba "📅 Prospecção" (rota prospeccao) com gestão de leads CRM, mini calendário de follow-ups, cards com urgência, estatísticas do pipeline e modal de criação/edição (path Firebase: prosp_leads/).
+
 ## v1.37
 Calendário filtra por áreas onde o usuário é membro; push de eventos de calendário atrasados na aba Atualizações (⏰ throttle 5h); fluxograma: select "Macro" na toolbar para criar processos já dentro de um macroprocesso.
 
