@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.40
+Auto-marca como lidas notificações de comentário com mais de 7 dias ao abrir Atualizações, eliminando acúmulo histórico no badge.
+
 ## v1.39
 Prospecção restrita ao admin master (isAdmin1); backup completo passa a incluir prosp_leads; barra de uso de leads adicionada ao painel Admin com legenda de bloqueio.
 

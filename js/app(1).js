@@ -1,6 +1,7 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.38
-//  - Módulo Prospecção & Follow-up Comercial (prosp_leads)
+//  Mineirart Lagos — App v1.39
+//  - Prospecção visível só para admin1; backup inclui
+//    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -487,7 +488,7 @@ function renderSidebar(){
     ${ni("fluxo","⟆","Fluxograma")}
     ${ni("calendario","📅","Calendário")}
     ${ni("prospecção","🎯","Cal. Prospecção")}
-    ${(isAdmin()||currentProfile?.role==="comercial")?ni("prospeccao","📅","Prospecção"):""}
+    ${isAdmin1?ni("prospeccao","📅","Prospecção"):""}
     ${ni("organograma","🏢","Organograma")}
     ${ni("fyi","💡","FYI")}
     ${ni("notas-pessoais","📝","Rascunhos Pessoais")}
@@ -568,7 +569,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.38</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.39</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -2707,6 +2708,7 @@ function renderAdminPage(){
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Blocos fluxograma (máx ${LIMITS.MAX_FLOW_NODES})</div>${usageBar(Object.keys(flowData.nodes||{}).length,LIMITS.MAX_FLOW_NODES,"#f0a832")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Usuários (máx 100 simultâneos)</div>${usageBar(userList.length,100,"#4ae89c")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Histórico (auto-purga em ${LIMITS.MAX_AUDIT_LOGS})</div>${usageBar(Object.keys(auditLog).length,LIMITS.MAX_AUDIT_LOGS,"#a84ae8")}</div>
+        <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Leads Prospecção (máx ${LIMITS.MAX_PROSP_LEADS})</div>${usageBar(Object.keys(prospLeads).length,LIMITS.MAX_PROSP_LEADS,"#f0a832")}</div>
       </div>
       <div style="margin-top:12px;padding:10px 14px;background:rgba(74,200,232,0.07);border:1px solid #4ac8e844;border-radius:8px;font-size:12px;color:#4ac8e8">
         🛡️ Tarefas protegidas por data (hoje ou futura): <strong>${Object.values(tasks).filter(t=>taskHasFutureDate(t)).length}</strong>
@@ -2716,6 +2718,7 @@ function renderAdminPage(){
         <div>📋 <strong style="color:#c8f04e">Tarefas:</strong> ao atingir ${LIMITS.MAX_TASKS}, purga automaticamente as mais antigas não fixadas, mantendo ${LIMITS.TASK_PURGE_TARGET}.</div>
         <div>📜 <strong style="color:#a84ae8">Histórico de ações:</strong> ao atingir ${LIMITS.MAX_AUDIT_LOGS}, purga automaticamente os mais antigos, mantendo ${LIMITS.AUDIT_PURGE_KEEP}.</div>
         <div>🚫 <strong style="color:#7a7a8a">Notas, Áreas, Blocos de fluxograma:</strong> bloqueiam a criação de novos itens com mensagem de erro ao atingir o limite.</div>
+        <div>🚫 <strong style="color:#f0a832">Leads Prospecção:</strong> bloqueiam a criação ao atingir ${LIMITS.MAX_PROSP_LEADS}. Feche ou exclua leads antigos para liberar espaço.</div>
       </div>
     </div>
 
@@ -4699,7 +4702,7 @@ function renderProspLeadsPage(){
 
   return`<div class="page-header">
     <div><div class="page-title">📅 Prospecção & Follow-up</div><div class="page-sub">Gestão de leads e oportunidades comerciais</div></div>
-    ${(isAdmin()||currentProfile?.role==="comercial")?`<button class="btn-primary" id="btn-new-lead">+ Novo Lead</button>`:""}
+    ${isAdmin1?`<button class="btn-primary" id="btn-new-lead">+ Novo Lead</button>`:""}
   </div>
   ${bannerHtml}
   ${statsHtml}
@@ -6663,12 +6666,12 @@ async function exportFullBackup(){
     // Busca direta no Firebase para garantir dados completos
     const paths=["areas","tasks","notes","users","flow/nodes","flow/edges","flow/stickies",
       "org/nodes","org/edges","org/stickies","cal_events","freela_events","prosp_events",
-      "fyi_notes","task_comments","personal_notes","area_notes","audit"];
+      "prosp_leads","fyi_notes","task_comments","personal_notes","area_notes","audit"];
     const results=await Promise.all(paths.map(p=>get(dbRef(p)).then(s=>s.val())));
     const [
       bAreas,bTasks,bNotes,bUsers,bFlowNodes,bFlowEdges,bFlowStickies,
       bOrgNodes,bOrgEdges,bOrgStickies,bCalEvents,bFreelaEvents,bProspEvents,
-      bFyiNotes,bTaskComments,bPersonalNotes,bAreaNotes,bAudit
+      bProspLeads,bFyiNotes,bTaskComments,bPersonalNotes,bAreaNotes,bAudit
     ]=results;
 
     const backup={
@@ -6683,6 +6686,7 @@ async function exportFullBackup(){
       calEvents:bCalEvents||{},
       freelaEvents:bFreelaEvents||{},
       prospEvents:bProspEvents||{},
+      prospLeads:bProspLeads||{},
       fyiNotes:bFyiNotes||{},
       taskComments:bTaskComments||{},
       personalNotes:bPersonalNotes||{},
