@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.39
+Prospecção restrita ao admin master (isAdmin1); backup completo passa a incluir prosp_leads; barra de uso de leads adicionada ao painel Admin com legenda de bloqueio.
+
 ## v1.38
 Módulo Prospecção & Follow-up Comercial: nova aba "📅 Prospecção" (rota prospeccao) com gestão de leads CRM, mini calendário de follow-ups, cards com urgência, estatísticas do pipeline e modal de criação/edição (path Firebase: prosp_leads/).
 
