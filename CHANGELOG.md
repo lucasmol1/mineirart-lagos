@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.41
+Logout automático em tempo real quando o admin remove um usuário: o listener do próprio perfil detecta a remoção e chama signOut imediatamente.
+
 ## v1.40
 Auto-marca como lidas notificações de comentário com mais de 7 dias ao abrir Atualizações, eliminando acúmulo histórico no badge.
 
