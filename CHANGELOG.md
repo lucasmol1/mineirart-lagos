@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.42
+Corrige barra lateral colorida e handles de conexão no organograma: todos usam agora nW/nH (tamanho real do bloco) em vez dos valores padrão fixos W/H, acompanhando o resize.
+
 ## v1.41
 Logout automático em tempo real quando o admin remove um usuário: o listener do próprio perfil detecta a remoção e chama signOut imediatamente.
 

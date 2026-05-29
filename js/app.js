@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.41
+//  Mineirart Lagos — App v1.42
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -569,7 +569,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.41</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.42</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -5436,18 +5436,18 @@ function renderOrgPage(){
     const nW=n.w||W, nH=n.h||H, nFs=n.fsize||12;
     return`<g class="org-node" data-nid="${n.id}" transform="translate(${n.x},${n.y})" style="cursor:grab">
       <rect x="0" y="0" width="${nW}" height="${nH}" rx="10" fill="${orgFill}" stroke="${orgStroke}" stroke-width="${n.parentId?"1.2":"1.8"}"/>
-      <rect x="0" y="0" width="6" height="${H}" rx="3" fill="${aColor}"/>
+      <rect x="0" y="0" width="6" height="${nH}" rx="3" fill="${aColor}"/>
       ${parentBadge}
-      ${hasChildren?`<rect x="${W-54}" y="7" width="42" height="14" rx="7" fill="${aColor}22" stroke="${aColor}55" stroke-width="1"/><text x="${W-33}" y="14" text-anchor="middle" dominant-baseline="middle" fill="${aColor}" font-size="8" font-weight="700" font-family="DM Sans,sans-serif" style="pointer-events:none">GRUPO</text>`:""}
+      ${hasChildren?`<rect x="${nW-54}" y="7" width="42" height="14" rx="7" fill="${aColor}22" stroke="${aColor}55" stroke-width="1"/><text x="${nW-33}" y="14" text-anchor="middle" dominant-baseline="middle" fill="${aColor}" font-size="8" font-weight="700" font-family="DM Sans,sans-serif" style="pointer-events:none">GRUPO</text>`:""}
       ${nameTxt?`<text x="16" y="22" fill="#f0eff5" font-size="${n.parentId?"11":"12"}" font-weight="700" font-family="Syne,sans-serif" style="pointer-events:none">${esc(nameTxt)}</text>`:""}
       ${roleTxt?`<text x="16" y="38" fill="${aColor}" font-size="10" font-weight="500" font-family="DM Sans,sans-serif" style="pointer-events:none">${esc(roleTxt)}</text>`:""}
       ${areaTxt?`<text x="16" y="54" fill="#7a7a8a" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${esc(areaTxt)}</text>`:""}
       ${expandBtn}
       ${addChildBtn}
-      <circle cx="${W/2}" cy="0" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="top" style="cursor:crosshair"/>
-      <circle cx="${W}" cy="${H/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="right" style="cursor:crosshair"/>
-      <circle cx="${W/2}" cy="${H}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="bottom" style="cursor:crosshair"/>
-      <circle cx="0" cy="${H/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="left" style="cursor:crosshair"/>
+      <circle cx="${nW/2}" cy="0" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="top" style="cursor:crosshair"/>
+      <circle cx="${nW}" cy="${nH/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="right" style="cursor:crosshair"/>
+      <circle cx="${nW/2}" cy="${nH}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="bottom" style="cursor:crosshair"/>
+      <circle cx="0" cy="${nH/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="left" style="cursor:crosshair"/>
       ${isAdmin1?`<g class="org-edit-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="${W-10}" cy="10" r="9" fill="#1e1e28" stroke="${aColor}" stroke-width="1"/><text x="${W-10}" y="10" text-anchor="middle" dominant-baseline="middle" fill="${aColor}" font-size="10" style="pointer-events:none">✏</text></g>`:""}
       ${isAdmin1?`<g class="org-del-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="-8" cy="-8" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2"/><text x="-8" y="-8" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text></g>`:""}
       <rect x="${nW-18}" y="${nH-18}" width="22" height="22" rx="4" fill="${aColor}18" stroke="${aColor}55" stroke-width="1" class="org-resize-handle" data-nid="${n.id}" style="cursor:se-resize"/>
