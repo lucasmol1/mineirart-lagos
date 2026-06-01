@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.45
+Separa aba Atualizações em duas seções: 💬 Comentários (só dispensável individualmente) e ⏰ Automáticas (tarefas/eventos atrasados, com "Limpar todas" próprio).
+
 ## v1.44
 Adiciona botão "🗑️ Limpar tudo" no cabeçalho da aba Atualizações, visível imediatamente sem precisar rolar a página.
 

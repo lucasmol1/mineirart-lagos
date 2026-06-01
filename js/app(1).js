@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.43
+//  Mineirart Lagos — App v1.44
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -569,7 +569,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.43</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.44</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1435,7 +1435,7 @@ function renderAtualizacoesPage(){
         </div>`;
       }).join("")}
     </div>`:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\ud83d\udced</div><div class="empty-title">Nenhuma atualiza\u00e7\u00e3o</div></div>`;
-  return`<div class="page-header"><div><div class="page-title">Atualiza\u00e7\u00f5es</div><div class="page-sub">${myNotifs.length} notifica\u00e7${myNotifs.length!==1?"\u00f5es":"\u00e3o"} \u00b7 ${unreadCount} n\u00e3o lida${unreadCount!==1?"s":""}</div></div></div>${notifsHtml}`;
+  return`<div class="page-header"><div><div class="page-title">Atualiza\u00e7\u00f5es</div><div class="page-sub">${myNotifs.length} notifica\u00e7${myNotifs.length!==1?"\u00f5es":"\u00e3o"} \u00b7 ${unreadCount} n\u00e3o lida${unreadCount!==1?"s":""}</div></div>${myNotifs.length>0?`<button id="btn-clear-all-notifs" style="background:#1e1e2a;border:1px solid #3a3a4a;color:#d0d0e0;cursor:pointer;font-size:13px;padding:8px 18px;border-radius:8px;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:15px">\ud83d\uddd1\ufe0f</span> Limpar tudo</button>`:""}</div>${notifsHtml}`;
 }
 
 
@@ -2833,6 +2833,14 @@ function attachContentEvents(){
     const keys=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");
     for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
     toast("Notificações limpas","success");
+  });
+  document.getElementById("btn-clear-all-notifs")?.addEventListener("click",async()=>{
+    const notifs=window._myNotifs||{};
+    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");
+    const btn=document.getElementById("btn-clear-all-notifs");
+    if(btn){btn.disabled=true;btn.textContent="Limpando...";}
+    for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
+    toast("Tudo limpo!","success");
   });
   // Auto-marca como lidas notificações de comentário com mais de 7 dias
   (async()=>{
