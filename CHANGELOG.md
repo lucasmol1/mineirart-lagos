@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.44
+Adiciona botão "🗑️ Limpar tudo" no cabeçalho da aba Atualizações, visível imediatamente sem precisar rolar a página.
+
 ## v1.43
 Adiciona botão "Marcar todas como lidas" na aba Atualizações (marca todos os tipos: comentários, tarefas e eventos atrasados). Corrige "Limpar todas" para apagar todos os tipos de notificação, não só comentários.
 
