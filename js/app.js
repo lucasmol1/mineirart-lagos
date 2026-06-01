@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.42
+//  Mineirart Lagos — App v1.43
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -569,7 +569,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.42</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.43</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1406,7 +1406,10 @@ function renderAtualizacoesPage(){
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <span>\ud83d\udcac Notifica\u00e7\u00f5es (${myNotifs.length})${unreadCount>0?` <span style="font-size:10px;background:#c8f04e;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${unreadCount} n\u00e3o lidas</span>`:""}
         </span>
-        <button id="btn-clear-notifs" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
+        <div style="display:flex;gap:6px">
+          ${unreadCount>0?`<button id="btn-markall-read" style="background:#c8f04e22;border:1px solid #c8f04e55;color:#c8f04e;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px;font-weight:600">✓ Marcar todas como lidas</button>`:""}
+          <button id="btn-clear-notifs" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
+        </div>
       </div>
       ${myNotifs.map(n=>{
         const isComment=n.type==="new_comment";
@@ -2819,11 +2822,17 @@ function attachContentEvents(){
     }
     if(taskId) openDetailModal(taskId);
   }));
+  document.getElementById("btn-markall-read")?.addEventListener("click",async()=>{
+    const notifs=window._myNotifs||{};
+    const keys=Object.keys(notifs).filter(k=>!notifs[k].read&&(notifs[k].type==="new_comment"||notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event"));
+    for(const k of keys) await dbSet(`user_notifs/${currentUser.uid}/${k}/read`,true);
+    toast(`${keys.length} notificação${keys.length!==1?"ões":""} marcada${keys.length!==1?"s":""} como lida${keys.length!==1?"s":""}!`,"success");
+  });
   document.getElementById("btn-clear-notifs")?.addEventListener("click",async()=>{
     const notifs=window._myNotifs||{};
-    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment");
+    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");
     for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
-    toast("Comentários limpos","success");
+    toast("Notificações limpas","success");
   });
   // Auto-marca como lidas notificações de comentário com mais de 7 dias
   (async()=>{

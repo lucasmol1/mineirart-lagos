@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.43
+Adiciona botão "Marcar todas como lidas" na aba Atualizações (marca todos os tipos: comentários, tarefas e eventos atrasados). Corrige "Limpar todas" para apagar todos os tipos de notificação, não só comentários.
+
 ## v1.42
 Corrige barra lateral colorida e handles de conexão no organograma: todos usam agora nW/nH (tamanho real do bloco) em vez dos valores padrão fixos W/H, acompanhando o resize.
 
