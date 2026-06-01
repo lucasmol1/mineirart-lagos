@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.45
+//  Mineirart Lagos — App v1.46
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -494,6 +494,7 @@ function renderSidebar(){
     ${ni("notas-pessoais","📝","Rascunhos Pessoais")}
     ${(isAdmin()||currentProfile?.manageAreas)?ni("admin","⚙️","Administração",pendingCount>0?`<span class="nav-alert-count">${pendingCount}</span>`:""):""}
     ${(isAdmin1||currentProfile?.viewPerformance)?ni("performance","📊","Performance"):""}
+    ${isAdmin1?ni("gorila","🦍",""):""}
     ${ni("historico","🕵️","Histórico")}
     <div class="side-label">ÁREAS</div>
     ${areaTreeHtml}`;
@@ -558,7 +559,7 @@ function renderSidebar(){
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 function renderTopbar(){
   const tb=document.getElementById("topbar");if(!tb)return;
-  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",prospeccao:"Prospecção & Follow-up",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",atualizacoes:"Atualizações",admin:"Administração",historico:"Histórico de Ações",performance:"Performance"};
+  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",prospeccao:"Prospecção & Follow-up",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",atualizacoes:"Atualizações",admin:"Administração",historico:"Histórico de Ações",performance:"Performance",gorila:"🦍"};
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
   tb.innerHTML=`<button id="hamburger-btn" aria-label="Menu">☰</button>
     <div class="topbar-title">${esc(label)}</div>
@@ -569,7 +570,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.45</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.46</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -709,8 +710,9 @@ document.addEventListener("keydown",e=>{
 function renderContent(){
   const mc=document.getElementById("main-content");if(!mc)return;
   if(!window._myNotifs)window._myNotifs={};
-  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,prospeccao:renderProspLeadsPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage};
+  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,prospeccao:renderProspLeadsPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage,gorila:renderGorilaPage};
   if(page==="performance"&&!isAdmin1&&!currentProfile?.viewPerformance){navigate("dashboard");return;}
+  if(page==="gorila"&&!isAdmin1){navigate("dashboard");return;}
   if(page==="performance"&&mc.querySelector("#perf-iframe"))return;
   try{
     mc.innerHTML=(map[page]||renderDashboard)();
@@ -1446,6 +1448,12 @@ function renderAtualizacoesPage(){
   const empty=!comments.length&&!autos.length;
   return`<div class="page-header"><div><div class="page-title">Atualizações</div><div class="page-sub">${allNotifs.length} notificaç${allNotifs.length!==1?"ões":"ão"} · ${totalUnread} não lida${totalUnread!==1?"s":""}</div></div></div>
     ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`:`${commentsHtml}${autosHtml}`}`;
+}
+
+// ── GORILA (adm master only) ───────────────────────────────────────────────────
+function renderGorilaPage(){
+  if(!isAdmin1){return '<div style="display:flex;align-items:center;justify-content:center;height:60vh"><div style="font-size:48px">🔒</div></div>';}
+  return `<div style="display:flex;align-items:center;justify-content:center;height:calc(100vh - 56px);background:#0d0d12"><img src="img/gorila.jpg" alt="🦍" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px"/></div>`;
 }
 
 // ── HISTÓRICO ─────────────────────────────────────────────────────────────────

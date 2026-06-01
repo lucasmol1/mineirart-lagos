@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.46
+Adiciona opção secreta 🦍 na sidebar (visível apenas para adm master), exibindo a foto do gorila em tela cheia.
+
 ## v1.45
 Separa aba Atualizações em duas seções: 💬 Comentários (só dispensável individualmente) e ⏰ Automáticas (tarefas/eventos atrasados, com "Limpar todas" próprio).
 

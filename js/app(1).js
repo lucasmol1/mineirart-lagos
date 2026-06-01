@@ -1,5 +1,5 @@
-// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.44
+﻿// ════════════════════════════════════════════════════════
+//  Mineirart Lagos — App v1.45
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -569,7 +569,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.44</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.45</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1399,45 +1399,54 @@ function renderAlertsPage(){
 }
 
 function renderAtualizacoesPage(){
-  const myNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task"||n.type==="overdue_event")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
-  const unreadCount=myNotifs.filter(n=>!n.read).length;
-  const notifsHtml=myNotifs.length?`
+  const allNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task"||n.type==="overdue_event")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const comments=allNotifs.filter(n=>n.type==="new_comment");
+  const autos=allNotifs.filter(n=>n.type==="overdue_task"||n.type==="overdue_event");
+  const commentsUnread=comments.filter(n=>!n.read).length;
+  const autosUnread=autos.filter(n=>!n.read).length;
+  const totalUnread=commentsUnread+autosUnread;
+  function notifRow(n){
+    const isComment=n.type==="new_comment";
+    const isOverdue=n.type==="overdue_task";
+    const borderColor=isComment?"#7c6eff":isOverdue?"#ff6b6b":"#f0a832";
+    const icon=isComment?"💬":isOverdue?"⏰":"📅";
+    const task=n.taskId?tasks[n.taskId]:null;
+    const isUnread=!n.read;
+    return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isUnread?"background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;":""}transition:background .12s">
+      ${isUnread?`<span title="Não lida" style="width:7px;height:7px;border-radius:50%;background:#c8f04e;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
+      <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${icon}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;color:${isUnread?"#f0eff5":"#d0d0e0"};line-height:1.4;${isUnread?"font-weight:500":""}">${esc(n.msg||"")}</div>
+        ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid #7c6eff">"${esc(n.commentPreview)}"</div>`:""}
+        <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+        ${isUnread?`<span style="font-size:10px;color:#c8f04e;border:1px solid #c8f04e44;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
+        ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a;pointer-events:none">Ver tarefa</button>`:""}
+        <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">✕</button>
+      </div>
+    </div>`;
+  }
+  const commentsHtml=comments.length?`
+    <div style="margin-bottom:24px">
+      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>💬 Comentários (${comments.length})${commentsUnread>0?` <span style="font-size:10px;background:#c8f04e;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${commentsUnread} não lido${commentsUnread!==1?"s":""}</span>`:""}</span>
+        <span style="font-size:11px;color:#5a5a6a;font-style:italic">clique em ✕ para dispensar</span>
+      </div>
+      ${comments.map(notifRow).join("")}
+    </div>`:"";
+  const autosHtml=autos.length?`
     <div style="margin-bottom:20px">
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-        <span>\ud83d\udcac Notifica\u00e7\u00f5es (${myNotifs.length})${unreadCount>0?` <span style="font-size:10px;background:#c8f04e;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${unreadCount} n\u00e3o lidas</span>`:""}
-        </span>
-        <div style="display:flex;gap:6px">
-          ${unreadCount>0?`<button id="btn-markall-read" style="background:#c8f04e22;border:1px solid #c8f04e55;color:#c8f04e;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px;font-weight:600">✓ Marcar todas como lidas</button>`:""}
-          <button id="btn-clear-notifs" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
-        </div>
+        <span>⏰ Automáticas (${autos.length})${autosUnread>0?` <span style="font-size:10px;background:#f0a832;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${autosUnread} não lida${autosUnread!==1?"s":""}</span>`:""}</span>
+        <button id="btn-clear-autos" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
       </div>
-      ${myNotifs.map(n=>{
-        const isComment=n.type==="new_comment";
-        const isOverdue=n.type==="overdue_task";
-        const isOverdueEv=n.type==="overdue_event";
-        const borderColor=isComment?"#7c6eff":isOverdue?"#ff6b6b":isOverdueEv?"#f0a832":"#f0a832";
-        const icon=isComment?"\ud83d\udcac":isOverdue?"\u23f0":isOverdueEv?"\ud83d\udcc5":"\ud83d\udd14";
-        const task=n.taskId?tasks[n.taskId]:null;
-        const isUnread=!n.read;
-        return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isUnread?'background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;':''}transition:background .12s">
-          ${isUnread?`<span title="N\u00e3o lida" style="width:7px;height:7px;border-radius:50%;background:#c8f04e;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
-          <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${icon}</div>
-          <div style="flex:1">
-            <div style="font-size:13px;color:${isUnread?"#f0eff5":"#d0d0e0"};line-height:1.4;${isUnread?"font-weight:500":""}">${esc(n.msg||"")}</div>
-            ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid #7c6eff">"${esc(n.commentPreview)}"</div>`:""}
-            <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
-            ${isUnread?`<span style="font-size:10px;color:#c8f04e;border:1px solid #c8f04e44;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
-            ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a;pointer-events:none">Ver tarefa</button>`:""}
-            <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">\u2715</button>
-          </div>
-        </div>`;
-      }).join("")}
-    </div>`:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">\ud83d\udced</div><div class="empty-title">Nenhuma atualiza\u00e7\u00e3o</div></div>`;
-  return`<div class="page-header"><div><div class="page-title">Atualiza\u00e7\u00f5es</div><div class="page-sub">${myNotifs.length} notifica\u00e7${myNotifs.length!==1?"\u00f5es":"\u00e3o"} \u00b7 ${unreadCount} n\u00e3o lida${unreadCount!==1?"s":""}</div></div>${myNotifs.length>0?`<button id="btn-clear-all-notifs" style="background:#1e1e2a;border:1px solid #3a3a4a;color:#d0d0e0;cursor:pointer;font-size:13px;padding:8px 18px;border-radius:8px;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:15px">\ud83d\uddd1\ufe0f</span> Limpar tudo</button>`:""}</div>${notifsHtml}`;
+      ${autos.map(notifRow).join("")}
+    </div>`:"";
+  const empty=!comments.length&&!autos.length;
+  return`<div class="page-header"><div><div class="page-title">Atualizações</div><div class="page-sub">${allNotifs.length} notificaç${allNotifs.length!==1?"ões":"ão"} · ${totalUnread} não lida${totalUnread!==1?"s":""}</div></div></div>
+    ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`:`${commentsHtml}${autosHtml}`}`;
 }
-
 
 // ── HISTÓRICO ─────────────────────────────────────────────────────────────────
 function renderHistoricoPage(){
@@ -2822,25 +2831,13 @@ function attachContentEvents(){
     }
     if(taskId) openDetailModal(taskId);
   }));
-  document.getElementById("btn-markall-read")?.addEventListener("click",async()=>{
+  document.getElementById("btn-clear-autos")?.addEventListener("click",async()=>{
     const notifs=window._myNotifs||{};
-    const keys=Object.keys(notifs).filter(k=>!notifs[k].read&&(notifs[k].type==="new_comment"||notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event"));
-    for(const k of keys) await dbSet(`user_notifs/${currentUser.uid}/${k}/read`,true);
-    toast(`${keys.length} notificação${keys.length!==1?"ões":""} marcada${keys.length!==1?"s":""} como lida${keys.length!==1?"s":""}!`,"success");
-  });
-  document.getElementById("btn-clear-notifs")?.addEventListener("click",async()=>{
-    const notifs=window._myNotifs||{};
-    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");
-    for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
-    toast("Notificações limpas","success");
-  });
-  document.getElementById("btn-clear-all-notifs")?.addEventListener("click",async()=>{
-    const notifs=window._myNotifs||{};
-    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="new_comment"||notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");
-    const btn=document.getElementById("btn-clear-all-notifs");
+    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");
+    const btn=document.getElementById("btn-clear-autos");
     if(btn){btn.disabled=true;btn.textContent="Limpando...";}
     for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
-    toast("Tudo limpo!","success");
+    toast(`${keys.length} notificaç${keys.length!==1?"ões":"ão"} automática${keys.length!==1?"s":""} removida${keys.length!==1?"s":""}!`,"success");
   });
   // Auto-marca como lidas notificações de comentário com mais de 7 dias
   (async()=>{
