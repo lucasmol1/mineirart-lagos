@@ -4,6 +4,10 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.47
+Clique em notificação da aba Atualizações abre detalhe da tarefa; botão "Ver tarefa →" destacado.
+Suporte a @menção em comentários: dropdown de usuários ao digitar @, destaque visual e notificação ao mencionado.
+
 ## v1.46
 Adiciona opção secreta 🦍 na sidebar (visível apenas para adm master), exibindo a foto do gorila em tela cheia.
 

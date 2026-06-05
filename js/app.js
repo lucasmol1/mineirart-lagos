@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.46
+//  Mineirart Lagos — App v1.47
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -55,6 +55,16 @@ function linkify(text){
   return escaped.replace(/(https?:\/\/[^\s<>"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:#4ac8e8;text-decoration:underline;word-break:break-all" onclick="event.stopPropagation()">$1</a>');
 }
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function renderCommentText(text){
+  if(!text)return"";
+  let result=esc(text);
+  const names=Object.values(users).map(u=>u.name).filter(Boolean).sort((a,b)=>b.length-a.length);
+  for(const name of names){
+    const en=esc(name);
+    result=result.replace(new RegExp("@"+en.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"g"),`<span style="color:#c8f04e;font-weight:600;background:#c8f04e15;border-radius:3px;padding:0 3px">@${en}</span>`);
+  }
+  return result.replace(/(https?:\/\/[^\s<>"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:#4ac8e8;text-decoration:underline;word-break:break-all" onclick="event.stopPropagation()">$1</a>');
+}
 function applyAutoHyperlinks(el){
   const URL_RE=/https?:\/\/[^\s<>"]+/g;
   const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{
@@ -570,7 +580,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.46</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.47</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1385,7 +1395,7 @@ function renderAlertsPage(){
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
           ${isUnread?`<span style="font-size:10px;color:#f0a832;border:1px solid #f0a83244;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
-          ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a;pointer-events:none">Ver tarefa</button>`:""}
+          ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #7c6eff44;color:#7c6eff">Ver tarefa →</button>`:""}
           <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">\u2715</button>
         </div>
       </div>`;}).join("")}
@@ -1424,7 +1434,7 @@ function renderAtualizacoesPage(){
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
         ${isUnread?`<span style="font-size:10px;color:#c8f04e;border:1px solid #c8f04e44;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
-        ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #2e2e3a;color:#7a7a8a;pointer-events:none">Ver tarefa</button>`:""}
+        ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #7c6eff44;color:#7c6eff">Ver tarefa →</button>`:""}
         <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">✕</button>
       </div>
     </div>`;
@@ -2824,7 +2834,7 @@ function attachContentEvents(){
   document.getElementById("btn-toggle-members")?.addEventListener("click",()=>{areaMembersExpanded[activeAreaId]=!areaMembersExpanded[activeAreaId];render();});
   document.querySelectorAll(".btn-add-task-col").forEach(b=>b.addEventListener("click",()=>openTaskModal({areaId:activeAreaId,status:b.dataset.status,priority:"media"})));
   document.querySelectorAll(".card[data-detail]").forEach(c=>c.addEventListener("click",()=>openDetailModal(c.dataset.detail)));
-  document.querySelectorAll(".btn-detail-alert").forEach(b=>b.addEventListener("click",()=>openDetailModal(b.dataset.id)));
+  document.querySelectorAll(".btn-detail-alert").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();openDetailModal(b.dataset.id);}));
   document.querySelectorAll(".btn-del-notif").forEach(b=>b.addEventListener("click",async(e)=>{
     e.stopPropagation();
     await dbRemove(`user_notifs/${currentUser.uid}/${b.dataset.nid}`);
@@ -6407,7 +6417,7 @@ function openDetailModal(taskId){
           <span style="font-size:10px;color:#4a4a5a;margin-left:auto">${fmtTs(c.ts)}</span>
           ${canDel?`<button class="btn-del-comment" data-cid="${c.id}" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:11px;padding:0 2px;opacity:0.5">✕</button>`:""}
         </div>
-        <div style="font-size:12px;color:#a0a0b0;line-height:1.5;word-break:break-word">${linkify(c.text||"")}</div>
+        <div style="font-size:12px;color:#a0a0b0;line-height:1.5;word-break:break-word">${renderCommentText(c.text||"")}</div>
       </div>`;
     }).join("");
     // wire delete buttons
@@ -6424,15 +6434,56 @@ function openDetailModal(taskId){
   commentsUnsub=onValue(dbRef(commentsPath),snap=>renderComments(snap.val()||{}));
   // Clean up listener when modal closes
   const origCloseModal=window._origCloseForComments;
-  const _closeAndUnsub=()=>{if(commentsUnsub){commentsUnsub();commentsUnsub=null;}closeModal();};
+  let _mentionStart=-1,_mentionIdx=0;
+  function _hideMentionDd(){const d=document.getElementById("mention-dd");if(d)d.style.display="none";_mentionStart=-1;}
+  function _insertMention(name){
+    const val=commentInput.value,pos=commentInput.selectionStart;
+    commentInput.value=val.slice(0,_mentionStart)+"@"+name+" "+val.slice(pos);
+    const np=_mentionStart+name.length+2;commentInput.focus();commentInput.setSelectionRange(np,np);
+    _hideMentionDd();
+  }
+  function _showMentionDd(query){
+    const all=Object.values(users).map(u=>u.name).filter(Boolean).sort();
+    const filtered=query?all.filter(n=>n.toLowerCase().includes(query.toLowerCase())):all;
+    if(!filtered.length){_hideMentionDd();return;}
+    let dd=document.getElementById("mention-dd");
+    if(!dd){dd=document.createElement("div");dd.id="mention-dd";document.body.appendChild(dd);}
+    dd.style.cssText="position:fixed;background:#1a1a26;border:1px solid #2e2e3a;border-radius:8px;z-index:99999;max-height:220px;overflow-y:auto;min-width:190px;box-shadow:0 4px 20px rgba(0,0,0,.7);";
+    const sliced=filtered.slice(0,8);
+    dd.innerHTML=sliced.map((name,i)=>{const u=Object.values(users).find(u=>u.name===name);const color=u?.color||"#7c6eff";return`<div class="mention-item" data-name="${esc(name)}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;color:#d0d0e0;font-size:13px;border-bottom:1px solid #1e1e28;background:${i===0?"#22223a":""}"><div style="width:22px;height:22px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f;flex-shrink:0">${initials(name)}</div>${esc(name)}</div>`;}).join("");
+    _mentionIdx=0;
+    dd.querySelectorAll(".mention-item").forEach(el=>el.addEventListener("mousedown",e=>{e.preventDefault();_insertMention(el.dataset.name);}));
+    const rect=commentInput.getBoundingClientRect(),ddH=Math.min(sliced.length*40,220);
+    dd.style.top=(rect.top>ddH+20?rect.top-ddH-4:rect.bottom+4)+"px";
+    dd.style.left=rect.left+"px";dd.style.display="block";
+  }
+  const _closeAndUnsub=()=>{_hideMentionDd();if(commentsUnsub){commentsUnsub();commentsUnsub=null;}closeModal();};
 
   // Submit comment
   const commentInput=document.getElementById("comment-input");
   commentInput?.addEventListener("focus",e=>{e.target.style.borderColor="#c8f04e44";});
   commentInput?.addEventListener("blur",e=>{e.target.style.borderColor="#1e1e28";});
-  commentInput?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("comment-submit")?.click();}});
+  commentInput?.addEventListener("input",()=>{
+    const val=commentInput.value,pos=commentInput.selectionStart,before=val.slice(0,pos);
+    const atIdx=before.lastIndexOf("@");
+    if(atIdx>=0){const q=before.slice(atIdx+1);if(!q.includes(" ")&&!q.includes("\n")){_mentionStart=atIdx;_showMentionDd(q);return;}}
+    _hideMentionDd();
+  });
+  commentInput?.addEventListener("keydown",e=>{
+    const dd=document.getElementById("mention-dd");
+    const ddOpen=dd&&dd.style.display!=="none";
+    if(ddOpen){
+      const items=dd.querySelectorAll(".mention-item");
+      if(e.key==="ArrowDown"){e.preventDefault();_mentionIdx=Math.min(_mentionIdx+1,items.length-1);items.forEach((el,i)=>el.style.background=i===_mentionIdx?"#22223a":"");return;}
+      if(e.key==="ArrowUp"){e.preventDefault();_mentionIdx=Math.max(_mentionIdx-1,0);items.forEach((el,i)=>el.style.background=i===_mentionIdx?"#22223a":"");return;}
+      if(e.key==="Enter"){e.preventDefault();const sel=items[_mentionIdx];if(sel)_insertMention(sel.dataset.name);return;}
+      if(e.key==="Escape"){_hideMentionDd();return;}
+    }
+    if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("comment-submit")?.click();}
+  });
   document.getElementById("comment-submit")?.addEventListener("click",async()=>{
     const text=commentInput?.value.trim(); if(!text)return;
+    _hideMentionDd();
     const cid=uid();
     await dbSet(`${commentsPath}/${cid}`,{
       id:cid, text, authorId:currentUser.uid, authorName:currentProfile.name,
@@ -6450,17 +6501,23 @@ function openDetailModal(taskId){
     const taskAreaIds=[t.areaId,...(Array.isArray(t.extraAreaIds)?t.extraAreaIds:[])].filter(Boolean);
     taskAreaIds.forEach(aId=>{
       const area=areas[aId]; if(!area)return;
-      // Membros = usuários com permissão nessa área
       Object.entries(users).forEach(([uid2,u])=>{
         if(uid2===currentUser.uid)return;
         const hasPerm=u.role==="admin1"||u.role==="admin"||(u.permissions||[]).includes(aId);
         if(hasPerm) toNotify.add(uid2);
       });
     });
+    // Notificar usuários mencionados com @
+    const mentionedNames=[...text.matchAll(/@([\wÀ-ÿ][^@\n]*?)(?=\s|$)/g)].map(m=>m[1].trim());
+    Object.entries(users).forEach(([uid2,u])=>{
+      if(uid2===currentUser.uid)return;
+      if(mentionedNames.some(mn=>u.name===mn)) toNotify.add(uid2);
+    });
     const commentPreview=text.length>80?text.slice(0,80)+"…":text;
     for(const uid2 of toNotify){
+      const isMentioned=mentionedNames.includes(users[uid2]?.name||"");
       await dbSet(`user_notifs/${uid2}/${uid()}`,{
-        type:"new_comment", msg:`💬 ${currentProfile.name} comentou em "${t.title}"`,
+        type:"new_comment", msg:isMentioned?`📣 ${currentProfile.name} mencionou você em "${t.title}"`:`💬 ${currentProfile.name} comentou em "${t.title}"`,
         taskId, commentAuthor:currentProfile.name, commentPreview,
         ts:new Date().toISOString(), read:false
       });
