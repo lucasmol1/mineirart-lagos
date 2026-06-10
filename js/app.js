@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.52
+//  Mineirart Lagos — App v1.53
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -109,6 +109,7 @@ let flowSelectMode=false; // true = select mode, false = pan mode
 let orgSelectMode=false;
 let flowContainerExpanded={}; // {containerId: true/false}
 let expandedAreas=new Set(); // sidebar subarea toggle
+let atualizacoesTab="todas"; // aba ativa na pagina de Atualizacoes
 let areaNotesListeners={};
 let alertsSent={}, calAlertsSent={};
 let fyiNotes={};
@@ -579,7 +580,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.52</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.53</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1467,8 +1468,25 @@ function renderAtualizacoesPage(){
       ${autos.map(notifRow).join("")}
     </div>`:"";
   const empty=!mentions.length&&!comments.length&&!autos.length;
+  const tabs=[
+    {id:"todas",label:"📋 Todas",count:allNotifs.length,unread:totalUnread},
+    {id:"mencoes",label:"📣 Menções",count:mentions.length,unread:mentionsUnread},
+    {id:"comentarios",label:"💬 Comentários",count:comments.length,unread:commentsUnread},
+    {id:"automaticas",label:"⏰ Automáticas",count:autos.length,unread:autosUnread},
+  ];
+  const tabsHtml=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid #1e1e28;padding-bottom:12px">
+    ${tabs.map(tb=>`<button class="atualizacoes-tab-btn" data-tab="${tb.id}" style="background:${atualizacoesTab===tb.id?"#c8f04e":"#16161f"};color:${atualizacoesTab===tb.id?"#0c0c0f":"#b0b0c0"};border:1px solid ${atualizacoesTab===tb.id?"#c8f04e":"#2a2a38"};border-radius:7px;padding:6px 14px;font-size:12px;font-weight:${atualizacoesTab===tb.id?"700":"500"};cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .12s">
+      <span>${tb.label}</span><span style="font-size:11px;${atualizacoesTab===tb.id?"color:#0c0c0f99":"color:#5a5a6a"}">${tb.count}</span>${tb.unread>0?`<span style="font-size:10px;background:${atualizacoesTab===tb.id?"#0c0c0f":"#c8f04e"};color:${atualizacoesTab===tb.id?"#c8f04e":"#0c0c0f"};border-radius:10px;padding:1px 6px;font-weight:700">${tb.unread}</span>`:""}
+    </button>`).join("")}
+  </div>`;
+  let contentHtml;
+  if(empty) contentHtml=`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`;
+  else if(atualizacoesTab==="mencoes") contentHtml=mentions.length?mentionsHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📣</div><div class="empty-title">Nenhuma menção</div></div>`;
+  else if(atualizacoesTab==="comentarios") contentHtml=comments.length?commentsHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">💬</div><div class="empty-title">Nenhum comentário</div></div>`;
+  else if(atualizacoesTab==="automaticas") contentHtml=autos.length?autosHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">⏰</div><div class="empty-title">Nenhuma notificação automática</div></div>`;
+  else contentHtml=`${mentionsHtml}${commentsHtml}${autosHtml}`;
   return`<div class="page-header"><div><div class="page-title">Atualizações</div><div class="page-sub">${allNotifs.length} notificaç${allNotifs.length!==1?"ões":"ão"} · ${totalUnread} não lida${totalUnread!==1?"s":""}</div></div></div>
-    ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`:`${mentionsHtml}${commentsHtml}${autosHtml}`}`;
+    ${tabsHtml}${contentHtml}`;
 }
 
 // ── HISTÓRICO ─────────────────────────────────────────────────────────────────
@@ -2854,6 +2872,7 @@ function attachContentEvents(){
     }
     if(taskId) openDetailModal(taskId);
   }));
+  document.querySelectorAll(".atualizacoes-tab-btn").forEach(b=>b.addEventListener("click",()=>{atualizacoesTab=b.dataset.tab;render();}));
   document.getElementById("btn-clear-autos")?.addEventListener("click",async()=>{
     const notifs=window._myNotifs||{};
     const keys=Object.keys(notifs).filter(k=>notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");

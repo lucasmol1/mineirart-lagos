@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.51
+//  Mineirart Lagos — App v1.52
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -579,7 +579,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.51</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.52</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1381,7 +1381,7 @@ function renderAlertsPage(){
   const manualHtml=manualAlerts.length?`
     <div style="margin-bottom:20px">
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-        <span>\ud83d\udd14 Lembretes de a\u00e7\u00f5es de tarefas (${manualAlerts.length})${manualUnread>0?` <span style="font-size:10px;background:#f0a832;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${manualUnread} n\u00e3o lidas</span>`:""}</span>
+        <span>\ud83d\udd14 Lembretes A\u00e7\u00f5es (${manualAlerts.length})${manualUnread>0?` <span style="font-size:10px;background:#f0a832;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${manualUnread} n\u00e3o lidas</span>`:""}</span>
         <button id="btn-clear-manual-alerts" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
       </div>
       ${manualAlerts.map(n=>{const isUnread=!n.read;const task=n.taskId?tasks[n.taskId]:null;return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid #f0a832;margin-bottom:8px;cursor:pointer;${isUnread?'background:#17171f;border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;':''}transition:background .12s">
@@ -1410,15 +1410,18 @@ function renderAlertsPage(){
 
 function renderAtualizacoesPage(){
   const allNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task"||n.type==="overdue_event")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
-  const comments=allNotifs.filter(n=>n.type==="new_comment");
+  const isMentionNotif=n=>!!n.mention||(n.msg||"").includes("mencionou você");
+  const mentions=allNotifs.filter(n=>n.type==="new_comment"&&isMentionNotif(n));
+  const comments=allNotifs.filter(n=>n.type==="new_comment"&&!isMentionNotif(n));
   const autos=allNotifs.filter(n=>n.type==="overdue_task"||n.type==="overdue_event");
+  const mentionsUnread=mentions.filter(n=>!n.read).length;
   const commentsUnread=comments.filter(n=>!n.read).length;
   const autosUnread=autos.filter(n=>!n.read).length;
-  const totalUnread=commentsUnread+autosUnread;
+  const totalUnread=mentionsUnread+commentsUnread+autosUnread;
   function notifRow(n){
     const isComment=n.type==="new_comment";
     const isOverdue=n.type==="overdue_task";
-    const isMention=!!n.mention||(n.msg||"").includes("mencionou você");
+    const isMention=isMentionNotif(n);
     const borderColor=isMention?"#c8f04e":isComment?"#7c6eff":isOverdue?"#ff6b6b":"#f0a832";
     const icon=isMention?"📣":isComment?"💬":isOverdue?"⏰":"📅";
     const task=n.taskId?tasks[n.taskId]:null;
@@ -1439,6 +1442,14 @@ function renderAtualizacoesPage(){
       </div>
     </div>`;
   }
+  const mentionsHtml=mentions.length?`
+    <div style="margin-bottom:24px">
+      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>📣 Menções (${mentions.length})${mentionsUnread>0?` <span style="font-size:10px;background:#c8f04e;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${mentionsUnread} não lida${mentionsUnread!==1?"s":""}</span>`:""}</span>
+        <span style="font-size:11px;color:#5a5a6a;font-style:italic">clique em ✕ para dispensar</span>
+      </div>
+      ${mentions.map(notifRow).join("")}
+    </div>`:"";
   const commentsHtml=comments.length?`
     <div style="margin-bottom:24px">
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
@@ -1455,9 +1466,9 @@ function renderAtualizacoesPage(){
       </div>
       ${autos.map(notifRow).join("")}
     </div>`:"";
-  const empty=!comments.length&&!autos.length;
+  const empty=!mentions.length&&!comments.length&&!autos.length;
   return`<div class="page-header"><div><div class="page-title">Atualizações</div><div class="page-sub">${allNotifs.length} notificaç${allNotifs.length!==1?"ões":"ão"} · ${totalUnread} não lida${totalUnread!==1?"s":""}</div></div></div>
-    ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`:`${commentsHtml}${autosHtml}`}`;
+    ${empty?`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`:`${mentionsHtml}${commentsHtml}${autosHtml}`}`;
 }
 
 // ── HISTÓRICO ─────────────────────────────────────────────────────────────────

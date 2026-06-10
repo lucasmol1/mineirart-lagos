@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.53
+Adiciona abas superiores em Atualizações (Todas, Menções, Comentários, Automáticas) com contadores e não lidas.
+
 ## v1.52
 Cria secao separada "Menções" em Atualizações e renomeia "Lembretes de ações de tarefas" para "Lembretes Ações".
 
