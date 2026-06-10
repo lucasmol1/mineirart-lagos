@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.50
+Corrige deteccao de mencao em comentarios antigos (sem flag salva), aplicando o destaque visual tambem por texto da mensagem.
+
 ## v1.49
 Notificações de menção em comentários agora têm destaque visual (selo "Você foi mencionado", borda e ícone diferenciados).
 
