@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.51
+Renomeia secao "Cobrancas de colegas" para "Lembretes de acoes de tarefas" na pagina de Alertas.
+
 ## v1.50
 Corrige deteccao de mencao em comentarios antigos (sem flag salva), aplicando o destaque visual tambem por texto da mensagem.
 
