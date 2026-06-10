@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.52
+Cria secao separada "Menções" em Atualizações e renomeia "Lembretes de ações de tarefas" para "Lembretes Ações".
+
 ## v1.51
 Renomeia secao "Cobrancas de colegas" para "Lembretes de acoes de tarefas" na pagina de Alertas.
 
