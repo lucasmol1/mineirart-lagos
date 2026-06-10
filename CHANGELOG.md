@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.49
+Notificações de menção em comentários agora têm destaque visual (selo "Você foi mencionado", borda e ícone diferenciados).
+
 ## v1.48
 Removida a aba secreta do gorila (ícone 🦍) e sua página com foto, presentes apenas para adm master.
 
