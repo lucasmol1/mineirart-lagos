@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.55
+Rebranding visual: paleta alinhada ao site mineirart.com.br (accent âmbar #f0a848 + fundo dark warm + detalhe vinho #5d1200). Status "Em Andamento" agora azul (#4a9ee8) e "Concluído" verde (#4ae89c).
+
 ## v1.54
 Separa aba "Automáticas" em "Tarefas" (só some quando concluída) e "Eventos" (informativo, "Limpar tudo" descarta para sempre).
 

@@ -4,8 +4,8 @@
   "description": "Sistema de gestão de tarefas Mineirart Lagos",
   "start_url": "/mineirart-lagos/",
   "display": "standalone",
-  "background_color": "#0c0c0f",
-  "theme_color": "#0c0c0f",
+  "background_color": "#0f0c09",
+  "theme_color": "#0f0c09",
   "orientation": "any",
   "icons": [
     {

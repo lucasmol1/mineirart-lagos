@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.53
+//  Mineirart Lagos — App v1.54
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -580,7 +580,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.53</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.54</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -1410,20 +1410,31 @@ function renderAlertsPage(){
 }
 
 function renderAtualizacoesPage(){
-  const allNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n})).filter(n=>n&&(n.type==="new_comment"||n.type==="overdue_task"||n.type==="overdue_event")).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const allMyNotifs=Object.entries((typeof window!=="undefined"&&window._myNotifs)||{}).map(([id,n])=>({id,...n}));
   const isMentionNotif=n=>!!n.mention||(n.msg||"").includes("mencionou você");
-  const mentions=allNotifs.filter(n=>n.type==="new_comment"&&isMentionNotif(n));
-  const comments=allNotifs.filter(n=>n.type==="new_comment"&&!isMentionNotif(n));
-  const autos=allNotifs.filter(n=>n.type==="overdue_task"||n.type==="overdue_event");
+  const mentions=allMyNotifs.filter(n=>n.type==="new_comment"&&isMentionNotif(n)).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const comments=allMyNotifs.filter(n=>n.type==="new_comment"&&!isMentionNotif(n)).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  // Tarefas atrasadas: só saem da lista quando a tarefa é concluída
+  const autosRaw=allMyNotifs.filter(n=>n.type==="overdue_task").sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const autos=autosRaw.filter(n=>{
+    const t=n.taskId?tasks[n.taskId]:null;
+    if(t&&t.status==="concluido"){ dbRemove(`user_notifs/${currentUser.uid}/${n.id}`); return false; }
+    return true;
+  });
+  // Eventos passados: apenas informativo, não conta como notificação essencial
+  const eventos=allMyNotifs.filter(n=>n.type==="overdue_event").sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+  const allNotifs=[...mentions,...comments,...autos].sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
   const mentionsUnread=mentions.filter(n=>!n.read).length;
   const commentsUnread=comments.filter(n=>!n.read).length;
   const autosUnread=autos.filter(n=>!n.read).length;
+  const eventosUnread=eventos.filter(n=>!n.read).length;
   const totalUnread=mentionsUnread+commentsUnread+autosUnread;
   function notifRow(n){
     const isComment=n.type==="new_comment";
     const isOverdue=n.type==="overdue_task";
+    const isEvent=n.type==="overdue_event";
     const isMention=isMentionNotif(n);
-    const borderColor=isMention?"#c8f04e":isComment?"#7c6eff":isOverdue?"#ff6b6b":"#f0a832";
+    const borderColor=isMention?"#c8f04e":isComment?"#7c6eff":isOverdue?"#ff6b6b":"#5a5a6a";
     const icon=isMention?"📣":isComment?"💬":isOverdue?"⏰":"📅";
     const task=n.taskId?tasks[n.taskId]:null;
     const isUnread=!n.read;
@@ -1437,7 +1448,7 @@ function renderAtualizacoesPage(){
         <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
-        ${isUnread?`<span style="font-size:10px;color:#c8f04e;border:1px solid #c8f04e44;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
+        ${isUnread&&!isEvent?`<span style="font-size:10px;color:#c8f04e;border:1px solid #c8f04e44;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
         ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #7c6eff44;color:#7c6eff">Ver tarefa →</button>`:""}
         <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">✕</button>
       </div>
@@ -1462,17 +1473,26 @@ function renderAtualizacoesPage(){
   const autosHtml=autos.length?`
     <div style="margin-bottom:20px">
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-        <span>⏰ Automáticas (${autos.length})${autosUnread>0?` <span style="font-size:10px;background:#f0a832;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${autosUnread} não lida${autosUnread!==1?"s":""}</span>`:""}</span>
-        <button id="btn-clear-autos" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar todas</button>
+        <span>⏰ Tarefas atrasadas (${autos.length})${autosUnread>0?` <span style="font-size:10px;background:#f0a832;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${autosUnread} não lida${autosUnread!==1?"s":""}</span>`:""}</span>
+        <span style="font-size:11px;color:#5a5a6a;font-style:italic">sai da lista quando a tarefa for concluída</span>
       </div>
       ${autos.map(notifRow).join("")}
+    </div>`:"";
+  const eventosHtml=eventos.length?`
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>📅 Eventos passados (${eventos.length})</span>
+        <button id="btn-clear-eventos" style="background:none;border:1px solid #2e2e3a;color:#7a7a8a;cursor:pointer;font-size:11px;padding:3px 10px;border-radius:5px">Limpar tudo</button>
+      </div>
+      ${eventos.map(notifRow).join("")}
     </div>`:"";
   const empty=!mentions.length&&!comments.length&&!autos.length;
   const tabs=[
     {id:"todas",label:"📋 Todas",count:allNotifs.length,unread:totalUnread},
     {id:"mencoes",label:"📣 Menções",count:mentions.length,unread:mentionsUnread},
     {id:"comentarios",label:"💬 Comentários",count:comments.length,unread:commentsUnread},
-    {id:"automaticas",label:"⏰ Automáticas",count:autos.length,unread:autosUnread},
+    {id:"tarefas",label:"⏰ Tarefas",count:autos.length,unread:autosUnread},
+    {id:"eventos",label:"📅 Eventos",count:eventos.length,unread:eventosUnread},
   ];
   const tabsHtml=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid #1e1e28;padding-bottom:12px">
     ${tabs.map(tb=>`<button class="atualizacoes-tab-btn" data-tab="${tb.id}" style="background:${atualizacoesTab===tb.id?"#c8f04e":"#16161f"};color:${atualizacoesTab===tb.id?"#0c0c0f":"#b0b0c0"};border:1px solid ${atualizacoesTab===tb.id?"#c8f04e":"#2a2a38"};border-radius:7px;padding:6px 14px;font-size:12px;font-weight:${atualizacoesTab===tb.id?"700":"500"};cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .12s">
@@ -1480,10 +1500,11 @@ function renderAtualizacoesPage(){
     </button>`).join("")}
   </div>`;
   let contentHtml;
-  if(empty) contentHtml=`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`;
-  else if(atualizacoesTab==="mencoes") contentHtml=mentions.length?mentionsHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📣</div><div class="empty-title">Nenhuma menção</div></div>`;
+  if(atualizacoesTab==="mencoes") contentHtml=mentions.length?mentionsHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📣</div><div class="empty-title">Nenhuma menção</div></div>`;
   else if(atualizacoesTab==="comentarios") contentHtml=comments.length?commentsHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">💬</div><div class="empty-title">Nenhum comentário</div></div>`;
-  else if(atualizacoesTab==="automaticas") contentHtml=autos.length?autosHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">⏰</div><div class="empty-title">Nenhuma notificação automática</div></div>`;
+  else if(atualizacoesTab==="tarefas") contentHtml=autos.length?autosHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">⏰</div><div class="empty-title">Nenhuma tarefa atrasada</div></div>`;
+  else if(atualizacoesTab==="eventos") contentHtml=eventos.length?eventosHtml:`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📅</div><div class="empty-title">Nenhum evento passado</div></div>`;
+  else if(empty) contentHtml=`<div class="empty-state" style="padding:60px 20px"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="empty-title">Nenhuma atualização</div></div>`;
   else contentHtml=`${mentionsHtml}${commentsHtml}${autosHtml}`;
   return`<div class="page-header"><div><div class="page-title">Atualizações</div><div class="page-sub">${allNotifs.length} notificaç${allNotifs.length!==1?"ões":"ão"} · ${totalUnread} não lida${totalUnread!==1?"s":""}</div></div></div>
     ${tabsHtml}${contentHtml}`;
@@ -2873,13 +2894,16 @@ function attachContentEvents(){
     if(taskId) openDetailModal(taskId);
   }));
   document.querySelectorAll(".atualizacoes-tab-btn").forEach(b=>b.addEventListener("click",()=>{atualizacoesTab=b.dataset.tab;render();}));
-  document.getElementById("btn-clear-autos")?.addEventListener("click",async()=>{
+  document.getElementById("btn-clear-eventos")?.addEventListener("click",async()=>{
     const notifs=window._myNotifs||{};
-    const keys=Object.keys(notifs).filter(k=>notifs[k].type==="overdue_task"||notifs[k].type==="overdue_event");
-    const btn=document.getElementById("btn-clear-autos");
+    const entries=Object.entries(notifs).filter(([,n])=>n.type==="overdue_event");
+    const btn=document.getElementById("btn-clear-eventos");
     if(btn){btn.disabled=true;btn.textContent="Limpando...";}
-    for(const k of keys) await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
-    toast(`${keys.length} notificaç${keys.length!==1?"ões":"ão"} automática${keys.length!==1?"s":""} removida${keys.length!==1?"s":""}!`,"success");
+    for(const[k,n]of entries){
+      if(n.eventId) localStorage.setItem(`dismissed_calevent_${n.eventId}`,"1");
+      await dbRemove(`user_notifs/${currentUser.uid}/${k}`);
+    }
+    toast(`${entries.length} evento${entries.length!==1?"s":""} removido${entries.length!==1?"s":""}!`,"success");
   });
   // Auto-marca como lidas notificações de comentário com mais de 7 dias
   (async()=>{
@@ -5201,6 +5225,7 @@ async function checkOverdueCalEvents(){
     const evDate=new Date(e.dateStart+"T00:00:00");
     if(evDate>=today)continue; // ainda não passou
     if(e.areaId&&!myMbAreaIds.includes(e.areaId))continue; // não pertence ao usuário
+    if(localStorage.getItem(`dismissed_calevent_${eid}`))continue; // descartado definitivamente pelo usuário
     const lsKey=`overdue_calevent_${eid}`;
     const last=localStorage.getItem(lsKey);
     if(last&&Date.now()-parseInt(last)<fiveH)continue;
@@ -6851,7 +6876,7 @@ function listenUserNotifs(){
   onValue(dbRef(`user_notifs/${currentUser.uid}`),snap=>{
     const notifs=snap.val()||{};
     window._myNotifs=notifs;
-    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="overdue_task"||n.type==="overdue_event")).length;
+    userNotifsUnread=Object.values(notifs).filter(n=>!n.read&&(n.type==="new_comment"||n.type==="overdue_task")).length;
     manualAlertUnread=Object.values(notifs).filter(n=>!n.read&&n.type==="manual_alert").length;
     // Mostra banner apenas uma vez por notificação nova, sem marcar como lida
     // (o usuário lê na aba Alertas e clica na linha para marcar como lida)

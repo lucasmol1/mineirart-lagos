@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.54
+//  Mineirart Lagos — App v1.55
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -8,10 +8,10 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https:/
 import { ref, onValue, set, push, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const STATUS   = {"a-fazer":{label:"A Fazer",color:"#7c6eff"},"em-andamento":{label:"Em Andamento",color:"#f0a832"},"concluido":{label:"Concluído",color:"#c8f04e"},"bloqueado":{label:"Bloqueado",color:"#ff6b6b"}};
-const PRIORITY = {alta:{label:"Alta",color:"#ff6b6b"},media:{label:"Média",color:"#f0a832"},baixa:{label:"Baixa",color:"#c8f04e"}};
-const AREA_COLORS=["#e8624a","#e8a84a","#c8e04a","#4ae89c","#4ac8e8","#4a7ee8","#a84ae8","#e84ab8","#c8f04e","#7c6eff"];
-const NOTE_COLORS=["#c8f04e","#7c6eff","#4ac8e8","#f0a832","#ff6b6b","#4ae89c"];
+const STATUS   = {"a-fazer":{label:"A Fazer",color:"#7c6eff"},"em-andamento":{label:"Em Andamento",color:"#4a9ee8"},"concluido":{label:"Concluído",color:"#4ae89c"},"bloqueado":{label:"Bloqueado",color:"#ff6b6b"}};
+const PRIORITY = {alta:{label:"Alta",color:"#ff6b6b"},media:{label:"Média",color:"#f0a832"},baixa:{label:"Baixa",color:"#4ae89c"}};
+const AREA_COLORS=["#e8624a","#e8a84a","#c8e04a","#4ae89c","#4ac8e8","#4a7ee8","#a84ae8","#e84ab8","#f0a848","#7c6eff"];
+const NOTE_COLORS=["#f0a848","#7c6eff","#4ac8e8","#f0a832","#ff6b6b","#4ae89c"];
 
 // ── FIREBASE SAFETY LIMITS ────────────────────────────────────────────────────
 // Spark plan: 1 GB storage, 10 GB/month download, 100 simultaneous connections
@@ -61,7 +61,7 @@ function renderCommentText(text){
   const names=Object.values(users).map(u=>u.name).filter(Boolean).sort((a,b)=>b.length-a.length);
   for(const name of names){
     const en=esc(name);
-    result=result.replace(new RegExp("@"+en.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"g"),`<span style="color:#c8f04e;font-weight:600;background:#c8f04e15;border-radius:3px;padding:0 3px">@${en}</span>`);
+    result=result.replace(new RegExp("@"+en.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"g"),`<span style="color:#f0a848;font-weight:600;background:#f0a84815;border-radius:3px;padding:0 3px">@${en}</span>`);
   }
   return result.replace(/(https?:\/\/[^\s<>"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:#4ac8e8;text-decoration:underline;word-break:break-all" onclick="event.stopPropagation()">$1</a>');
 }
@@ -573,14 +573,14 @@ function renderTopbar(){
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
   tb.innerHTML=`<button id="hamburger-btn" aria-label="Menu">☰</button>
     <div class="topbar-title">${esc(label)}</div>
-    <button id="btn-undo-topbar" title="Desfazer (Ctrl+Z)" onclick="undoLastAction()" style="background:none;border:1px solid #2e2e3a;border-radius:8px;color:#7a7a8a;cursor:pointer;padding:5px 10px;font-size:14px;flex-shrink:0;transition:all .12s" onmouseover="this.style.color='#c8f04e';this.style.borderColor='#c8f04e44'" onmouseout="this.style.color='#7a7a8a';this.style.borderColor='#2e2e3a'">↩</button>
+    <button id="btn-undo-topbar" title="Desfazer (Ctrl+Z)" onclick="undoLastAction()" style="background:none;border:1px solid #2e2e3a;border-radius:8px;color:#7a7a8a;cursor:pointer;padding:5px 10px;font-size:14px;flex-shrink:0;transition:all .12s" onmouseover="this.style.color='#f0a848';this.style.borderColor='#f0a84844'" onmouseout="this.style.color='#7a7a8a';this.style.borderColor='#2e2e3a'">↩</button>
     <div id="global-search-wrap" style="flex:1;max-width:320px;position:relative">
       <input id="global-search" placeholder="🔍 Buscar tarefas, áreas, responsáveis…" autocomplete="off"
         style="width:100%;box-sizing:border-box;background:#13131a;border:1px solid #2e2e3a;border-radius:20px;padding:7px 14px;color:#d0d0e0;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;transition:border-color .15s"/>
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#c8f04e;margin-left:5px;font-weight:700">v1.54</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.55</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -735,7 +735,7 @@ function renderContent(){
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function renderDashboard(){
   const myAreas=visibleAreas(),myTasks=Object.values(tasks).filter(t=>myAreas.map(a=>a.id).includes(t.areaId));
-  const stats=[["Total",myTasks.length,"#c8f04e"],["Em andamento",myTasks.filter(t=>t.status==="em-andamento").length,"#f0a832"],["Concluídos",myTasks.filter(t=>t.status==="concluido").length,"#4ae89c"],["Bloqueados",myTasks.filter(t=>t.status==="bloqueado").length,"#ff6b6b"]];
+  const stats=[["Total",myTasks.length,"#f0a848"],["Em andamento",myTasks.filter(t=>t.status==="em-andamento").length,"#4a9ee8"],["Concluídos",myTasks.filter(t=>t.status==="concluido").length,"#4ae89c"],["Bloqueados",myTasks.filter(t=>t.status==="bloqueado").length,"#ff6b6b"]];
   const cards=myAreas.length===0
     ?`<div class="empty-state"><div style="font-size:48px;margin-bottom:12px">⬡</div><div class="empty-title">Nenhuma área disponível</div><div class="empty-sub">${isAdmin()?"Crie a primeira área pelo menu lateral":"Aguarde o administrador liberar seu acesso"}</div></div>`
     :`<div class="areas-grid">${myAreas.map(a=>{
@@ -795,7 +795,7 @@ function renderAreaPage(){
           <div style="width:20px;height:20px;border-radius:50%;background:${Object.values(users).find(u=>u.name===t.creatorName)?.color||"#4ac8e8"};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0c0c0f" title="${esc(t.creatorName)}">${initials(t.creatorName)}</div>
         </div>`:""}
       </div>
-      ${(()=>{if(t.status!=="concluido")return"";const _cn=Object.values(t.completions||{}).map(c=>c.name).filter(Boolean);const _nm=_cn.length?_cn.join(", "):t.completed_by;if(!_nm)return"";return`<div style="font-size:9px;color:#c8f04e;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Concluída por ${esc(_nm)}">✓ Concluída por ${esc(_nm)}</div>`;})()}
+      ${(()=>{if(t.status!=="concluido")return"";const _cn=Object.values(t.completions||{}).map(c=>c.name).filter(Boolean);const _nm=_cn.length?_cn.join(", "):t.completed_by;if(!_nm)return"";return`<div style="font-size:9px;color:#4ae89c;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Concluída por ${esc(_nm)}">✓ Concluída por ${esc(_nm)}</div>`;})()}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
         ${Object.keys(taskComments[t.id]||{}).length>0?`<span style="font-size:10px;color:#7c6eff;background:#7c6eff18;border:1px solid #7c6eff33;border-radius:10px;padding:2px 7px">💬 ${Object.keys(taskComments[t.id]).length}</span>`:"<span></span>"}
         ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:9px;color:#5a5a6a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
@@ -934,7 +934,7 @@ function renderFlowPage(){
     const mx=(fx+tx)/2,my=(fy+ty)/2;
     const isSel=selEdge===e.id;
     const hasLabel=!!e.label, hasDetail=!!e.detail;
-    const strokeColor=isSel?"#c8f04e":hasLabel||hasDetail?"#7c6eff":e._collapsed?"#6a6a7a":"#3e3e52";
+    const strokeColor=isSel?"#f0a848":hasLabel||hasDetail?"#7c6eff":e._collapsed?"#6a6a7a":"#3e3e52";
     const markerSuffix=isSel?"Sel":hasLabel||hasDetail?"Det":"";
     const labelBg=hasLabel?`<rect x="${mx-46}" y="${my-11}" width="92" height="20" rx="5" fill="#13131a" stroke="${strokeColor}" stroke-width="1" style="pointer-events:none"/><text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="middle" fill="${strokeColor}" font-size="10" font-family="DM Sans,sans-serif" style="pointer-events:none">${esc(e.label.slice(0,18)+(e.label.length>18?"...":""))}</text>`:"";
     const detailDot=hasDetail&&!isSel?`<circle cx="${mx+(hasLabel?52:0)}" cy="${my-(hasLabel?0:0)}" r="4" fill="#7c6eff" style="pointer-events:none"/>`:"";
@@ -958,7 +958,7 @@ function renderFlowPage(){
     const side=connecting.side||"right";
     const sx=side==="right"?fn.x+W2:side==="left"?fn.x:fn.x+W2/2;
     const sy=side==="bottom"?fn.y+H2:side==="top"?fn.y:fn.y+H2/2;
-    return`<path d="M${sx},${sy} L${mousePos.x},${mousePos.y}" fill="none" stroke="#c8f04e" stroke-width="1.8" stroke-dasharray="6,3"/>`;
+    return`<path d="M${sx},${sy} L${mousePos.x},${mousePos.y}" fill="none" stroke="#f0a848" stroke-width="1.8" stroke-dasharray="6,3"/>`;
   })();
 
   // Build defs for multi-area gradients
@@ -986,7 +986,7 @@ function renderFlowPage(){
     const areaIdList=Array.isArray(n.areaIds)&&n.areaIds.length>0?n.areaIds:(n.areaId?[n.areaId]:[]);
     const hasArea=areaIdList.length>0&&areas[areaIdList[0]];
     const isMulti=areaIdList.length>1;
-    const bc=hasArea?areas[areaIdList[0]].color:(n.color||"#c8f04e");
+    const bc=hasArea?areas[areaIdList[0]].color:(n.color||"#f0a848");
     const fillColor=isMulti?`url(#grad-${n.id})`:`${bc}20`;
     const strokeColor=isMulti?`url(#grad-${n.id})`:bc;
     const isSel=selectedNodes.has(n.id);
@@ -995,10 +995,10 @@ function renderFlowPage(){
     const detail=n.detail||"";
     const areaLabel=areaIdList.filter(id=>areas[id]).map(id=>areas[id].name.slice(0,10)).join(" · ");
     const shape=n.shape==="diamond"
-      ?`<polygon points="${W/2},0 ${W},${H/2} ${W/2},${H} 0,${H/2}" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`
+      ?`<polygon points="${W/2},0 ${W},${H/2} ${W/2},${H} 0,${H/2}" fill="${fillColor}" stroke="${isSel?"#f0a848":strokeColor}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`
       :n.shape==="pill"
-      ?`<rect x="0" y="0" width="${W}" height="${H}" rx="${H/2}" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:1.5}"/>`
-      :`<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="${fillColor}" stroke="${isSel?"#c8f04e":strokeColor}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`;
+      ?`<rect x="0" y="0" width="${W}" height="${H}" rx="${H/2}" fill="${fillColor}" stroke="${isSel?"#f0a848":strokeColor}" stroke-width="${isSel?3:1.5}"/>`
+      :`<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="${fillColor}" stroke="${isSel?"#f0a848":strokeColor}" stroke-width="${isSel?3:hasArea?2.5:1.5}"/>`;
     const isRootNode=n.type==="root";
     const childNodesFlow=allFlowNodes.filter(ch=>ch.flowParent===n.id);
     const childCountFlow=childNodesFlow.length;
@@ -1007,13 +1007,13 @@ function renderFlowPage(){
     const rootMeta=isRootNode?`${isExpRoot?"expandido":"minimizado"} · ${childCountFlow} micro${childCountFlow===1?"":"s"}`:"";
     const expandBtnFlow=isRootNode?`
       <g class="flow-root-toggle" data-nid="${n.id}" style="cursor:pointer">
-        <rect x="${W/2-36}" y="${H+5}" width="72" height="20" rx="10" fill="${isExpRoot?"#c8f04e22":"#1e1e28"}" stroke="${isExpRoot?"#c8f04e":"#3e3e52"}" stroke-width="1.2"/>
-        <text x="${W/2}" y="${H+15}" text-anchor="middle" dominant-baseline="middle" fill="${isExpRoot?"#c8f04e":"#7a7a8a"}" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${isExpRoot?"Recolher":"Abrir"} ${childCountFlow}</text>
+        <rect x="${W/2-36}" y="${H+5}" width="72" height="20" rx="10" fill="${isExpRoot?"#f0a84822":"#1e1e28"}" stroke="${isExpRoot?"#f0a848":"#3e3e52"}" stroke-width="1.2"/>
+        <text x="${W/2}" y="${H+15}" text-anchor="middle" dominant-baseline="middle" fill="${isExpRoot?"#f0a848":"#7a7a8a"}" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${isExpRoot?"Recolher":"Abrir"} ${childCountFlow}</text>
       </g>`:"";
     const addChildBtnFlow=isAdmin1&&isRootNode?`
       <g class="flow-add-child" data-nid="${n.id}" style="cursor:pointer" title="Adicionar bloco filho">
-        <circle cx="${W+12}" cy="${H+4}" r="9" fill="#c8f04e18" stroke="#c8f04e44" stroke-width="1.2"/>
-        <text x="${W+12}" y="${H+4}" text-anchor="middle" dominant-baseline="middle" fill="#c8f04e" font-size="13" style="pointer-events:none">+</text>
+        <circle cx="${W+12}" cy="${H+4}" r="9" fill="#f0a84818" stroke="#f0a84844" stroke-width="1.2"/>
+        <text x="${W+12}" y="${H+4}" text-anchor="middle" dominant-baseline="middle" fill="#f0a848" font-size="13" style="pointer-events:none">+</text>
       </g>`:"";
     return`<g class="flow-node${isRootNode?" flow-root-node":""}" data-node-id="${n.id}" data-area-id="${areaIdList[0]||""}" transform="translate(${n.x},${n.y})" style="cursor:${hasArea&&!connecting?"pointer":"grab"}">
       ${shape}
@@ -1024,10 +1024,10 @@ function renderFlowPage(){
       ${expandBtnFlow}
       ${addChildBtnFlow}
       <!-- 4-side connection handles -->
-      <circle cx="${W/2}" cy="0" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="top" style="cursor:crosshair"/>
-      <circle cx="${W}" cy="${H/2}" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="right" style="cursor:crosshair"/>
-      <circle cx="${W/2}" cy="${H}" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="bottom" style="cursor:crosshair"/>
-      <circle cx="0" cy="${H/2}" r="6" fill="${connecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="left" style="cursor:crosshair"/>
+      <circle cx="${W/2}" cy="0" r="6" fill="${connecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="top" style="cursor:crosshair"/>
+      <circle cx="${W}" cy="${H/2}" r="6" fill="${connecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="right" style="cursor:crosshair"/>
+      <circle cx="${W/2}" cy="${H}" r="6" fill="${connecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="bottom" style="cursor:crosshair"/>
+      <circle cx="0" cy="${H/2}" r="6" fill="${connecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${bc}" stroke-width="1.5" class="conn-handle" data-node-id="${n.id}" data-side="left" style="cursor:crosshair"/>
       ${isAdmin1?`<circle cx="${W+4}" cy="-4" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2" class="del-node" data-node-id="${n.id}" style="cursor:pointer"/><text x="${W+4}" y="-4" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text>`:""}
       ${isAdmin1?`<circle cx="-4" cy="${H+4}" r="8" fill="#7c6eff1a" stroke="#7c6eff" stroke-width="1.2" class="edit-flow-node" data-node-id="${n.id}" style="cursor:pointer"/><text x="-4" y="${H+4}" text-anchor="middle" dominant-baseline="middle" fill="#9d93ff" font-size="10" style="pointer-events:none">✏</text>`:""}
       <rect x="${W-18}" y="${H-18}" width="22" height="22" rx="4" fill="${bc}18" stroke="${bc}55" stroke-width="1" class="flow-resize-handle" data-node-id="${n.id}" style="cursor:se-resize"/>
@@ -1053,10 +1053,10 @@ function renderFlowPage(){
           <option value="rect">Processo</option><option value="diamond">Decisão ◇</option><option value="pill">Início/Fim</option>
         </select>
         ${rootNodeOpts?`<select id="node-parent-root" style="background:#1a1a22;border:1px solid #7c6eff44;border-radius:7px;padding:8px 10px;color:#9d93ff;font-family:inherit;font-size:12px;outline:none;max-width:140px" title="Adicionar dentro de um Macro"><option value="">— Macro —</option>${rootNodeOpts}</select>`:""}
-        <input type="color" id="node-color" value="#c8f04e" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
+        <input type="color" id="node-color" value="#f0a848" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
         <button class="btn-primary" id="btn-add-node" ${nodeCount>=LIMITS.MAX_FLOW_NODES?"disabled":""}>+ Processo</button>
         <button class="btn-small" id="btn-add-root-node" style="border:1px solid #7c6eff44;color:#9d93ff;background:#7c6eff12">+ Macro</button>
-        <button class="btn-small" id="btn-flow-select-mode" style="border:1px solid ${flowSelectMode?"#c8f04e":"#2e2e3a"};color:${flowSelectMode?"#c8f04e":"#7a7a8a"};background:${flowSelectMode?"#c8f04e12":"transparent"}">${flowSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
+        <button class="btn-small" id="btn-flow-select-mode" style="border:1px solid ${flowSelectMode?"#f0a848":"#2e2e3a"};color:${flowSelectMode?"#f0a848":"#7a7a8a"};background:${flowSelectMode?"#f0a84812":"transparent"}">${flowSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
       </div>
       ${areaButtons?`<div style="display:flex;gap:6px;flex-wrap:wrap">${areaButtons}</div>`:""}
     </div>`:""}
@@ -1071,20 +1071,20 @@ function renderFlowPage(){
             <path d="M0,0 L0,7 L9,3.5 z" fill="#5a5a6e"/>
           </marker>
           <marker id="arrowSel" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
-            <path d="M0,0 L0,7 L9,3.5 z" fill="#c8f04e"/>
+            <path d="M0,0 L0,7 L9,3.5 z" fill="#f0a848"/>
           </marker>
           <marker id="arrowDet" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
             <path d="M0,0 L0,7 L9,3.5 z" fill="#7c6eff"/>
           </marker>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)"/>
-        <g id="flow-zoom-group" transform="translate(${flowPan.x},${flowPan.y}) scale(${flowZoom})">${svgContainers}${svgEdges}${liveEdge}${svgNodes}${selBox?`<rect x="${Math.min(selBox.x1,selBox.x2)}" y="${Math.min(selBox.y1,selBox.y2)}" width="${Math.abs(selBox.x2-selBox.x1)}" height="${Math.abs(selBox.y2-selBox.y1)}" fill="#c8f04e08" stroke="#c8f04e" stroke-width="1" stroke-dasharray="5,3" style="pointer-events:none"/>`:""}</g>
+        <g id="flow-zoom-group" transform="translate(${flowPan.x},${flowPan.y}) scale(${flowZoom})">${svgContainers}${svgEdges}${liveEdge}${svgNodes}${selBox?`<rect x="${Math.min(selBox.x1,selBox.x2)}" y="${Math.min(selBox.y1,selBox.y2)}" width="${Math.abs(selBox.x2-selBox.x1)}" height="${Math.abs(selBox.y2-selBox.y1)}" fill="#f0a84808" stroke="#f0a848" stroke-width="1" stroke-dasharray="5,3" style="pointer-events:none"/>`:""}</g>
         ${nodes.length===0?`<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="#2e2e42" font-size="15" font-family="DM Sans,sans-serif">Use os botões acima para adicionar blocos e conectar áreas</text>`:""}
       </svg>
     </div>
     ${selectedNodes.size>1?`
-    <div id="flow-group-bar" style="margin-top:10px;background:#1a1a22;border:1px solid #c8f04e33;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span style="font-size:12px;color:#c8f04e;font-weight:700">${selectedNodes.size} processos selecionados</span>
+    <div id="flow-group-bar" style="margin-top:10px;background:#1a1a22;border:1px solid #f0a84833;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:12px;color:#f0a848;font-weight:700">${selectedNodes.size} processos selecionados</span>
       <input id="flow-macro-label" placeholder="Nome do macroprocesso…" style="width:190px;background:#13131a;border:1px solid #2e2e3a;border-radius:7px;padding:6px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none"/>
       <button id="flow-create-macro" class="btn-primary" style="font-size:12px;padding:6px 14px;background:#7c6eff;color:#fff">Criar macro</button>
       <button id="flow-layout-selected" class="btn-small" style="font-size:12px;padding:6px 10px;border-color:#4ac8e844;color:#4ac8e8;background:#4ac8e812">Ordenar seleção</button>
@@ -1123,7 +1123,7 @@ function renderNotesPage(){
       const links=(n.links||[]).map(l=>`<a class="note-link" href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.label||l.url)}</a>`).join("");
       const uColor=(users[n.authorId]||Object.values(users).find(u=>u.name===n.authorName))?.color||"#7c6eff";
       const cornerAvatar=n.authorName?`<div title="${esc(n.authorName)}" style="position:absolute;bottom:10px;right:10px;width:22px;height:22px;border-radius:50%;background:${uColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f">${initials(n.authorName)}</div>`:"";
-      return`<div class="note-card"${cornerAvatar?` style="padding-bottom:36px"`:""}>${n.tag?`<span class="note-tag" style="background:${n.color||"#c8f04e"}18;color:${n.color||"#c8f04e"};border:1px solid ${n.color||"#c8f04e"}30">${esc(n.tag)}</span>`:""}
+      return`<div class="note-card"${cornerAvatar?` style="padding-bottom:36px"`:""}>${n.tag?`<span class="note-tag" style="background:${n.color||"#f0a848"}18;color:${n.color||"#f0a848"};border:1px solid ${n.color||"#f0a848"}30">${esc(n.tag)}</span>`:""}
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px"><div class="note-title">${esc(n.title)}</div><div style="display:flex;align-items:center;gap:6px">${isAdmin()||n.authorId===currentUser?.uid?`<button class="icon-btn btn-edit-note" data-id="${n.id}">✏</button><button class="icon-btn btn-del-note" data-id="${n.id}">✕</button>`:""}</div></div>
         ${n.body?`<div class="note-body">${esc(n.body)}</div>`:""}${links?`<div class="note-links">${links}</div>`:""}
       ${cornerAvatar}</div>`;}).join("")}</div>`}`;
@@ -1199,7 +1199,7 @@ function renderFYIPage(){
     .filter(n=>!n.areaId) // global FYI only (area FYIs have areaId)
     .sort((a,b)=>(a.order||0)-(b.order||0)||(new Date(b.createdAt)-new Date(a.createdAt)));
   const noteCards=notes.map(n=>{
-    const color=n.color||"#c8f04e";
+    const color=n.color||"#f0a848";
     const syncBadge=n.syncCal?`<span style="font-size:10px;background:#7c6eff22;color:#9d93ff;border:1px solid #7c6eff44;border-radius:10px;padding:1px 7px">📅 no calendário</span>`:"";
     const fyiUColor=(users[n.authorId]||Object.values(users).find(u=>u.name===n.authorName))?.color||"#7c6eff";
     const fyiCornerAvatar=n.authorName?`<div title="${esc(n.authorName)}" style="position:absolute;bottom:10px;right:12px;width:22px;height:22px;border-radius:50%;background:${fyiUColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f">${initials(n.authorName)}</div>`:"";
@@ -1228,7 +1228,7 @@ function renderFYIPage(){
 function openFYIModal(noteId, readOnly=false){
   const n=noteId?fyiNotes[noteId]:{};
   if(readOnly&&noteId){
-    const color=n.color||"#c8f04e";
+    const color=n.color||"#f0a848";
     openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
       <div class="modal-header"><div class="modal-title" style="color:${color}">${esc(n.title||"Nota FYI")}</div><button class="icon-btn" id="m-x">✕</button></div>
       <div class="modal-body">
@@ -1247,7 +1247,7 @@ function openFYIModal(noteId, readOnly=false){
       <div class="field"><label>Título *</label><input id="m-ftitle" value="${esc(n.title||"")}" placeholder="Assunto da nota…" autofocus/></div>
       <div class="field"><label>Conteúdo</label><textarea id="m-fbody" rows="5" placeholder="Detalhes, links, referências…">${esc(n.body||"")}</textarea></div>
       <div class="field-row">
-        <div class="field"><label>Cor</label><input type="color" id="m-fcolor" value="${n.color||"#c8f04e"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
+        <div class="field"><label>Cor</label><input type="color" id="m-fcolor" value="${n.color||"#f0a848"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
         <div class="field" style="display:flex;align-items:flex-end;gap:10px;padding-bottom:6px">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" id="m-fsynccal" ${n.syncCal?"checked":""} style="width:15px;height:15px;accent-color:#7c6eff"/>
@@ -1301,7 +1301,7 @@ function openFYIModal(noteId, readOnly=false){
 function openAreaFYIModal(noteId, areaId, readOnly=false){
   const n=noteId?fyiNotes[noteId]:{};
   if(readOnly&&noteId){
-    const color=n.color||"#c8f04e";
+    const color=n.color||"#f0a848";
     openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:500px">
       <div class="modal-header"><div class="modal-title" style="color:${color}">${esc(n.title||"Nota FYI")}</div><button class="icon-btn" id="m-x">✕</button></div>
       <div class="modal-body">
@@ -1320,7 +1320,7 @@ function openAreaFYIModal(noteId, areaId, readOnly=false){
       <div class="field"><label>Título *</label><input id="m-ftitle" value="${esc(n.title||"")}" placeholder="Assunto da nota…" autofocus/></div>
       <div class="field"><label>Conteúdo</label><textarea id="m-fbody" rows="5" placeholder="Detalhes, links, referências…">${esc(n.body||"")}</textarea></div>
       <div class="field-row">
-        <div class="field"><label>Cor</label><input type="color" id="m-fcolor" value="${n.color||"#c8f04e"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
+        <div class="field"><label>Cor</label><input type="color" id="m-fcolor" value="${n.color||"#f0a848"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
         <div class="field" style="display:flex;align-items:flex-end;gap:10px;padding-bottom:6px">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" id="m-fsynccal" ${n.syncCal?"checked":""} style="width:15px;height:15px;accent-color:#7c6eff"/>
@@ -1434,21 +1434,21 @@ function renderAtualizacoesPage(){
     const isOverdue=n.type==="overdue_task";
     const isEvent=n.type==="overdue_event";
     const isMention=isMentionNotif(n);
-    const borderColor=isMention?"#c8f04e":isComment?"#7c6eff":isOverdue?"#ff6b6b":"#5a5a6a";
+    const borderColor=isMention?"#f0a848":isComment?"#7c6eff":isOverdue?"#ff6b6b":"#5a5a6a";
     const icon=isMention?"📣":isComment?"💬":isOverdue?"⏰":"📅";
     const task=n.taskId?tasks[n.taskId]:null;
     const isUnread=!n.read;
-    return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isMention?"background:#c8f04e0d;":isUnread?"background:#17171f;":""}${isUnread?"border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;":""}transition:background .12s">
-      ${isUnread?`<span title="Não lida" style="width:7px;height:7px;border-radius:50%;background:#c8f04e;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
+    return`<div class="alert-card notif-row" data-nid="${n.id}" data-taskid="${n.taskId||''}" style="border-left:3px solid ${borderColor};margin-bottom:8px;cursor:pointer;${isMention?"background:#f0a8480d;":isUnread?"background:#17171f;":""}${isUnread?"border-top:1px solid #2a2a38;border-bottom:1px solid #2a2a38;border-right:1px solid #2a2a38;":""}transition:background .12s">
+      ${isUnread?`<span title="Não lida" style="width:7px;height:7px;border-radius:50%;background:#f0a848;flex-shrink:0;align-self:center;margin-right:6px"></span>`:`<span style="width:7px;height:7px;flex-shrink:0;margin-right:6px"></span>`}
       <div style="font-size:18px;width:28px;text-align:center;flex-shrink:0">${icon}</div>
       <div style="flex:1">
-        ${isMention?`<div style="font-size:10px;color:#0c0c0f;background:#c8f04e;display:inline-block;border-radius:4px;padding:1px 7px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Você foi mencionado</div>`:""}
+        ${isMention?`<div style="font-size:10px;color:#0c0c0f;background:#f0a848;display:inline-block;border-radius:4px;padding:1px 7px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Você foi mencionado</div>`:""}
         <div style="font-size:13px;color:${isUnread?"#f0eff5":"#d0d0e0"};line-height:1.4;${isUnread||isMention?"font-weight:500":""}">${esc(n.msg||"")}</div>
-        ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid ${isMention?"#c8f04e":"#7c6eff"}">"${esc(n.commentPreview)}"</div>`:""}
+        ${isComment&&n.commentPreview?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px;font-style:italic;background:#13131a;border-radius:5px;padding:4px 8px;border-left:2px solid ${isMention?"#f0a848":"#7c6eff"}">"${esc(n.commentPreview)}"</div>`:""}
         <div style="font-size:11px;color:#5a5a6a;margin-top:3px">${fmtTs(n.ts)}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
-        ${isUnread&&!isEvent?`<span style="font-size:10px;color:#c8f04e;border:1px solid #c8f04e44;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
+        ${isUnread&&!isEvent?`<span style="font-size:10px;color:#f0a848;border:1px solid #f0a84844;border-radius:4px;padding:2px 6px">Clique para ler</span>`:""}
         ${n.taskId&&task?`<button class="btn-small btn-detail-alert" data-id="${n.taskId}" style="border:1px solid #7c6eff44;color:#7c6eff">Ver tarefa →</button>`:""}
         <button class="btn-del-notif" data-nid="${n.id}" style="background:none;border:none;color:#5a5a6a;cursor:pointer;font-size:14px;padding:2px 4px">✕</button>
       </div>
@@ -1457,7 +1457,7 @@ function renderAtualizacoesPage(){
   const mentionsHtml=mentions.length?`
     <div style="margin-bottom:24px">
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-        <span>📣 Menções (${mentions.length})${mentionsUnread>0?` <span style="font-size:10px;background:#c8f04e;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${mentionsUnread} não lida${mentionsUnread!==1?"s":""}</span>`:""}</span>
+        <span>📣 Menções (${mentions.length})${mentionsUnread>0?` <span style="font-size:10px;background:#f0a848;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${mentionsUnread} não lida${mentionsUnread!==1?"s":""}</span>`:""}</span>
         <span style="font-size:11px;color:#5a5a6a;font-style:italic">clique em ✕ para dispensar</span>
       </div>
       ${mentions.map(notifRow).join("")}
@@ -1465,7 +1465,7 @@ function renderAtualizacoesPage(){
   const commentsHtml=comments.length?`
     <div style="margin-bottom:24px">
       <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-        <span>💬 Comentários (${comments.length})${commentsUnread>0?` <span style="font-size:10px;background:#c8f04e;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${commentsUnread} não lido${commentsUnread!==1?"s":""}</span>`:""}</span>
+        <span>💬 Comentários (${comments.length})${commentsUnread>0?` <span style="font-size:10px;background:#f0a848;color:#0c0c0f;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px">${commentsUnread} não lido${commentsUnread!==1?"s":""}</span>`:""}</span>
         <span style="font-size:11px;color:#5a5a6a;font-style:italic">clique em ✕ para dispensar</span>
       </div>
       ${comments.map(notifRow).join("")}
@@ -1495,8 +1495,8 @@ function renderAtualizacoesPage(){
     {id:"eventos",label:"📅 Eventos",count:eventos.length,unread:eventosUnread},
   ];
   const tabsHtml=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid #1e1e28;padding-bottom:12px">
-    ${tabs.map(tb=>`<button class="atualizacoes-tab-btn" data-tab="${tb.id}" style="background:${atualizacoesTab===tb.id?"#c8f04e":"#16161f"};color:${atualizacoesTab===tb.id?"#0c0c0f":"#b0b0c0"};border:1px solid ${atualizacoesTab===tb.id?"#c8f04e":"#2a2a38"};border-radius:7px;padding:6px 14px;font-size:12px;font-weight:${atualizacoesTab===tb.id?"700":"500"};cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .12s">
-      <span>${tb.label}</span><span style="font-size:11px;${atualizacoesTab===tb.id?"color:#0c0c0f99":"color:#5a5a6a"}">${tb.count}</span>${tb.unread>0?`<span style="font-size:10px;background:${atualizacoesTab===tb.id?"#0c0c0f":"#c8f04e"};color:${atualizacoesTab===tb.id?"#c8f04e":"#0c0c0f"};border-radius:10px;padding:1px 6px;font-weight:700">${tb.unread}</span>`:""}
+    ${tabs.map(tb=>`<button class="atualizacoes-tab-btn" data-tab="${tb.id}" style="background:${atualizacoesTab===tb.id?"#f0a848":"#16161f"};color:${atualizacoesTab===tb.id?"#0c0c0f":"#b0b0c0"};border:1px solid ${atualizacoesTab===tb.id?"#f0a848":"#2a2a38"};border-radius:7px;padding:6px 14px;font-size:12px;font-weight:${atualizacoesTab===tb.id?"700":"500"};cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .12s">
+      <span>${tb.label}</span><span style="font-size:11px;${atualizacoesTab===tb.id?"color:#0c0c0f99":"color:#5a5a6a"}">${tb.count}</span>${tb.unread>0?`<span style="font-size:10px;background:${atualizacoesTab===tb.id?"#0c0c0f":"#f0a848"};color:${atualizacoesTab===tb.id?"#f0a848":"#0c0c0f"};border-radius:10px;padding:1px 6px;font-weight:700">${tb.unread}</span>`:""}
     </button>`).join("")}
   </div>`;
   let contentHtml;
@@ -2776,7 +2776,7 @@ function renderAdminPage(){
       <div class="admin-section-title">📊 Uso do Sistema (Plano Gratuito)</div>
       <div style="font-size:12px;color:#7a7a8a;margin-bottom:14px">Monitoramento para evitar cobranças. Limites do plano gratuito: 1 GB de dados, 10 GB/mês de download, 100 conexões simultâneas.</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px">
-        <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Tarefas (máx ${LIMITS.MAX_TASKS})</div>${usageBar(Object.keys(tasks).length,LIMITS.MAX_TASKS,"#c8f04e")}</div>
+        <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Tarefas (máx ${LIMITS.MAX_TASKS})</div>${usageBar(Object.keys(tasks).length,LIMITS.MAX_TASKS,"#f0a848")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Áreas (máx ${LIMITS.MAX_AREAS})</div>${usageBar(Object.keys(areas).length,LIMITS.MAX_AREAS,"#4ac8e8")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Notas (máx ${LIMITS.MAX_NOTES})</div>${usageBar(Object.keys(notes).length,LIMITS.MAX_NOTES,"#7c6eff")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Blocos fluxograma (máx ${LIMITS.MAX_FLOW_NODES})</div>${usageBar(Object.keys(flowData.nodes||{}).length,LIMITS.MAX_FLOW_NODES,"#f0a832")}</div>
@@ -2789,7 +2789,7 @@ function renderAdminPage(){
         <span style="color:#5a5a6a;margin-left:6px">— nunca removidas pela purga automática</span>
       </div>
       <div style="margin-top:8px;font-size:12px;color:#5a5a6a;display:flex;flex-direction:column;gap:4px">
-        <div>📋 <strong style="color:#c8f04e">Tarefas:</strong> ao atingir ${LIMITS.MAX_TASKS}, purga automaticamente as mais antigas não fixadas, mantendo ${LIMITS.TASK_PURGE_TARGET}.</div>
+        <div>📋 <strong style="color:#f0a848">Tarefas:</strong> ao atingir ${LIMITS.MAX_TASKS}, purga automaticamente as mais antigas não fixadas, mantendo ${LIMITS.TASK_PURGE_TARGET}.</div>
         <div>📜 <strong style="color:#a84ae8">Histórico de ações:</strong> ao atingir ${LIMITS.MAX_AUDIT_LOGS}, purga automaticamente os mais antigos, mantendo ${LIMITS.AUDIT_PURGE_KEEP}.</div>
         <div>🚫 <strong style="color:#7a7a8a">Notas, Áreas, Blocos de fluxograma:</strong> bloqueiam a criação de novos itens com mensagem de erro ao atingir o limite.</div>
         <div>🚫 <strong style="color:#f0a832">Leads Prospecção:</strong> bloqueiam a criação ao atingir ${LIMITS.MAX_PROSP_LEADS}. Feche ou exclua leads antigos para liberar espaço.</div>
@@ -2820,7 +2820,7 @@ function renderAdminPage(){
                 ?`<input class="user-name-input" data-uid="${u.id}" value="${esc(u.name)}" style="font-weight:600;font-size:14px;background:transparent;border:none;border-bottom:1px solid #2e2e3a;color:#f0eff5;font-family:inherit;outline:none;width:150px"/>`
                 :`<div class="user-row-name">${esc(u.name)}</div>`}
               ${u.role==="admin1"?"👑":""}
-              ${canEditName?`<button class="btn-small save-user-name" data-uid="${u.id}" style="border:1px solid #c8f04e44;color:#c8f04e;font-size:10px">Salvar nome</button>`:""}
+              ${canEditName?`<button class="btn-small save-user-name" data-uid="${u.id}" style="border:1px solid #f0a84844;color:#f0a848;font-size:10px">Salvar nome</button>`:""}
             </div>
             <div class="user-row-email">${esc(u.email)}</div>
             <div class="permission-grid">
@@ -2833,7 +2833,7 @@ function renderAdminPage(){
             ${u.id!==currentUser?.uid&&u.role!=="admin1"?`
               ${isAdmin1?`<button class="btn-small toggle-role" data-uid="${u.id}" data-role="${u.role}" style="border:1px solid #2e2e3a;color:#7a7a8a;font-size:11px">${u.role==="admin"?"→ Usuário":"→ Admin"}</button>`:""}
               ${isAdmin1?`<button class="btn-small btn-ghost-link" data-uid="${u.id}" data-name="${esc(u.name||"")}" style="border:1px solid #4ac8e844;color:#4ac8e8;font-size:11px" title="Vincular tarefas de usuário fantasma">🔗 Vincular tarefas</button>`:""}
-              ${isAdmin1?`<button class="btn-small toggle-manage-areas" data-uid="${u.id}" style="border:1px solid ${manageOn?"#c8f04e":"#2e2e3a"};color:${manageOn?"#c8f04e":"#7a7a8a"};font-size:10px" title="Permite que este usuário adicione/remova outros das áreas">${manageOn?"✅ Gerencia áreas":"⬜ Gerencia áreas"}</button>`:""}
+              ${isAdmin1?`<button class="btn-small toggle-manage-areas" data-uid="${u.id}" style="border:1px solid ${manageOn?"#f0a848":"#2e2e3a"};color:${manageOn?"#f0a848":"#7a7a8a"};font-size:10px" title="Permite que este usuário adicione/remova outros das áreas">${manageOn?"✅ Gerencia áreas":"⬜ Gerencia áreas"}</button>`:""}
               ${isAdmin1?`<button class="btn-small toggle-view-performance" data-uid="${u.id}" style="border:1px solid ${u.viewPerformance?'#4ac8e8':'#2e2e3a'};color:${u.viewPerformance?'#4ac8e8':'#7a7a8a'};font-size:10px">📊 ${u.viewPerformance?'Performance ✅':'Performance ⬜'}</button>`:""}
               <button class="btn-small del-user" data-uid="${u.id}" style="border:1px solid rgba(255,107,107,.25);color:#ff8080;font-size:11px">Remover</button>
             `:`<span style="font-size:11px;color:#5a5a6a">Você</span>`}
@@ -2862,7 +2862,7 @@ function attachContentEvents(){
     document.getElementById("area-detail-view").style.display="none";
     const ta=document.getElementById("area-detail-text");
     ta.style.display="block";
-    ta.style.borderColor=(areas[activeAreaId]?.color||"#c8f04e")+"44";
+    ta.style.borderColor=(areas[activeAreaId]?.color||"#f0a848")+"44";
     document.getElementById("btn-edit-area-detail").style.display="none";
     document.getElementById("btn-save-area-detail").style.display="";
     ta.focus();
@@ -2996,7 +2996,7 @@ function attachContentEvents(){
     // Drag to reorder
     card.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",card.dataset.fyiId);card.style.opacity="0.5";});
     card.addEventListener("dragend",()=>card.style.opacity="1");
-    card.addEventListener("dragover",e=>{e.preventDefault();card.style.outline="2px solid #c8f04e44";});
+    card.addEventListener("dragover",e=>{e.preventDefault();card.style.outline="2px solid #f0a84844";});
     card.addEventListener("dragleave",()=>card.style.outline="");
     card.addEventListener("drop",async e=>{
       e.preventDefault();card.style.outline="";
@@ -3037,7 +3037,7 @@ function openGhostLinkModal(targetUid, targetName){
   openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:460px">
     <div class="modal-header"><div class="modal-title">👻 Vincular nome fantasma a ${esc(targetName)}</div><button class="icon-btn" id="m-x">✕</button></div>
     <div class="modal-body">
-      <div style="font-size:13px;color:#a0a0b0;margin-bottom:14px">Selecione um nome antigo nas tarefas para ser substituído pelo nome atual de <strong style="color:#c8f04e">${esc(targetName)}</strong>. Isso atualizará todas as tarefas que contenham esse nome nos responsáveis.</div>
+      <div style="font-size:13px;color:#a0a0b0;margin-bottom:14px">Selecione um nome antigo nas tarefas para ser substituído pelo nome atual de <strong style="color:#f0a848">${esc(targetName)}</strong>. Isso atualizará todas as tarefas que contenham esse nome nos responsáveis.</div>
       <div class="field"><label>Nome fantasma a substituir</label>
         <select id="m-ghostname" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
           <option value="">Selecione…</option>
@@ -3391,7 +3391,7 @@ function attachFlowEvents(){
       const childCount=Object.values(flowData.nodes||{}).filter(n=>n.flowParent===parentId).length;
       const nid=uid();
       dbSet(`flow/nodes/${nid}`,{
-        label,color:pn?.color||"#c8f04e",shape:"rect",
+        label,color:pn?.color||"#f0a848",shape:"rect",
         flowParent:parentId,
         x:(pn?.x||80)+40+(childCount%3)*186,
         y:(pn?.y||60)+95+Math.floor(childCount/3)*86
@@ -3469,7 +3469,7 @@ function openContainerDrawer(cid){
   function buildInnerSVG(){
     const svgNodes=dNodes.map(n=>{
       const W=n.w||150, H=n.h||48;
-      const bc=n.areaId&&areas[n.areaId]?areas[n.areaId].color:(n.color||"#c8f04e");
+      const bc=n.areaId&&areas[n.areaId]?areas[n.areaId].color:(n.color||"#f0a848");
       return`<g class="dn-node" data-nid="${n.id}" transform="translate(${n.x},${n.y})" style="cursor:grab">
         <rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="${bc}18" stroke="${bc}88" stroke-width="1.5"/>
         <text x="${W/2}" y="${H/2}" text-anchor="middle" dominant-baseline="middle" fill="#d0d0e0" font-size="12" font-family="DM Sans,sans-serif" style="pointer-events:none;user-select:none">${esc(n.label||"")}</text>
@@ -3525,7 +3525,7 @@ function openContainerDrawer(cid){
     </div>
     <div style="display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid #1a1a22;flex-shrink:0;flex-wrap:wrap;align-items:center">
       <input id="dn-label" placeholder="Nome do novo bloco…" style="flex:1;min-width:120px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:6px 10px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none"/>
-      <input type="color" id="dn-color" value="#c8f04e" style="width:30px;height:30px;border:none;background:none;cursor:pointer;border-radius:6px"/>
+      <input type="color" id="dn-color" value="#f0a848" style="width:30px;height:30px;border:none;background:none;cursor:pointer;border-radius:6px"/>
       <button id="dn-add" class="btn-primary" style="font-size:12px;padding:6px 14px">+ Bloco</button>
     </div>
     <div style="flex:1;position:relative;overflow:hidden">
@@ -3566,7 +3566,7 @@ function openContainerDrawer(cid){
     const label=document.getElementById("dn-label")?.value.trim();
     if(!label){toast("Digite um nome","error");return;}
     if(Object.keys(flowData.nodes||{}).length>=LIMITS.MAX_FLOW_NODES){toast("Limite de blocos atingido","error");return;}
-    const color=document.getElementById("dn-color")?.value||"#c8f04e";
+    const color=document.getElementById("dn-color")?.value||"#f0a848";
     const nid=uid();
     const nx=60+Math.random()*200, ny=60+Math.random()*150;
     const nodeData={label,color,shape:"rect",x:nx+minX,y:ny+minY,containerParent:cid};
@@ -3651,7 +3651,7 @@ function openFlowNodeEditModal(nodeId){
             <option value="pill" ${n.shape==="pill"?"selected":""}>Pílula</option>
           </select>
         </div>
-        <div class="field"><label>Cor</label><input type="color" id="m-ncolor" value="${n.color||"#c8f04e"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
+        <div class="field"><label>Cor</label><input type="color" id="m-ncolor" value="${n.color||"#f0a848"}" style="width:100%;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/></div>
       </div>
       <div style="font-size:11px;color:#4a4a5a;background:#13131a;border:1px solid #2e2e3a;border-radius:6px;padding:7px 10px;margin-bottom:4px">💡 Redimensione o bloco arrastando o canto inferior direito diretamente no canvas.</div>
       <div class="field">
@@ -3672,7 +3672,7 @@ function openFlowNodeEditModal(nodeId){
         <label>Criar nova área e vincular <span style="color:#7a7a8a;font-size:10px">(deixe vazio para não criar)</span></label>
         <div style="display:flex;gap:8px">
           <input id="m-nnewarea" placeholder="Nome da nova área…" style="flex:1;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
-          <input type="color" id="m-nnewareacolor" value="#c8f04e" style="width:38px;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/>
+          <input type="color" id="m-nnewareacolor" value="#f0a848" style="width:38px;height:38px;border:none;background:none;cursor:pointer;border-radius:6px"/>
         </div>
       </div>
     </div>
@@ -3704,7 +3704,7 @@ function openFlowNodeEditModal(nodeId){
     const label=document.getElementById("m-nlabel").value.trim(); if(!label){toast("Rótulo obrigatório","error");return;}
     const newAreaName=document.getElementById("m-nnewarea").value.trim();
     if(newAreaName){
-      const newColor=document.getElementById("m-nnewareacolor").value||"#c8f04e";
+      const newColor=document.getElementById("m-nnewareacolor").value||"#f0a848";
       const newAid=uid();
       await dbSet(`areas/${newAid}`,{name:newAreaName,color:newColor,createdAt:new Date().toISOString()});
       selAreaIds.push(newAid);
@@ -3730,7 +3730,7 @@ function openFlowNodeEditModal(nodeId){
 
 function addFlowNode(){
   if(Object.keys(flowData.nodes||{}).length>=LIMITS.MAX_FLOW_NODES){toast(`Limite de ${LIMITS.MAX_FLOW_NODES} blocos atingido`,"error");return;}
-  const l=document.getElementById("node-label")?.value.trim(),s=document.getElementById("node-shape")?.value||"rect",c=document.getElementById("node-color")?.value||"#c8f04e";
+  const l=document.getElementById("node-label")?.value.trim(),s=document.getElementById("node-shape")?.value||"rect",c=document.getElementById("node-color")?.value||"#f0a848";
   const parentId=document.getElementById("node-parent-root")?.value||"";
   if(!l)return;
   const nodeData={label:l,color:c,shape:s,areaId:null,x:60+Math.random()*380,y:60+Math.random()*280};
@@ -3891,7 +3891,7 @@ function renderMyTasksPage(){
     const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
     const ar=areas[t.areaId];
     const dl=deadlineClass(t.date);
-    return`<div class="task-row btn-detail-task" data-id="${t.id}" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#13131a;border:1px solid #1e1e28;border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background .12s;${t.pinned?"border-left:3px solid #c8f04e;":""}">
+    return`<div class="task-row btn-detail-task" data-id="${t.id}" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#13131a;border:1px solid #1e1e28;border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background .12s;${t.pinned?"border-left:3px solid #f0a848;":""}">
       <span style="width:8px;height:8px;border-radius:50%;background:${st?.color};flex-shrink:0"></span>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title)}</div>
@@ -3901,7 +3901,7 @@ function renderMyTasksPage(){
           ${resps.length?`<span style="font-size:10px;color:#9d93ff">👤 ${resps.join(", ")}</span>`:""}
           ${t.creatorName?`<span style="font-size:10px;color:#5a5a6a">por ${esc(t.creatorName)}</span>`:""}
           ${t.createdAt?`<span title="${fmtTs(t.createdAt)}" style="font-size:10px;color:#3a3a4a;cursor:default">🕐 ${timeAgo(t.createdAt)}</span>`:""}
-          ${t.status==="concluido"&&t.completed_by?`<span style="font-size:10px;color:#c8f04e">✓ por ${esc(t.completed_by)}</span>`:""}
+          ${t.status==="concluido"&&t.completed_by?`<span style="font-size:10px;color:#f0a848">✓ por ${esc(t.completed_by)}</span>`:""}
         </div>
       </div>
       ${t.date?`<span style="font-size:10px;color:${dl?"#f0a832":"#7a7a8a"};white-space:nowrap;flex-shrink:0">${fmtDate(t.date)}</span>`:""}
@@ -4024,7 +4024,7 @@ function renderCalPage(){
         <div class="cal-task-count" data-date="${ds}" style="font-size:11px;color:#7a7a8a;padding:0 4px;cursor:pointer">${taskEvs.length} tarefas</div>`
       :"";
     cells+=`<div class="cal-cell ${isToday?"cal-today":""} ${!isCurrentMonth?"cal-other":""} ${isPast&&isCurrentMonth?"cal-past":""}" data-date="${isCurrentMonth?ds:""}" style="min-height:88px">
-      <div class="cal-day-num" style="${isToday?"background:#c8f04e;color:#0c0c0f;":""}${!isCurrentMonth?"color:#2e2e3a;":""}">${isCurrentMonth?dayNum:""}</div>
+      <div class="cal-day-num" style="${isToday?"background:#f0a848;color:#0c0c0f;":""}${!isCurrentMonth?"color:#2e2e3a;":""}">${isCurrentMonth?dayNum:""}</div>
       ${calChips}
       ${taskBlock}
     </div>`;
@@ -4140,7 +4140,7 @@ function attachCalEvents(){
 }
 
 // ── FREELA CALENDAR ───────────────────────────────────────────────────────────
-const FREELA_COLORS=["#c8f04e","#7c6eff","#4ac8e8","#f0a832","#ff6b6b","#4ae89c","#e84ab8"];
+const FREELA_COLORS=["#f0a848","#7c6eff","#4ac8e8","#f0a832","#ff6b6b","#4ae89c","#e84ab8"];
 
 function renderFreelaPage(){
   const today=new Date(); today.setHours(0,0,0,0);
@@ -4207,7 +4207,7 @@ function renderFreelaPage(){
 
   // Quick-add panel (top right corner block)
   const quickAdd=`<div id="freela-quick-add" style="background:#13131a;border:1px solid #2e2e3a;border-radius:10px;padding:14px;margin-bottom:18px">
-    <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:10px;color:#c8f04e">+ Novo Agendamento</div>
+    <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:10px;color:#f0a848">+ Novo Agendamento</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <input id="fq-title" placeholder="Título *" style="background:#0e0e14;border:1px solid #2e2e3a;border-radius:6px;padding:7px 10px;color:#f0eff5;font-family:'DM Sans',sans-serif;font-size:12px;outline:none"/>
       <input id="fq-client" placeholder="Cliente (opcional)" style="background:#0e0e14;border:1px solid #2e2e3a;border-radius:6px;padding:7px 10px;color:#f0eff5;font-family:'DM Sans',sans-serif;font-size:12px;outline:none"/>
@@ -4330,29 +4330,29 @@ function openFreelaEventModal(eventId){
 // ── CALENDÁRIO PROSPECÇÃO ─────────────────────────────────────────────────────
 const PROSP_SEED=[
   {title:"Búzios Sailing Week Oceano",dateStart:"2026-04-02",dateEnd:"2026-04-05",color:"#4ac8e8"},
-  {title:"Via Sacra",dateStart:"2026-04-03",color:"#c8f04e"},
+  {title:"Via Sacra",dateStart:"2026-04-03",color:"#f0a848"},
   {title:"Desafio das Ilhas – Búzios Swim",dateStart:"2026-04-12",color:"#f0a832"},
   {title:"Estadual de Va'a – RJ",dateStart:"2026-04-18",dateEnd:"2026-04-19",color:"#7c6eff"},
   {title:"Águas Abertas",dateStart:"2026-04-24",dateEnd:"2026-04-25",color:"#4ac8e8"},
   {title:"Búzios Jazz Festival",dateStart:"2026-05-01",dateEnd:"2026-05-03",color:"#f0a832"},
   {title:"Campeonato de Motocross",dateStart:"2026-05-08",dateEnd:"2026-05-09",color:"#e8624a"},
-  {title:"Circuito Mundial de Beach Tennis",dateStart:"2026-05-13",dateEnd:"2026-05-17",color:"#c8f04e"},
+  {title:"Circuito Mundial de Beach Tennis",dateStart:"2026-05-13",dateEnd:"2026-05-17",color:"#f0a848"},
   {title:"Estadual de Surf",dateStart:"2026-05-23",dateEnd:"2026-05-24",color:"#4ac8e8"},
   {title:"Mi Búzios",dateStart:"2026-05-29",dateEnd:"2026-05-30",color:"#7c6eff"},
   {title:"Wine in Búzios",dateStart:"2026-06-02",dateEnd:"2026-06-07",color:"#a84ae8"},
-  {title:"Corpus Christ",dateStart:"2026-06-04",color:"#c8f04e"},
+  {title:"Corpus Christ",dateStart:"2026-06-04",color:"#f0a848"},
   {title:"Búzios Sailing Week Monotipo",dateStart:"2026-06-04",dateEnd:"2026-06-07",color:"#4ac8e8"},
   {title:"Semana Gospel",dateStart:"2026-06-05",dateEnd:"2026-06-06",color:"#f0a832"},
   {title:"Nativo Swim Run – Búzios",dateStart:"2026-06-07",color:"#4ac8e8"},
   {title:"Anarriê",dateStart:"2026-06-19",dateEnd:"2026-06-20",color:"#e8624a"},
-  {title:"Make Music Day",dateStart:"2026-06-21",color:"#c8f04e"},
+  {title:"Make Music Day",dateStart:"2026-06-21",color:"#f0a848"},
   {title:"Festa dos Pescadores",dateStart:"2026-06-26",dateEnd:"2026-06-29",color:"#4a7ee8"},
   {title:"Festa do Divino",dateStart:"2026-07-05",color:"#f0a832"},
   {title:"2ª Corrida das Guardas de Búzios",dateStart:"2026-07-05",color:"#e8624a"},
   {title:"Semana LGBT+ de Búzios",dateStart:"2026-07-11",color:"#a84ae8"},
   {title:"Pride Búzios",dateStart:"2026-07-12",color:"#e84ab8"},
   {title:"Paralimpíadas de Búzios",dateStart:"2026-07-19",color:"#7c6eff"},
-  {title:"Búzios On",dateStart:"2026-07-24",dateEnd:"2026-07-25",color:"#c8f04e"},
+  {title:"Búzios On",dateStart:"2026-07-24",dateEnd:"2026-07-25",color:"#f0a848"},
   {title:"Festa de Sant'Anna",dateStart:"2026-07-24",dateEnd:"2026-07-26",color:"#f0a832"},
   {title:"Búzios Sailing Week Optimis",dateStart:"2026-07-24",dateEnd:"2026-07-26",color:"#4ac8e8"},
   {title:"Degusta",dateStart:"2026-08-31",dateEnd:"2026-09-02",color:"#e8a84a"},
@@ -4361,44 +4361,44 @@ const PROSP_SEED=[
   {title:"Hero Swim Run",dateStart:"2026-08-22",color:"#4ac8e8"},
   {title:"Encontro de Motos",dateStart:"2026-08-27",dateEnd:"2026-08-30",color:"#e8624a"},
   {title:"Circuito das Artes",dateStart:"2026-09-03",dateEnd:"2026-09-05",color:"#a84ae8"},
-  {title:"Evento Petz",dateStart:"2026-09-11",dateEnd:"2026-09-12",color:"#c8f04e"},
+  {title:"Evento Petz",dateStart:"2026-09-11",dateEnd:"2026-09-12",color:"#f0a848"},
   {title:"Festival da Sardinha e Frutos do Mar",dateStart:"2026-09-18",dateEnd:"2026-09-19",color:"#4ac8e8"},
   {title:"Parafina",dateStart:"2026-09-24",dateEnd:"2026-09-27",color:"#7c6eff"},
   {title:"Búzios Café e Chocolate",dateStart:"2026-09-25",dateEnd:"2026-09-27",color:"#e8a84a"},
-  {title:"MPBúzios",dateStart:"2026-10-09",dateEnd:"2026-10-11",color:"#c8f04e"},
+  {title:"MPBúzios",dateStart:"2026-10-09",dateEnd:"2026-10-11",color:"#f0a848"},
   {title:"Dia das Crianças",dateStart:"2026-10-12",color:"#f0a832"},
   {title:"Circuito Bike Lagos",dateStart:"2026-10-13",color:"#4ac8e8"},
   {title:"XC Run Búzios",dateStart:"2026-10-18",color:"#e8624a"},
   {title:"1ª Copa Triathlon – RJ",dateStart:"2026-11-01",color:"#7c6eff"},
   {title:"Festa Literária",dateStart:"2026-11-09",dateEnd:"2026-11-11",color:"#a84ae8"},
-  {title:"Festa da Cidade",dateStart:"2026-11-12",dateEnd:"2026-11-14",color:"#c8f04e"},
+  {title:"Festa da Cidade",dateStart:"2026-11-12",dateEnd:"2026-11-14",color:"#f0a848"},
   {title:"Consciência Negra",dateStart:"2026-11-20",color:"#f0a832"},
   {title:"Carros Antigos",dateStart:"2026-11-27",dateEnd:"2026-11-28",color:"#e8624a"},
-  {title:"Natal de Luz",dateStart:"2026-12-01",dateEnd:"2026-12-31",color:"#c8f04e"},
+  {title:"Natal de Luz",dateStart:"2026-12-01",dateEnd:"2026-12-31",color:"#f0a848"},
   {title:"Meia Maratona de Búzios",dateStart:"2026-12-06",color:"#4ac8e8"},
   {title:"Cantata de Natal",dateStart:"2026-12-11",dateEnd:"2026-12-12",color:"#f0a832"},
   // ── Calendário Maricá ──
   {title:"Páscoa / Cinema Inflável",dateStart:"2026-04-03",dateEnd:"2026-04-05",color:"#f0a832",note:"Calendário Marica"},
   {title:"Paixão de Cristo",dateStart:"2026-04-10",dateEnd:"2026-04-11",color:"#7c6eff",note:"Calendário Marica"},
-  {title:"Páscoa das Comunidades",dateStart:"2026-04-11",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Páscoa das Comunidades",dateStart:"2026-04-11",color:"#f0a848",note:"Calendário Marica"},
   {title:"Espraiado de Portas Abertas",dateStart:"2026-04-12",color:"#4ac8e8",note:"Calendário Marica"},
   {title:"Celebração do Dia dos Povos Indígenas",dateStart:"2026-04-19",color:"#4ae89c",note:"Calendário Marica"},
   {title:"Festival Nacional do Choro",dateStart:"2026-04-23",dateEnd:"2026-04-24",color:"#e8a84a",note:"Calendário Marica"},
   {title:"Festa de São Jorge no Espraiado",dateStart:"2026-04-23",color:"#e8624a",note:"Calendário Marica"},
-  {title:"Festa de Ogum em Cordeirinho",dateStart:"2026-04-25",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Festa de Ogum em Cordeirinho",dateStart:"2026-04-25",color:"#f0a848",note:"Calendário Marica"},
   {title:"Maricá em Dança",dateStart:"2026-04-25",dateEnd:"2026-04-26",color:"#a84ae8",note:"Calendário Marica"},
   {title:"Festa da Trabalhadora e do Trabalhador",dateStart:"2026-05-01",color:"#e8624a",note:"Calendário Marica"},
   {title:"Festa da Pesca de Maricá",dateStart:"2026-05-02",dateEnd:"2026-05-03",color:"#4ac8e8",note:"Calendário Marica"},
   {title:"Maricá Musical",dateStart:"2026-05-08",dateEnd:"2026-05-09",color:"#7c6eff",note:"Calendário Marica"},
-  {title:"Curta Itaocaia Valley",dateStart:"2026-05-10",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Curta Itaocaia Valley",dateStart:"2026-05-10",color:"#f0a848",note:"Calendário Marica"},
   {title:"Corrida Cidade Maricá",dateStart:"2026-05-16",color:"#4ac8e8",note:"Calendário Marica"},
   {title:"Aqui é mais liberdade (Feira Ancestral Casa de Terreiro)",dateStart:"2026-05-17",color:"#e8a84a",note:"Calendário Marica"},
   {title:"Aniversário da Cidade de Maricá (212 anos)",dateStart:"2026-05-23",dateEnd:"2026-05-26",color:"#f0a832",note:"Calendário Marica"},
   {title:"Circuito Maricá de Pesca Esportiva",dateStart:"2026-05-24",color:"#4ac8e8",note:"Calendário Marica"},
-  {title:"Dia do Evangélico",dateStart:"2026-05-25",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Dia do Evangélico",dateStart:"2026-05-25",color:"#f0a848",note:"Calendário Marica"},
   {title:"Casamento e 15 anos comunitários",dateStart:"2026-05-01",color:"#e84ab8",note:"Calendário Marica — Data em aberto"},
   {title:"Festival de Cinema e Política",dateStart:"2026-06-02",dateEnd:"2026-06-07",color:"#7c6eff",note:"Calendário Marica"},
-  {title:"Corpus Christi",dateStart:"2026-06-04",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Corpus Christi",dateStart:"2026-06-04",color:"#f0a848",note:"Calendário Marica"},
   {title:"Prêmio Maysa",dateStart:"2026-06-06",color:"#e84ab8",note:"Calendário Marica"},
   {title:"Maricá na Copa (Copa do Mundo)",dateStart:"2026-06-11",dateEnd:"2026-07-19",color:"#4ae89c",note:"Calendário Marica"},
   {title:"Espraiado de Portas Abertas",dateStart:"2026-06-14",color:"#4ac8e8",note:"Calendário Marica"},
@@ -4406,21 +4406,21 @@ const PROSP_SEED=[
   {title:"Festival de Inverno Recantando",dateStart:"2026-07-03",dateEnd:"2026-07-05",color:"#7c6eff",note:"Calendário Marica"},
   {title:"Circuito Maricá de Pesca Esportiva",dateStart:"2026-07-05",color:"#4ac8e8",note:"Calendário Marica"},
   {title:"Festival Internacional de Blues, Rock e Jazz",dateStart:"2026-07-09",dateEnd:"2026-07-12",color:"#e8624a",note:"Calendário Marica"},
-  {title:"Maricá Games",dateStart:"2026-07-10",dateEnd:"2026-07-11",color:"#c8f04e",note:"Calendário Marica"},
-  {title:"Curta Itaocaia Valley",dateStart:"2026-07-12",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Maricá Games",dateStart:"2026-07-10",dateEnd:"2026-07-11",color:"#f0a848",note:"Calendário Marica"},
+  {title:"Curta Itaocaia Valley",dateStart:"2026-07-12",color:"#f0a848",note:"Calendário Marica"},
   {title:"Colônia de férias das comunidades",dateStart:"2026-07-13",dateEnd:"2026-07-24",color:"#4ae89c",note:"Calendário Marica"},
   {title:"Maricá Moto Fest / Roteiros Trilhas Maricá",dateStart:"2026-07-23",dateEnd:"2026-07-26",color:"#e8624a",note:"Calendário Marica"},
   {title:"Festa do Produtor Rural",dateStart:"2026-07-24",dateEnd:"2026-07-26",color:"#e8a84a",note:"Calendário Marica"},
   {title:"Festa de Nossa Senhora do Amparo",dateStart:"2026-08-03",dateEnd:"2026-08-15",color:"#4a7ee8",note:"Calendário Marica"},
-  {title:"Expo Maricá",dateStart:"2026-08-06",dateEnd:"2026-08-08",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Expo Maricá",dateStart:"2026-08-06",dateEnd:"2026-08-08",color:"#f0a848",note:"Calendário Marica"},
   {title:"A Padroeira Abraça São João (Comunidades)",dateStart:"2026-08-07",dateEnd:"2026-08-09",color:"#f0a832",note:"Calendário Marica"},
   {title:"Espraiado de Portas Abertas",dateStart:"2026-08-09",color:"#4ac8e8",note:"Calendário Marica"},
   {title:"FRACJ — Festival Regional de Arte e Cultura Jovem",dateStart:"2026-08-10",dateEnd:"2026-08-15",color:"#a84ae8",note:"Calendário Marica"},
   {title:"Festa da Padroeira Abraça São João",dateStart:"2026-08-14",dateEnd:"2026-08-16",color:"#7c6eff",note:"Calendário Marica"},
-  {title:"Marcha para Jesus",dateStart:"2026-08-29",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Marcha para Jesus",dateStart:"2026-08-29",color:"#f0a848",note:"Calendário Marica"},
   {title:"FLIM + Língua ao Mar",dateStart:"2026-09-01",color:"#4ac8e8",note:"Calendário Marica — Data em aberto"},
   {title:"Circuito Maricá de Pesca Esportiva",dateStart:"2026-09-13",color:"#4ac8e8",note:"Calendário Marica"},
-  {title:"Curta Itaocaia Valley",dateStart:"2026-09-13",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Curta Itaocaia Valley",dateStart:"2026-09-13",color:"#f0a848",note:"Calendário Marica"},
   {title:"Dia Nacional da Luta da Pessoa com Deficiência",dateStart:"2026-09-26",color:"#7c6eff",note:"Calendário Marica"},
   {title:"Festividade de São Cosme e Damião",dateStart:"2026-09-27",color:"#f0a832",note:"Calendário Marica"},
   {title:"FLIM nas Comunidades",dateStart:"2026-09-15",color:"#4ac8e8",note:"Calendário Marica — Data em aberto"},
@@ -4432,19 +4432,19 @@ const PROSP_SEED=[
   {title:"Maricá Bier Fest",dateStart:"2026-10-15",dateEnd:"2026-10-18",color:"#e8a84a",note:"Calendário Marica"},
   {title:"Prêmio Heloneida Studart",dateStart:"2026-10-24",color:"#e84ab8",note:"Calendário Marica"},
   {title:"Festival Internacional de Poesia de Maricá",dateStart:"2026-10-29",dateEnd:"2026-11-02",color:"#7c6eff",note:"Calendário Marica"},
-  {title:"Aniversário Darcy Ribeiro",dateStart:"2026-10-31",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Aniversário Darcy Ribeiro",dateStart:"2026-10-31",color:"#f0a848",note:"Calendário Marica"},
   {title:"Parada LGBTQIAPN+",dateStart:"2026-10-15",color:"#e84ab8",note:"Calendário Marica — Data em aberto"},
   {title:"Feira de Ciências, Tecnologia e Inovação",dateStart:"2026-10-20",color:"#4ac8e8",note:"Calendário Marica — Data em aberto"},
   {title:"Dia da Favela / Virada Cultural",dateStart:"2026-11-07",color:"#7c6eff",note:"Calendário Marica"},
   {title:"Circuito Maricá de Pesca Esportiva",dateStart:"2026-11-08",color:"#4ac8e8",note:"Calendário Marica"},
   {title:"Volta ao Mundo Bambas (Capoeira)",dateStart:"2026-11-13",dateEnd:"2026-11-15",color:"#e8624a",note:"Calendário Marica"},
   {title:"Semana da Consciência Negra",dateStart:"2026-11-14",dateEnd:"2026-11-21",color:"#f0a832",note:"Calendário Marica"},
-  {title:"Curta Itaocaia Valley",dateStart:"2026-11-15",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Curta Itaocaia Valley",dateStart:"2026-11-15",color:"#f0a848",note:"Calendário Marica"},
   {title:"Feira das Yabás",dateStart:"2026-11-20",color:"#e84ab8",note:"Calendário Marica"},
-  {title:"Natal Brasilidade",dateStart:"2026-11-22",dateEnd:"2026-12-31",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Natal Brasilidade",dateStart:"2026-11-22",dateEnd:"2026-12-31",color:"#f0a848",note:"Calendário Marica"},
   {title:"Dia Nacional do Samba",dateStart:"2026-12-05",dateEnd:"2026-12-06",color:"#e8624a",note:"Calendário Marica"},
   {title:"Espraiado de Portas Abertas",dateStart:"2026-12-13",color:"#4ac8e8",note:"Calendário Marica"},
-  {title:"Natal Brasilidade nas Comunidades",dateStart:"2026-12-20",dateEnd:"2026-12-23",color:"#c8f04e",note:"Calendário Marica"},
+  {title:"Natal Brasilidade nas Comunidades",dateStart:"2026-12-20",dateEnd:"2026-12-23",color:"#f0a848",note:"Calendário Marica"},
   {title:"Ano Novo",dateStart:"2026-12-30",dateEnd:"2026-12-31",color:"#f0a832",note:"Calendário Marica"},
 ];
 
@@ -4627,7 +4627,7 @@ const LEAD_STATUS={
   novo:{label:"Novo",color:"#4ac8e8"},
   contato_feito:{label:"Contato feito",color:"#7c6eff"},
   proposta_enviada:{label:"Proposta enviada",color:"#f0a832"},
-  negociando:{label:"Negociando",color:"#c8f04e"},
+  negociando:{label:"Negociando",color:"#f0a848"},
   fechado:{label:"Fechado",color:"#4ae89c"},
   perdido:{label:"Perdido",color:"#5a5a6a"}
 };
@@ -4635,7 +4635,7 @@ const LEAD_TIPO={
   casamento:{label:"Casamento",color:"#e84ab8"},
   corporativo:{label:"Corporativo",color:"#4a7ee8"},
   aniversario:{label:"Aniversário",color:"#f0a832"},
-  formatura:{label:"Formatura",color:"#c8f04e"},
+  formatura:{label:"Formatura",color:"#f0a848"},
   outro:{label:"Outro",color:"#7a7a8a"}
 };
 function fmtMoeda(v){if(!v&&v!==0)return"—";return"R$ "+Number(v).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});}
@@ -4668,7 +4668,7 @@ function renderProspLeadsPage(){
 
   // Stats cards
   const statsHtml=`<div class="stats-row" style="margin-bottom:18px">
-    <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#c8f04e;line-height:1">${totalAtivos}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Leads ativos</div></div>
+    <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#f0a848;line-height:1">${totalAtivos}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Leads ativos</div></div>
     <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#ff6b6b;line-height:1">${vencidos}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Follow-up vencido</div></div>
     <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#f0a832;line-height:1">${proxSete}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Próx. 7 dias</div></div>
     <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#7c6eff;line-height:1;word-break:break-all">${fmtMoeda(totalValor)}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Pipeline estimado</div></div>
@@ -4748,7 +4748,7 @@ function renderProspLeadsPage(){
     if(fuDate<todayStr)return`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#ff6b6b22;color:#ff6b6b;border:1px solid #ff6b6b33">🔴 Vencido</span>`;
     if(fuDate===todayStr)return`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#f0a83222;color:#f0a832;border:1px solid #f0a83233">🟠 Hoje</span>`;
     const diff=Math.round((new Date(fuDate+"T00:00:00")-today)/86400000);
-    const c=diff<=3?"#f0a832":diff<=7?"#c8f04e":"#7c6eff";
+    const c=diff<=3?"#f0a832":diff<=7?"#f0a848":"#7c6eff";
     return`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${c}22;color:${c};border:1px solid ${c}33">🟡 ${diff} dia${diff!==1?"s":""}</span>`;
   }
 
@@ -4780,7 +4780,7 @@ function renderProspLeadsPage(){
         <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#7a7a8a;margin-top:8px">
           ${l.dataEvento?`<span>📅 Evento: <b style="color:#c0c0d0">${fmtDate(l.dataEvento)}</b></span>`:""}
           ${fu?`<span>🔔 Follow-up: <b style="color:#c0c0d0">${fmtDate(fu)}</b></span>`:""}
-          ${l.valor?`<span>💰 <b style="color:#c8f04e">${fmtMoeda(l.valor)}</b></span>`:""}
+          ${l.valor?`<span>💰 <b style="color:#f0a848">${fmtMoeda(l.valor)}</b></span>`:""}
           ${l.responsavel?`<span>👤 ${esc(l.responsavel)}</span>`:""}
         </div>
         ${l.observacoes?`<div style="font-size:11px;color:#5a5a6a;border-top:1px solid #1e1e28;padding-top:6px;margin-top:6px">${esc(l.observacoes.slice(0,120))}${l.observacoes.length>120?"…":""}</div>`:""}
@@ -4988,11 +4988,11 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
       <div class="field"><label>Cor do evento <span style="color:#7a7a8a;font-size:10px">(opcional, substitui a cor da prioridade)</span></label>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="color" id="m-ecolor" value="${ev.color||"#7c6eff"}" style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px"/>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#7a7a8a;cursor:pointer"><input type="checkbox" id="m-ecolor-use" ${ev.color?"checked":""} style="accent-color:#c8f04e"/> Usar cor personalizada</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#7a7a8a;cursor:pointer"><input type="checkbox" id="m-ecolor-use" ${ev.color?"checked":""} style="accent-color:#f0a848"/> Usar cor personalizada</label>
         </div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2e2e44;border-radius:8px;padding:10px 14px;font-size:11px;color:#7a7a8a;margin-top:4px">
-        <strong style="color:#c8f04e">Alertas automáticos:</strong><br>
+        <strong style="color:#f0a848">Alertas automáticos:</strong><br>
         Essencial → notificação 3, 2, 1 dia antes e no dia<br>
         Importante → notificação 2 e 1 dia antes
       </div>
@@ -5170,11 +5170,11 @@ function openCalDayModal(dateStr){
     <div class="modal-header" style="padding:20px 24px 16px">
       <div>
         <div style="font-size:11px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">${dayName}</div>
-        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${isToday?"#c8f04e":"#f0eff5"}">${dayFmt}${isToday?' <span style="font-size:13px;color:#c8f04e;font-family:\'DM Sans\',sans-serif;font-weight:600;margin-left:8px">Hoje</span>':""}</div>
+        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${isToday?"#f0a848":"#f0eff5"}">${dayFmt}${isToday?' <span style="font-size:13px;color:#f0a848;font-family:\'DM Sans\',sans-serif;font-weight:600;margin-left:8px">Hoje</span>':""}</div>
         ${totalItems>0?`<div style="font-size:12px;color:#7a7a8a;margin-top:4px">${totalItems} item${totalItems!==1?"s":""}</div>`:""}
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        ${!isPast?`<button class="btn-small" id="m-add-task-day" style="border:1px solid #c8f04e44;color:#c8f04e;font-size:12px;padding:7px 14px">+ Tarefa</button>`:""}
+        ${!isPast?`<button class="btn-small" id="m-add-task-day" style="border:1px solid #f0a84844;color:#f0a848;font-size:12px;padding:7px 14px">+ Tarefa</button>`:""}
         ${!isPast?`<button class="btn-primary" id="m-add-event-day" style="font-size:12px;padding:7px 14px">+ Evento</button>`:""}
         <button class="icon-btn" id="m-x">✕</button>
       </div>
@@ -5442,7 +5442,7 @@ function renderOrgPage(){
     }
     const mx=(fx+tx2)/2,my=(fy+ty)/2;
     const isSel=orgSelEdge===e.id;
-    const sc=isSel?"#c8f04e":e._collapsed?"#6a6a7a":"#3e3e52";
+    const sc=isSel?"#f0a848":e._collapsed?"#6a6a7a":"#3e3e52";
     const path=mode==="hierarchy"
       ?`M${fx},${fy} C${fx},${fy+40} ${tx2},${ty-40} ${tx2},${ty}`
       :`M${fx},${fy} C${fx+50},${fy} ${tx2-50},${ty} ${tx2},${ty}`;
@@ -5461,7 +5461,7 @@ function renderOrgPage(){
 
   const liveEdge=orgConnecting?(()=>{
     const fn=nodes.find(n=>n.id===orgConnecting.fromId);if(!fn)return"";
-    return`<path d="M${fn.x+W/2},${fn.y+H} L${orgMousePos.x},${orgMousePos.y}" fill="none" stroke="#c8f04e" stroke-width="1.5" stroke-dasharray="5,3"/>`;
+    return`<path d="M${fn.x+W/2},${fn.y+H} L${orgMousePos.x},${orgMousePos.y}" fill="none" stroke="#f0a848" stroke-width="1.5" stroke-dasharray="5,3"/>`;
   })():"";
 
   // Draw group background for expanded groups
@@ -5503,14 +5503,14 @@ function renderOrgPage(){
     // Expand/collapse button bottom-center
     const expandBtn=hasChildren?`
       <g class="org-toggle" data-nid="${n.id}" style="cursor:pointer">
-        <rect x="${W/2-20}" y="${H+4}" width="40" height="18" rx="9" fill="${isExp?"#c8f04e22":"#1e1e28"}" stroke="${isExp?"#c8f04e":"#3e3e52"}" stroke-width="1.2"/>
-        <text x="${W/2}" y="${H+13}" text-anchor="middle" dominant-baseline="middle" fill="${isExp?"#c8f04e":"#7a7a8a"}" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${isExp?`▲ ${cc}`:`▼ ${cc}`}</text>
+        <rect x="${W/2-20}" y="${H+4}" width="40" height="18" rx="9" fill="${isExp?"#f0a84822":"#1e1e28"}" stroke="${isExp?"#f0a848":"#3e3e52"}" stroke-width="1.2"/>
+        <text x="${W/2}" y="${H+13}" text-anchor="middle" dominant-baseline="middle" fill="${isExp?"#f0a848":"#7a7a8a"}" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${isExp?`▲ ${cc}`:`▼ ${cc}`}</text>
       </g>`:"";
     // Add child button (admin only)
     const addChildBtn=isAdmin1?`
       <g class="org-add-child" data-nid="${n.id}" style="cursor:pointer" title="Adicionar membro ao grupo">
-        <circle cx="${W+10}" cy="${H+4}" r="9" fill="#c8f04e18" stroke="#c8f04e44" stroke-width="1.2"/>
-        <text x="${W+10}" y="${H+4}" text-anchor="middle" dominant-baseline="middle" fill="#c8f04e" font-size="13" style="pointer-events:none">+</text>
+        <circle cx="${W+10}" cy="${H+4}" r="9" fill="#f0a84818" stroke="#f0a84844" stroke-width="1.2"/>
+        <text x="${W+10}" y="${H+4}" text-anchor="middle" dominant-baseline="middle" fill="#f0a848" font-size="13" style="pointer-events:none">+</text>
       </g>`:"";
     // Parent indicator badge
     const parentBadge=n.parentId?`<rect x="0" y="0" width="${W}" height="4" rx="2" fill="${aColor}60" style="pointer-events:none"/>`:"";
@@ -5525,10 +5525,10 @@ function renderOrgPage(){
       ${areaTxt?`<text x="16" y="54" fill="#7a7a8a" font-size="9" font-family="DM Sans,sans-serif" style="pointer-events:none">${esc(areaTxt)}</text>`:""}
       ${expandBtn}
       ${addChildBtn}
-      <circle cx="${nW/2}" cy="0" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="top" style="cursor:crosshair"/>
-      <circle cx="${nW}" cy="${nH/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="right" style="cursor:crosshair"/>
-      <circle cx="${nW/2}" cy="${nH}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="bottom" style="cursor:crosshair"/>
-      <circle cx="0" cy="${nH/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#c8f04e":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="left" style="cursor:crosshair"/>
+      <circle cx="${nW/2}" cy="0" r="6" fill="${orgConnecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="top" style="cursor:crosshair"/>
+      <circle cx="${nW}" cy="${nH/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="right" style="cursor:crosshair"/>
+      <circle cx="${nW/2}" cy="${nH}" r="6" fill="${orgConnecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="bottom" style="cursor:crosshair"/>
+      <circle cx="0" cy="${nH/2}" r="6" fill="${orgConnecting?.fromId===n.id?"#f0a848":"#16161e"}" stroke="${aColor}" stroke-width="1.5" class="org-conn-handle" data-nid="${n.id}" data-side="left" style="cursor:crosshair"/>
       ${isAdmin1?`<g class="org-edit-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="${W-10}" cy="10" r="9" fill="#1e1e28" stroke="${aColor}" stroke-width="1"/><text x="${W-10}" y="10" text-anchor="middle" dominant-baseline="middle" fill="${aColor}" font-size="10" style="pointer-events:none">✏</text></g>`:""}
       ${isAdmin1?`<g class="org-del-node" data-nid="${n.id}" style="cursor:pointer"><circle cx="-8" cy="-8" r="8" fill="#ff6b6b1a" stroke="#ff6b6b" stroke-width="1.2"/><text x="-8" y="-8" text-anchor="middle" dominant-baseline="middle" fill="#ff6b6b" font-size="11" style="pointer-events:none">✕</text></g>`:""}
       <rect x="${nW-18}" y="${nH-18}" width="22" height="22" rx="4" fill="${aColor}18" stroke="${aColor}55" stroke-width="1" class="org-resize-handle" data-nid="${n.id}" style="cursor:se-resize"/>
@@ -5554,7 +5554,7 @@ function renderOrgPage(){
       </select>
       <input type="color" id="org-color" value="#7c6eff" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px"/>
       <button class="btn-primary" id="btn-add-org-node" ${nodeCount>=LIMITS.MAX_ORG_NODES?"disabled":""}>+ Pessoa/Grupo</button>
-      <button class="btn-small" id="btn-org-select-mode" style="border:1px solid ${orgSelectMode?"#c8f04e":"#2e2e3a"};color:${orgSelectMode?"#c8f04e":"#7a7a8a"};background:${orgSelectMode?"#c8f04e12":"transparent"}">${orgSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
+      <button class="btn-small" id="btn-org-select-mode" style="border:1px solid ${orgSelectMode?"#f0a848":"#2e2e3a"};color:${orgSelectMode?"#f0a848":"#7a7a8a"};background:${orgSelectMode?"#f0a84812":"transparent"}">${orgSelectMode?"✅ Selecionar":"⬜ Selecionar"}</button>
     </div>
   </div>`:""}
   <div class="flow-canvas" style="position:relative">
@@ -5854,7 +5854,7 @@ function openOrgNodeModal(nodeId, parentId=null){
   const parentNode=parentId?orgData.nodes[parentId]:null;
   const parentLabel=parentNode?(parentNode.name||parentNode.role||"grupo"):"";
   openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:440px"><div class="modal-header"><div class="modal-title">${nodeId?"Editar":"Novo"} Bloco${parentLabel?" em "+esc(parentLabel):""}</div><button class="icon-btn" id="m-x">✕</button></div><div class="modal-body">
-    ${parentLabel?`<div style="font-size:11px;color:#7a7a8a;background:#1a1a22;border:1px solid #2e2e3a;padding:7px 10px;border-radius:7px;margin-bottom:12px">Será adicionado como membro de: <strong style="color:#c8f04e">${esc(parentLabel)}</strong></div>`:""}
+    ${parentLabel?`<div style="font-size:11px;color:#7a7a8a;background:#1a1a22;border:1px solid #2e2e3a;padding:7px 10px;border-radius:7px;margin-bottom:12px">Será adicionado como membro de: <strong style="color:#f0a848">${esc(parentLabel)}</strong></div>`:""}
     <div class="field"><label>Nome</label><input id="m-oname" value="${esc(n.name||"")}" placeholder="Nome do colaborador…" autofocus/></div>
     <div style="font-size:11px;color:#4a4a5a;background:#13131a;border:1px solid #2e2e3a;border-radius:6px;padding:7px 10px;margin-bottom:12px">💡 Redimensione o bloco arrastando o canto inferior direito diretamente no canvas.</div>
     <div class="field">
@@ -6023,7 +6023,7 @@ function openEditAreaModal(areaId){
 }
 
 const CELEBRATION_GIFS=[
-  {url:"https://media.tenor.com/qCfbcDGPAaYAAAAC/confetti-congratulations.gif",msg:"🎉 Arrasou! Tarefa concluída!",color:"#c8f04e"},
+  {url:"https://media.tenor.com/qCfbcDGPAaYAAAAC/confetti-congratulations.gif",msg:"🎉 Arrasou! Tarefa concluída!",color:"#f0a848"},
   {url:"https://media.tenor.com/ZCZTSNZczWgAAAAC/you-did-it-congratulations.gif",msg:"💪 Missão cumprida! Continue assim!",color:"#7c6eff"},
   {url:"https://media.tenor.com/NkEwMGCPuLAAAAAC/minions-banana.gif",msg:"🍌 BANANA! Tarefa destruída!",color:"#f0a832"},
 ];
@@ -6092,9 +6092,9 @@ function openTaskModal(init={}){
           ${buildRespOptions(init.areaId)}
         </select>
         <input id="m-resp-manual" placeholder="Ou digitar nome\u2026" style="flex:1;min-width:100px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
-        <button class="btn-small" id="m-resp-add" style="border:1px solid #2e2e3a;color:#c8f04e;white-space:nowrap">+ Add</button>
+        <button class="btn-small" id="m-resp-add" style="border:1px solid #2e2e3a;color:#f0a848;white-space:nowrap">+ Add</button>
         <button class="btn-small" id="m-resp-all" title="Adicionar todos os membros da área selecionada" style="border:1px solid #7c6eff44;color:#9d93ff;white-space:nowrap">👥 Área</button>
-        <button class="btn-small" id="m-resp-org" title="Adicionar toda a organização" style="border:1px solid #c8f04e44;color:#c8f04e;white-space:nowrap">📢 Toda org</button>
+        <button class="btn-small" id="m-resp-org" title="Adicionar toda a organização" style="border:1px solid #f0a84844;color:#f0a848;white-space:nowrap">📢 Toda org</button>
       </div>`:""}
     </div>
     <div class="field-row">
@@ -6111,12 +6111,12 @@ function openTaskModal(init={}){
       </select>
     </div>
     <div class="field" style="display:flex;align-items:center;gap:10px;margin-top:8px">
-      <input type="checkbox" id="m-allusers" style="width:16px;height:16px;accent-color:#c8f04e" ${init.allUsers?"checked":""}/>
+      <input type="checkbox" id="m-allusers" style="width:16px;height:16px;accent-color:#f0a848" ${init.allUsers?"checked":""}/>
       <label for="m-allusers" style="font-size:13px;color:#a0a0b0;cursor:pointer">Tarefa coletiva — todos os usuários devem marcar como concluída</label>
     </div>
     <div class="field" style="margin-top:10px;border-top:1px solid #1e1e28;padding-top:12px">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="m-recur-on" style="width:16px;height:16px;accent-color:#c8f04e" ${init.recurrence?"checked":""}/>
+        <input type="checkbox" id="m-recur-on" style="width:16px;height:16px;accent-color:#f0a848" ${init.recurrence?"checked":""}/>
         <span style="font-size:13px;color:#a0a0b0">Tarefa recorrente</span>
       </label>
       <div id="m-recur-fields" style="margin-top:10px;display:${init.recurrence?"flex":"none"};flex-direction:column;gap:8px;background:#13131a;border:1px solid #2e2e3a;border-radius:8px;padding:12px">
@@ -6304,7 +6304,7 @@ function renderAreaMembersTab(task){
   }
 
   const assigneeNames=new Set(Array.isArray(task.resps)?task.resps:(task.resp?[task.resp]:[]));
-  const COLORS=["#c8f04e","#4ec8f0","#f04ec8","#f0c84e","#4ef0c8","#c84ef0","#f04e4e","#4e4ef0"];
+  const COLORS=["#f0a848","#4ec8f0","#f04ec8","#f0c84e","#4ef0c8","#c84ef0","#f04e4e","#4e4ef0"];
   function avatarColor(uid2){let h=0;for(let i=0;i<uid2.length;i++)h=uid2.charCodeAt(i)+((h<<5)-h);return COLORS[Math.abs(h)%COLORS.length];}
 
   // Ordena: responsáveis atribuídos primeiro
@@ -6361,7 +6361,7 @@ function openDetailModal(taskId){
     <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✏ Criada por</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${personAvatar(t.creatorName,"#4ac8e8","Criador(a)")}</div>
   </div>`:"";
-  const completedByBlock=(()=>{if(t.status!=="concluido")return"";const _cn=Object.values(t.completions||{}).map(c=>c.name).filter(Boolean);const _names=_cn.length?_cn:[t.completed_by].filter(Boolean);if(!_names.length)return"";return`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✅ Concluída por</div><div style="display:flex;gap:8px;flex-wrap:wrap">${_names.map(n=>personAvatar(n,"#c8f04e","Concluiu")).join("")}</div>${t.completed_at?`<div style="font-size:10px;color:#5a5a6a;margin-top:6px">🕐 ${timeAgo(t.completed_at)}</div>`:""}</div>`;})();
+  const completedByBlock=(()=>{if(t.status!=="concluido")return"";const _cn=Object.values(t.completions||{}).map(c=>c.name).filter(Boolean);const _names=_cn.length?_cn:[t.completed_by].filter(Boolean);if(!_names.length)return"";return`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e28"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✅ Concluída por</div><div style="display:flex;gap:8px;flex-wrap:wrap">${_names.map(n=>personAvatar(n,"#f0a848","Concluiu")).join("")}</div>${t.completed_at?`<div style="font-size:10px;color:#5a5a6a;margin-top:6px">🕐 ${timeAgo(t.completed_at)}</div>`:""}</div>`;})();
   const statusBtns=Object.entries(STATUS).map(([k,v])=>{
     const sel=t.status===k;
     const s=sel?'background:'+v.color+'22;color:'+v.color+';border:1px solid '+v.color+'60':'border:1px solid #2e2e3a;color:#7a7a8a';
@@ -6376,10 +6376,10 @@ function openDetailModal(taskId){
     ${Object.entries(users).filter(([,u])=>resps.includes(u.name)).map(([uid2,u])=>{
       const done=!!(t.completions||{})[uid2];
       return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="width:14px;height:14px;border-radius:50%;background:${done?"#c8f04e":"#1e1e28"};border:2px solid ${done?"#c8f04e":"#3e3e4a"};flex-shrink:0"></span>
-        <span style="font-size:12px;color:${done?"#c8f04e":"#a0a0b0"}">${esc(u.name)}${done?" ✓":""}</span>
+        <span style="width:14px;height:14px;border-radius:50%;background:${done?"#f0a848":"#1e1e28"};border:2px solid ${done?"#f0a848":"#3e3e4a"};flex-shrink:0"></span>
+        <span style="font-size:12px;color:${done?"#f0a848":"#a0a0b0"}">${esc(u.name)}${done?" ✓":""}</span>
       </div>`;}).join("")}
-  </div>`:"";  const pinBtn=canPin?'<button id="m-pin" class="btn-small" style="border:1px solid '+(t.pinned?'#c8f04e':'#2e2e3a')+';color:'+(t.pinned?'#c8f04e':'#7a7a8a')+'">'+pinLabel+'</button>':"";
+  </div>`:"";  const pinBtn=canPin?'<button id="m-pin" class="btn-small" style="border:1px solid '+(t.pinned?'#f0a848':'#2e2e3a')+';color:'+(t.pinned?'#f0a848':'#7a7a8a')+'">'+pinLabel+'</button>':"";
   openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:860px;width:95vw;overflow:hidden;display:flex;flex-direction:column">
     <div class="modal-header" style="flex-shrink:0">
       <div class="modal-title">${pinTitlePrefix}Detalhe</div>
@@ -6510,7 +6510,7 @@ function openDetailModal(taskId){
 
   // Submit comment
   const commentInput=document.getElementById("comment-input");
-  commentInput?.addEventListener("focus",e=>{e.target.style.borderColor="#c8f04e44";});
+  commentInput?.addEventListener("focus",e=>{e.target.style.borderColor="#f0a84844";});
   commentInput?.addEventListener("blur",e=>{e.target.style.borderColor="#1e1e28";});
   commentInput?.addEventListener("input",()=>{
     const val=commentInput.value,pos=commentInput.selectionStart,before=val.slice(0,pos);
@@ -6651,7 +6651,7 @@ function openNoteModal(noteId,personal){
   window.pNoteImages=pNoteImages;window.renderPImgs=renderPImgs;renderPImgs();
   function handlePImgFile(file){if(!file||!file.type.startsWith("image/"))return;const reader=new FileReader();reader.onload=ev=>{const img2=new Image();img2.onload=()=>{const maxW=800,sc=Math.min(1,maxW/img2.width);const cv=document.createElement("canvas");cv.width=Math.round(img2.width*sc);cv.height=Math.round(img2.height*sc);cv.getContext("2d").drawImage(img2,0,0,cv.width,cv.height);pNoteImages.push({data:cv.toDataURL("image/webp",0.82),w:Math.min(cv.width,300)});renderPImgs();};img2.src=ev.target.result;};reader.readAsDataURL(file);}
   document.addEventListener("paste",function onPasteP(e){if(!document.getElementById("img-drop-zone"))return document.removeEventListener("paste",onPasteP);[...(e.clipboardData?.items||[])].forEach(it=>{if(it.type.startsWith("image/"))handlePImgFile(it.getAsFile());});});
-  const dzP=document.getElementById("img-drop-zone");dzP?.addEventListener("dragover",e=>{e.preventDefault();dzP.style.borderColor="#c8f04e";});dzP?.addEventListener("dragleave",()=>{dzP.style.borderColor="#2e2e3a";});dzP?.addEventListener("drop",e=>{e.preventDefault();dzP.style.borderColor="#2e2e3a";[...(e.dataTransfer.files||[])].forEach(handlePImgFile);});
+  const dzP=document.getElementById("img-drop-zone");dzP?.addEventListener("dragover",e=>{e.preventDefault();dzP.style.borderColor="#f0a848";});dzP?.addEventListener("dragleave",()=>{dzP.style.borderColor="#2e2e3a";});dzP?.addEventListener("drop",e=>{e.preventDefault();dzP.style.borderColor="#2e2e3a";[...(e.dataTransfer.files||[])].forEach(handlePImgFile);});
   document.getElementById("m-save").onclick=async()=>{const title=document.getElementById("m-nt").value.trim();if(!title){toast("Digite um título","error");return;}const data={id:n.id||uid(),title,tag:document.getElementById("m-ntag").value.trim(),body:document.getElementById("m-nb").value.trim(),color:col,links:[],images:pNoteImages,createdAt:n.createdAt||new Date().toISOString()};if(personal)await dbSet(`personal_notes/${currentUser.uid}/${data.id}`,data);else{await dbSet(`notes/${data.id}`,{...data,authorId:currentUser.uid});await logAction("criar_nota",`Nota: ${title}`);}toast(noteId?"Nota atualizada!":"Nota salva!","success");closeModal();};
   overlayClose("ov");
 }
@@ -6702,7 +6702,7 @@ function openAreaNoteModal(noteId){
     items.forEach(it=>{if(it.type.startsWith("image/"))handleImageFile(it.getAsFile());});
   });
   const dz=document.getElementById("img-drop-zone");
-  dz?.addEventListener("dragover",e=>{e.preventDefault();dz.style.borderColor="#c8f04e";});
+  dz?.addEventListener("dragover",e=>{e.preventDefault();dz.style.borderColor="#f0a848";});
   dz?.addEventListener("dragleave",()=>{dz.style.borderColor="#2e2e3a";});
   dz?.addEventListener("drop",e=>{e.preventDefault();dz.style.borderColor="#2e2e3a";[...(e.dataTransfer.files||[])].forEach(handleImageFile);});
   document.getElementById("m-save").onclick=async()=>{
@@ -6898,7 +6898,7 @@ function listenUserNotifs(){
 
 function renderAreaFYI(areaId){
   const aFyi=Object.values(fyiNotes).filter(n=>n.areaId===areaId).sort((a,b)=>(a.order||0)-(b.order||0));
-  const color_=n=>n.color||"#c8f04e";
+  const color_=n=>n.color||"#f0a848";
   const cards=aFyi.map(n=>{
     const aUColor=(users[n.authorId]||Object.values(users).find(u=>u.name===n.authorName))?.color||"#7c6eff";
     const aCornerAvatar=n.authorName?`<div title="${esc(n.authorName)}" style="position:absolute;bottom:10px;right:10px;width:22px;height:22px;border-radius:50%;background:${aUColor};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0c0f">${initials(n.authorName)}</div>`:"";
@@ -7012,7 +7012,7 @@ function renderAreaNotesEditor(areaId){
   const legacyHtml=legacyNotes.length
     ?`<div style="margin-bottom:16px;padding:10px 12px;background:#1a1a22;border:1px solid #2a2a34;border-radius:8px">
         <div style="font-size:10px;color:#5a5a6a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Notas antigas (formato anterior)</div>
-        ${legacyNotes.map(n=>`<div style="margin-bottom:8px;padding:8px;background:#13131a;border-left:3px solid ${n.color||"#c8f04e"};border-radius:4px">
+        ${legacyNotes.map(n=>`<div style="margin-bottom:8px;padding:8px;background:#13131a;border-left:3px solid ${n.color||"#f0a848"};border-radius:4px">
           <div style="font-size:12px;font-weight:600;color:#d0d0e0;margin-bottom:2px">${esc(n.title||"")}</div>
           ${n.body?`<div style="font-size:11px;color:#7a7a8a;line-height:1.5">${esc(n.body)}</div>`:""}
           ${isAdmin1||(n.authorId===currentUser?.uid)?`<button class="btn-del-legacy-note" data-nid="${n.id}" style="margin-top:6px;font-size:10px;color:#ff6b6b;background:none;border:none;cursor:pointer">✕ remover</button>`:""}
@@ -7066,7 +7066,7 @@ function attachAreaNotesEditorEvents(areaId){
 
   // Add block via input
   const inp=document.getElementById("new-block-input");
-  inp?.addEventListener("focus",e=>{e.target.style.borderColor="#c8f04e44";});
+  inp?.addEventListener("focus",e=>{e.target.style.borderColor="#f0a84844";});
   inp?.addEventListener("blur",e=>{e.target.style.borderColor="#1e1e28";});
   inp?.addEventListener("keydown",async e=>{
     if(e.key==="Enter"){e.preventDefault();const v=inp.value.trim();if(v){await addBlock(v);inp.value="";}}
@@ -7274,7 +7274,7 @@ function attachAreaNotesEditorEvents(areaId){
     row.addEventListener("dragover",e=>{
       e.preventDefault();
       e.dataTransfer.dropEffect="move";
-      if(row.dataset.bid!==dragBid)row.style.borderTop="2px solid #c8f04e88";
+      if(row.dataset.bid!==dragBid)row.style.borderTop="2px solid #f0a84888";
     });
     row.addEventListener("dragleave",()=>{row.style.borderTop="";});
     row.addEventListener("drop",async e=>{
@@ -7304,7 +7304,7 @@ function attachAreaNotesEditorEvents(areaId){
           ? {action:"to-toggle",icon:"▶",label:"Converter para toggle",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,type:"toggle",open:true,children:b.children||[]}:b);await saveBlocks();}}
           : {action:"to-text",icon:"Aa",label:"Converter para texto",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,type:"text"}:b);await saveBlocks();}},
         "---",
-        {action:"color",icon:"🎨",label:"Cor: verde",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#c8f04e"}:b);await saveBlocks();}},
+        {action:"color",icon:"🎨",label:"Cor: verde",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#f0a848"}:b);await saveBlocks();}},
         {action:"color2",icon:"🎨",label:"Cor: roxo",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#9d93ff"}:b);await saveBlocks();}},
         {action:"color3",icon:"🎨",label:"Cor: laranja",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#f0a832"}:b);await saveBlocks();}},
         {action:"color4",icon:"🎨",label:"Cor: vermelho",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#ff6b6b"}:b);await saveBlocks();}},
@@ -7319,13 +7319,13 @@ function attachAreaNotesEditorEvents(areaId){
   document.getElementById("tab-blocks")?.addEventListener("click",()=>{
     document.getElementById("area-tab-blocks").style.display="";
     document.getElementById("area-tab-fyi").style.display="none";
-    document.getElementById("tab-blocks").style.borderBottomColor="#c8f04e";document.getElementById("tab-blocks").style.color="#c8f04e";
+    document.getElementById("tab-blocks").style.borderBottomColor="#f0a848";document.getElementById("tab-blocks").style.color="#f0a848";
     document.getElementById("tab-fyi").style.borderBottomColor="transparent";document.getElementById("tab-fyi").style.color="#7a7a8a";
   });
   document.getElementById("tab-fyi")?.addEventListener("click",()=>{
     document.getElementById("area-tab-blocks").style.display="none";
     document.getElementById("area-tab-fyi").style.display="";
-    document.getElementById("tab-fyi").style.borderBottomColor="#c8f04e";document.getElementById("tab-fyi").style.color="#c8f04e";
+    document.getElementById("tab-fyi").style.borderBottomColor="#f0a848";document.getElementById("tab-fyi").style.color="#f0a848";
     document.getElementById("tab-blocks").style.borderBottomColor="transparent";document.getElementById("tab-blocks").style.color="#7a7a8a";
   });
 
@@ -7507,7 +7507,7 @@ function attachPersonalNotesEditorEvents(){
           ? {action:"to-toggle",icon:"▶",label:"Converter para toggle",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,type:"toggle",open:true,children:b.children||[]}:b);await saveBlocks();}}
           : {action:"to-text",icon:"Aa",label:"Converter para texto",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,type:"text"}:b);await saveBlocks();}},
         "---",
-        {action:"color",icon:"🎨",label:"Cor: verde",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#c8f04e"}:b);await saveBlocks();}},
+        {action:"color",icon:"🎨",label:"Cor: verde",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#f0a848"}:b);await saveBlocks();}},
         {action:"color2",icon:"🎨",label:"Cor: roxo",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#9d93ff"}:b);await saveBlocks();}},
         {action:"color3",icon:"🎨",label:"Cor: laranja",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#f0a832"}:b);await saveBlocks();}},
         {action:"color4",icon:"🎨",label:"Cor: vermelho",fn:async()=>{blocks=blocks.map(b=>b.id===bid?{...b,color:"#ff6b6b"}:b);await saveBlocks();}},
