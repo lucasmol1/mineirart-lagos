@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.54
+Separa aba "Automáticas" em "Tarefas" (só some quando concluída) e "Eventos" (informativo, "Limpar tudo" descarta para sempre).
+
 ## v1.53
 Adiciona abas superiores em Atualizações (Todas, Menções, Comentários, Automáticas) com contadores e não lidas.
 
