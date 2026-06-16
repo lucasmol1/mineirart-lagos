@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.56
+Responsáveis de tarefas divididos em FYA (For Your Action — quem deve agir) e FYI (For Your Information — quem deve saber), com chips coloridos e campos separados no modal e no detalhe.
+
 ## v1.55
 Rebranding visual: paleta alinhada ao site mineirart.com.br (accent âmbar #f0a848 + fundo dark warm + detalhe vinho #5d1200). Status "Em Andamento" agora azul (#4a9ee8) e "Concluído" verde (#4ae89c).
 
