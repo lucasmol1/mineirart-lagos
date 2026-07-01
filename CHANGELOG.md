@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.58
+Nova aba "Cotação de Frete": cadastro de freteiros (cubagem, valor do ajudante, tabela de preços por cidade) com importação via planilha (.xlsx/.csv), e comparador que ordena o custo total por destino.
+
 ## v1.57
 Notificação de tarefa atrasada agora substitui a anterior da mesma tarefa em vez de acumular — mantém só a mais recente na aba Atualizações.
 
