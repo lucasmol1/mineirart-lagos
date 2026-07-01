@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.57
+Notificação de tarefa atrasada agora substitui a anterior da mesma tarefa em vez de acumular — mantém só a mais recente na aba Atualizações.
+
 ## v1.56
 Responsáveis de tarefas divididos em FYA (For Your Action — quem deve agir) e FYI (For Your Information — quem deve saber), com chips coloridos e campos separados no modal e no detalhe.
 

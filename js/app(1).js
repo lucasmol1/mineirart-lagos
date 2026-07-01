@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.55
+//  Mineirart Lagos — App v1.56
 //  - Prospecção visível só para admin1; backup inclui
 //    prosp_leads; barra de uso na página Admin
 // ════════════════════════════════════════════════════════
@@ -580,7 +580,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.55</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.56</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -6056,6 +6056,7 @@ function openTaskModal(init={}){
   }
   const isCreator=!init.id||(init.creatorId===currentUser?.uid)||isAdmin();
   const existingResps=Array.isArray(init.resps)?init.resps:(init.resp?[init.resp]:[]);
+  const existingFyiResps=Array.isArray(init.fyiResps)?init.fyiResps:[];
 
   // Filtro: usuários com permissão na área selecionada
   function buildRespOptions(areaId){
@@ -6083,18 +6084,30 @@ function openTaskModal(init={}){
       <div class="field"><label>\u00c1rea</label><select id="m-area">${Object.entries(areas).map(([id,a])=>`<option value="${id}" ${init.areaId===id?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div>
       <div class="field"><label>Prioridade</label><select id="m-priority">${Object.entries(PRIORITY).map(([k,v])=>`<option value="${k}" ${(init.priority||"media")===k?"selected":""}>${v.label}</option>`).join("")}</select></div>
     </div>
-    <div class="field">
-      <label>Respons\u00e1veis <span style="color:#7a7a8a;font-size:11px">${isCreator?"(voc\u00ea pode alterar — \u00e9 o criador)":"(somente o criador pode alterar)"}</span></label>
+    <div class="field" style="background:#13131a;border:1px solid #2e2e3a;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="background:#f0a84822;color:#f0a848;border:1px solid #f0a84844;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700">FYA</span><span style="font-size:13px;font-weight:600;color:#f0eff5">For Your Action</span><span style="color:#7a7a8a;font-size:11px">${isCreator?"— quem deve agir":"— quem deve agir (somente o criador pode alterar)"}</span></label>
       <div id="resp-chips" style="display:flex;gap:6px;flex-wrap:wrap;min-height:28px;margin-bottom:8px"></div>
       ${isCreator?`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <select id="m-resp-sel" style="flex:1;min-width:130px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
-          <option value="">Selecionar usu\u00e1rio\u2026</option>
+          <option value="">Selecionar usuário…</option>
           ${buildRespOptions(init.areaId)}
         </select>
-        <input id="m-resp-manual" placeholder="Ou digitar nome\u2026" style="flex:1;min-width:100px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
-        <button class="btn-small" id="m-resp-add" style="border:1px solid #2e2e3a;color:#f0a848;white-space:nowrap">+ Add</button>
+        <input id="m-resp-manual" placeholder="Ou digitar nome…" style="flex:1;min-width:100px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
+        <button class="btn-small" id="m-resp-add" style="border:1px solid #f0a84866;color:#f0a848;white-space:nowrap">+ Add</button>
         <button class="btn-small" id="m-resp-all" title="Adicionar todos os membros da área selecionada" style="border:1px solid #7c6eff44;color:#9d93ff;white-space:nowrap">👥 Área</button>
         <button class="btn-small" id="m-resp-org" title="Adicionar toda a organização" style="border:1px solid #f0a84844;color:#f0a848;white-space:nowrap">📢 Toda org</button>
+      </div>`:""}
+    </div>
+    <div class="field" style="background:#13131a;border:1px solid #2e2e3a;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="background:#4ac8e822;color:#4ac8e8;border:1px solid #4ac8e844;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700">FYI</span><span style="font-size:13px;font-weight:600;color:#f0eff5">For Your Information</span><span style="color:#7a7a8a;font-size:11px">${isCreator?"— quem deve saber":"— quem deve saber (somente o criador pode alterar)"}</span></label>
+      <div id="fyi-resp-chips" style="display:flex;gap:6px;flex-wrap:wrap;min-height:28px;margin-bottom:8px"></div>
+      ${isCreator?`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="m-fyi-sel" style="flex:1;min-width:130px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
+          <option value="">Selecionar usuário…</option>
+          ${buildRespOptions(init.areaId)}
+        </select>
+        <input id="m-fyi-manual" placeholder="Ou digitar nome…" style="flex:1;min-width:100px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none"/>
+        <button class="btn-small" id="m-fyi-add" style="border:1px solid #4ac8e866;color:#4ac8e8;white-space:nowrap">+ Add</button>
       </div>`:""}
     </div>
     <div class="field-row">
@@ -6152,12 +6165,19 @@ function openTaskModal(init={}){
   </div><div class="modal-footer"><button class="btn-ghost" id="m-cancel">Cancelar</button><button class="btn-primary" id="m-save">Salvar</button></div></div></div>`);
 
   let selResps=[...existingResps];
+  let selFyiResps=[...existingFyiResps];
+  function refreshFyiChips(){
+    const el=document.getElementById("fyi-resp-chips");if(!el)return;
+    el.innerHTML=selFyiResps.map(r=>`<span style="background:#4ac8e822;color:#4ac8e8;border:1px solid #4ac8e844;padding:4px 10px;border-radius:20px;font-size:12px;${isCreator?"cursor:pointer":""}" data-fyi-r="${esc(r)}">${isCreator?"✕ ":""}${esc(r)}</span>`).join("")||`<span style="font-size:12px;color:#5a5a6a">Nenhum FYI</span>`;
+    if(isCreator) el.querySelectorAll("[data-fyi-r]").forEach(ch=>ch.addEventListener("click",()=>{selFyiResps=selFyiResps.filter(r=>r!==ch.dataset.fyiR);refreshFyiChips();}));
+  }
   function refreshRespChips(){
     const el=document.getElementById("resp-chips");if(!el)return;
     el.innerHTML=selResps.map(r=>`<span style="background:#7c6eff22;color:#9d93ff;border:1px solid #7c6eff44;padding:4px 10px;border-radius:20px;font-size:12px;${isCreator?"cursor:pointer":""}" data-r="${esc(r)}">${isCreator?"\u2715 ":""}${esc(r)}</span>`).join("")||`<span style="font-size:12px;color:#5a5a6a">Nenhum respons\u00e1vel</span>`;
     if(isCreator) el.querySelectorAll("[data-r]").forEach(ch=>ch.addEventListener("click",()=>{selResps=selResps.filter(r=>r!==ch.dataset.r);refreshRespChips();}));
   }
   refreshRespChips();
+  refreshFyiChips();
 
   // Atualiza o select de responsáveis quando a área principal muda
   if(isCreator){
@@ -6222,6 +6242,15 @@ function openTaskModal(init={}){
       refreshRespChips();
       toast("Toda a organização adicionada — remova quem não deve receber","success");
     });
+    document.getElementById("m-fyi-add")?.addEventListener("click",()=>{
+      const sel=document.getElementById("m-fyi-sel")?.value;
+      const manual=document.getElementById("m-fyi-manual")?.value.trim();
+      const name=manual||sel;
+      if(name&&!selFyiResps.includes(name)){selFyiResps.push(name);refreshFyiChips();}
+      if(document.getElementById("m-fyi-manual"))document.getElementById("m-fyi-manual").value="";
+      if(document.getElementById("m-fyi-sel"))document.getElementById("m-fyi-sel").value="";
+    });
+    document.getElementById("m-fyi-manual")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();document.getElementById("m-fyi-add").click();}});
   }
   document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
 
@@ -6238,6 +6267,7 @@ function openTaskModal(init={}){
     if(!title){toast("Digite um t\u00edtulo","error");return;}
     const isEdit=!!init.id;
     const respsToSave=isCreator?selResps:(init.resps||[]);
+    const fyiRespsToSave=isCreator?selFyiResps:(init.fyiResps||[]);
     const recurOn=document.getElementById("m-recur-on")?.checked||false;
     const recurrence=recurOn?{
       freq:document.getElementById("m-recur-freq")?.value||"semanal",
@@ -6249,6 +6279,7 @@ function openTaskModal(init={}){
       desc:document.getElementById("m-desc").value.trim(),
       areaId:document.getElementById("m-area").value,
       resps:respsToSave,
+      fyiResps:fyiRespsToSave.length?fyiRespsToSave:null,
       status:document.getElementById("m-status").value,
       priority:document.getElementById("m-priority").value,
       date:document.getElementById("m-date").value,
@@ -6336,7 +6367,8 @@ function openDetailModal(taskId){
   const t={id:taskId,...tasks[taskId]};if(!t.title)return;
   const area=areas[t.areaId],st=STATUS[t.status];
   const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
-  if(currentProfile&&resps.some(r=>r===currentProfile.name))markTaskSeen(taskId);
+  const fyiResps=Array.isArray(t.fyiResps)?t.fyiResps:[];
+  if(currentProfile&&(resps.some(r=>r===currentProfile.name)||fyiResps.some(r=>r===currentProfile.name)))markTaskSeen(taskId);
   const canPin=isAdmin();
   const canDelete=isAdmin()||(t.creatorId===currentUser?.uid);
   const priorityChip=t.priority?'<span class="chip" style="background:'+PRIORITY[t.priority].color+'18;color:'+PRIORITY[t.priority].color+';border:1px solid '+PRIORITY[t.priority].color+'30;padding:4px 12px;text-transform:capitalize">'+t.priority+'</span>':"";
@@ -6351,9 +6383,9 @@ function openDetailModal(taskId){
       <div><div style="font-size:13px;font-weight:600;color:#f0eff5">${esc(name)}</div>${role?`<div style="font-size:10px;color:${c};margin-top:1px">${esc(role)}</div>`:""}</div>
     </div>`;
   }
-  const respBlock=resps.length?`<div style="margin-bottom:14px">
-    <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">&#128100; Responsáveis (${resps.length})</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">${resps.map(r=>personAvatar(r,"#7c6eff","Responsável")).join("")}</div>
+  const respBlock=(resps.length||fyiResps.length)?`<div style="margin-bottom:14px">
+    ${resps.length?`<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="background:#f0a84822;color:#f0a848;border:1px solid #f0a84844;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">FYA</span><span style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px">For Your Action</span></div><div style="display:flex;gap:8px;flex-wrap:wrap">${resps.map(r=>personAvatar(r,"#f0a848","Ação")).join("")}</div></div>`:""} 
+    ${fyiResps.length?`<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="background:#4ac8e822;color:#4ac8e8;border:1px solid #4ac8e844;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">FYI</span><span style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px">For Your Information</span></div><div style="display:flex;gap:8px;flex-wrap:wrap">${fyiResps.map(r=>personAvatar(r,"#4ac8e8","Informação")).join("")}</div></div>`:""} 
   </div>`:"";
   const dateBlock=t.date?'<div><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Prazo</div><div>'+fmtDate(t.date)+'</div></div>':"";
   const createdAtBlock=t.createdAt?`<div><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Criada em</div><div title="${fmtTs(t.createdAt)}" style="cursor:default">${timeAgo(t.createdAt)}</div></div>`:"";
