@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.59
+Corrige edição de blocos no Organograma: quando o salvamento falhava (limite de escritas ou erro), o sistema mostrava "Salvo!" mesmo sem gravar. Agora exibe erro real e mantém o modal aberto.
+
 ## v1.58
 Nova aba "Cotação de Frete": cadastro de freteiros (cubagem, valor do ajudante, tabela de preços por cidade) com importação via planilha (.xlsx/.csv), e comparador que ordena o custo total por destino.
 

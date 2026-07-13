@@ -1,7 +1,7 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.58
-//  - Nova aba "Cotação de Frete": base de freteiros (com
-//    importação de planilha) + comparador por destino
+//  Mineirart Lagos — App v1.59
+//  - Corrige edição de blocos do organograma: falhas de
+//    salvamento agora aparecem como erro em vez de "Salvo!"
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -167,7 +167,7 @@ async function undoLastAction(){
 
 function dbSet(p,v){
   const isPos=/\/(x|y|w|h)$/.test(p);
-  if(!isPos&&!checkRateLimit("write",600))return Promise.resolve();
+  if(!isPos&&!checkRateLimit("write",600))return Promise.resolve({__rateLimited:true});
   return _captureAndSet(p,v);
 }
 function dbPush(p,v){return push(dbRef(p),v);}
@@ -587,7 +587,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.58</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.59</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -6133,9 +6133,15 @@ function openOrgNodeModal(nodeId, parentId=null){
       w:existingNode.w,h:existingNode.h,
       parentId:nodeId?(n.parentId||null):parentId,
       x:n.x||defaultX,y:n.y||defaultY};
-    await dbSet(`org/nodes/${nodeId||uid()}`,data);
-    await logAction("editar_org",`Bloco organograma: ${name||role}${parentLabel?" (em "+parentLabel+")":""}`);
-    toast("Salvo!","success");closeModal();
+    try{
+      const res=await dbSet(`org/nodes/${nodeId||uid()}`,data);
+      if(res&&res.__rateLimited){toast("Muitas ações seguidas — aguarde um instante e tente salvar de novo","error");return;}
+      await logAction("editar_org",`Bloco organograma: ${name||role}${parentLabel?" (em "+parentLabel+")":""}`);
+      toast("Salvo!","success");closeModal();
+    }catch(err){
+      console.error(err);
+      toast("Erro ao salvar o bloco — tente novamente","error");
+    }
   };
   overlayClose("ov");
 }

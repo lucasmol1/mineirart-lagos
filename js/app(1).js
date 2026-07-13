@@ -1,7 +1,7 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.57
-//  - Prospecção visível só para admin1; backup inclui
-//    prosp_leads; barra de uso na página Admin
+//  Mineirart Lagos — App v1.58
+//  - Nova aba "Cotação de Frete": base de freteiros (com
+//    importação de planilha) + comparador por destino
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -121,6 +121,8 @@ let prospLeadsCalSelectedDay=null;
 let areaCalCollapsed={};
 let areaMembersExpanded={};
 let orgExpanded={};
+let freteiros={}; // base de freteiros/transportadoras
+let freteTab="comparar", freteDestino="", freteAjudantes=0, freteSortDir="asc"; // estado da UI de Cotação de Frete
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
 const dbRef=p=>ref(db,p);
@@ -304,6 +306,7 @@ function initListeners(){
   dbListen("freela_events",v=>{freelaEvents=v||{}; render();});
   dbListen("prosp_events",v=>{prospEvents=v||{}; render();});
   dbListen("prosp_leads",v=>{prospLeads=v||{}; render();});
+  dbListen("freteiros",   v=>{freteiros=v||{};    render();});
   if(currentUser) onValue(dbRef(`personal_notes/${currentUser.uid}`),s=>{personalNotes=s.val()||{};render();});
   checkReady();
 }
@@ -504,6 +507,7 @@ function renderSidebar(){
     ${ni("prospecção","🎯","Cal. Prospecção")}
     ${isAdmin1?ni("prospeccao","📅","Prospecção"):""}
     ${ni("organograma","🏢","Organograma")}
+    ${ni("frete","🚚","Cotação de Frete")}
     ${ni("fyi","💡","FYI")}
     ${ni("notas-pessoais","📝","Rascunhos Pessoais")}
     ${(isAdmin()||currentProfile?.manageAreas)?ni("admin","⚙️","Administração",pendingCount>0?`<span class="nav-alert-count">${pendingCount}</span>`:""):""}
@@ -583,7 +587,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.57</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.58</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -723,7 +727,7 @@ document.addEventListener("keydown",e=>{
 function renderContent(){
   const mc=document.getElementById("main-content");if(!mc)return;
   if(!window._myNotifs)window._myNotifs={};
-  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,prospeccao:renderProspLeadsPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage,};
+  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,prospeccao:renderProspLeadsPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage,frete:renderFretePage,};
   if(page==="performance"&&!isAdmin1&&!currentProfile?.viewPerformance){navigate("dashboard");return;}
   if(page==="performance"&&mc.querySelector("#perf-iframe"))return;
   try{
@@ -1521,6 +1525,198 @@ function renderHistoricoPage(){
   return`<div class="page-header"><div><div class="page-title">Histórico de Ações</div><div class="page-sub">👑 Visível apenas para o Super Admin · Últimos ${LIMITS.AUDIT_PURGE_KEEP} registros</div></div></div>
     ${logs.length===0?`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">📋</div><div class="empty-title">Nenhuma ação registrada</div></div>`
     :`<div style="display:flex;flex-direction:column;gap:8px">${logs.map(l=>`<div class="alert-card"><div style="font-size:20px;width:32px;text-align:center;flex-shrink:0">${icons[l.action]||"📋"}</div><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(l.detail)}</div><div style="font-size:11px;color:#7a7a8a;margin-top:3px">👤 ${esc(l.userName)} · ${esc(l.userEmail)}</div></div><div style="font-size:11px;color:#5a5a6a;text-align:right;flex-shrink:0;min-width:120px">${fmtTs(l.ts)}</div></div>`).join("")}</div>`}`;
+}
+
+// ── COTAÇÃO DE FRETE ────────────────────────────────────────────────────────────
+function renderFretePage(){
+  const cidades=[...new Set(Object.values(freteiros).flatMap(f=>Object.keys(f.destinos||{})))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  return`<div class="page-header">
+    <div><div class="page-title">🚚 Cotação de Frete</div><div class="page-sub">Compare freteiros por destino e monte a cotação mais vantajosa</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-small ${freteTab==="comparar"?"btn-primary":"btn-ghost"}" id="frete-tab-comparar" type="button">Comparador</button>
+      <button class="btn-small ${freteTab==="base"?"btn-primary":"btn-ghost"}" id="frete-tab-base" type="button">Base de Freteiros</button>
+    </div>
+  </div>
+  ${freteTab==="comparar"?renderFreteComparar(cidades):renderFreteBase()}`;
+}
+
+function renderFreteComparar(cidades){
+  if(cidades.length===0){
+    return`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">🚚</div><div class="empty-title">Nenhum freteiro cadastrado ainda</div><div class="empty-sub">${isAdmin()?'Vá em "Base de Freteiros" e importe sua planilha ou cadastre manualmente':"Aguarde o administrador cadastrar os freteiros"}</div></div>`;
+  }
+  const rows=Object.entries(freteiros).map(([id,f])=>{
+    if(!freteDestino)return null;
+    const frete=f.destinos?.[freteDestino];
+    if(frete===undefined||frete===null)return null;
+    const ajCost=(f.valorAjudante||0)*freteAjudantes;
+    return{id,...f,frete,ajCost,total:(frete||0)+ajCost};
+  }).filter(Boolean);
+  const sorted=rows.sort((a,b)=>freteSortDir==="asc"?a.total-b.total:b.total-a.total);
+  return`
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px;background:#15151c;border:1px solid #2e2e3a;border-radius:10px;padding:16px">
+    <div class="field" style="min-width:220px;margin:0">
+      <label>Destino</label>
+      <select id="frete-sel-cidade" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
+        <option value="">Selecione a cidade…</option>
+        ${cidades.map(c=>`<option value="${esc(c)}" ${c===freteDestino?"selected":""}>${esc(c)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="field" style="width:140px;margin:0">
+      <label>Ajudantes</label>
+      <input type="number" min="0" id="frete-inp-ajudantes" value="${freteAjudantes}" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
+    </div>
+    <button class="btn-small btn-ghost" id="frete-btn-sort" type="button">${freteSortDir==="asc"?"⬆ Menor → Maior":"⬇ Maior → Menor"}</button>
+  </div>
+  ${!freteDestino?`<div class="empty-state"><div style="font-size:36px;margin-bottom:10px">📍</div><div class="empty-title">Selecione um destino para comparar</div></div>`
+   :sorted.length===0?`<div class="empty-state"><div style="font-size:36px;margin-bottom:10px">🤷</div><div class="empty-title">Nenhum freteiro atende esse destino</div></div>`
+   :`<div style="display:flex;flex-direction:column;gap:8px">
+      ${sorted.map((f,i)=>`<div class="alert-card" style="${i===0?"border-color:#4ae89c66":""}">
+        <div style="font-size:20px;width:32px;text-align:center;flex-shrink:0">${i===0?"🏆":"🚚"}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${esc(f.nome)}</div>
+          <div style="font-size:11px;color:#7a7a8a;margin-top:3px">Cubagem: ${f.cubagem||"—"} m³${f.obs?" · "+esc(f.obs):""}</div>
+        </div>
+        <div style="font-size:11px;color:#7a7a8a;text-align:right;min-width:170px">Frete: R$ ${(f.frete||0).toFixed(2)}${freteAjudantes>0?` + ${freteAjudantes}× R$ ${(f.valorAjudante||0).toFixed(2)}`:""}</div>
+        <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#f0a848;min-width:120px;text-align:right">R$ ${f.total.toFixed(2)}</div>
+      </div>`).join("")}
+    </div>`}`;
+}
+
+function renderFreteBase(){
+  const list=Object.entries(freteiros).map(([id,f])=>({id,...f})).sort((a,b)=>(a.nome||"").localeCompare(b.nome||"","pt-BR"));
+  return`
+  ${isAdmin()?`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn-primary btn-small" id="frete-btn-novo" type="button">+ Novo Freteiro</button>
+    <button class="btn-ghost btn-small" id="frete-btn-importar" type="button">📥 Importar Planilha</button>
+    <input type="file" id="frete-file-import" accept=".xlsx,.xls,.csv" style="display:none">
+    <div style="font-size:11px;color:#5a5a6a;align-self:center">Colunas esperadas: Nome, Cubagem, Ajudante, e uma coluna por cidade de destino</div>
+  </div>`:""}
+  ${list.length===0?`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">📋</div><div class="empty-title">Nenhum freteiro cadastrado</div></div>`
+  :`<div style="display:flex;flex-direction:column;gap:8px">
+    ${list.map(f=>`<div class="alert-card">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${esc(f.nome)}</div>
+        <div style="font-size:11px;color:#7a7a8a;margin-top:3px">Cubagem ${f.cubagem||"—"} m³ · Ajudante R$ ${(f.valorAjudante||0).toFixed(2)} · ${Object.keys(f.destinos||{}).length} destino(s)${f.obs?" · "+esc(f.obs):""}</div>
+      </div>
+      ${isAdmin()?`<div style="display:flex;gap:4px"><button class="icon-btn btn-edit-freteiro" data-id="${f.id}" title="Editar">✏</button><button class="icon-btn btn-del-freteiro" data-id="${f.id}" title="Excluir">✕</button></div>`:""}
+    </div>`).join("")}
+  </div>`}`;
+}
+
+function openFreteiroModal(id){
+  const f=id?freteiros[id]:null;
+  const destinosArr=f?Object.entries(f.destinos||{}):[["",""]];
+  const rowHtml=(cidade="",valor="")=>`<div class="frete-dest-row" style="display:flex;gap:8px;margin-bottom:6px">
+    <input class="fd-cidade" placeholder="Cidade" value="${esc(cidade)}" style="flex:1;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 9px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none">
+    <input class="fd-valor" type="number" step="0.01" placeholder="R$" value="${valor}" style="width:110px;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 9px;color:#f0eff5;font-family:inherit;font-size:12px;outline:none">
+    <button class="icon-btn btn-fd-remove" type="button" title="Remover">✕</button>
+  </div>`;
+  openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:480px">
+    <div class="modal-header"><div class="modal-title">${f?"Editar Freteiro":"Novo Freteiro"}</div><button class="icon-btn" id="m-x">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome do Freteiro *</label><input id="m-nome" value="${f?esc(f.nome):""}" autofocus/></div>
+      <div style="display:flex;gap:10px">
+        <div class="field" style="flex:1"><label>Cubagem do caminhão (m³)</label><input id="m-cubagem" type="number" step="0.01" value="${f?.cubagem??""}"/></div>
+        <div class="field" style="flex:1"><label>Valor do ajudante (R$)</label><input id="m-ajudante" type="number" step="0.01" value="${f?.valorAjudante??""}"/></div>
+      </div>
+      <div class="field"><label>Observações</label><input id="m-obs" value="${f?esc(f.obs||""):""}"/></div>
+      <div class="field">
+        <label>Valores de frete por destino</label>
+        <div id="frete-destinos-list">${destinosArr.map(([c,v])=>rowHtml(c,v)).join("")}</div>
+        <button class="btn-ghost btn-small" id="btn-add-destino" type="button" style="margin-top:4px">+ Destino</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      ${f?`<button class="btn-danger" id="m-del">Excluir</button>`:""}
+      <button class="btn-ghost" id="m-cancel">Cancelar</button>
+      <button class="btn-primary" id="m-save">Salvar</button>
+    </div>
+  </div></div>`);
+  function wireDestRemove(){document.querySelectorAll(".btn-fd-remove").forEach(b=>{b.onclick=()=>b.closest(".frete-dest-row").remove();});}
+  wireDestRemove();
+  document.getElementById("btn-add-destino").onclick=()=>{document.getElementById("frete-destinos-list").insertAdjacentHTML("beforeend",rowHtml());wireDestRemove();};
+  document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
+  document.getElementById("m-save").onclick=async()=>{
+    const nome=document.getElementById("m-nome").value.trim();
+    if(!nome){toast("Digite o nome do freteiro","error");return;}
+    const cubagem=parseFloat(document.getElementById("m-cubagem").value)||0;
+    const valorAjudante=parseFloat(document.getElementById("m-ajudante").value)||0;
+    const obs=document.getElementById("m-obs").value.trim();
+    const destinos={};
+    document.querySelectorAll(".frete-dest-row").forEach(row=>{
+      const c=row.querySelector(".fd-cidade").value.trim();
+      const v=parseFloat(row.querySelector(".fd-valor").value);
+      if(c&&!isNaN(v))destinos[c]=v;
+    });
+    if(id){
+      await dbSet(`freteiros/${id}`,{nome,cubagem,valorAjudante,obs,destinos,createdAt:f.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()});
+      await logAction("editar_freteiro",`Freteiro editado: ${nome}`);
+    }else{
+      const nid=uid();
+      await dbSet(`freteiros/${nid}`,{nome,cubagem,valorAjudante,obs,destinos,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+      await logAction("criar_freteiro",`Freteiro cadastrado: ${nome}`);
+    }
+    toast("Freteiro salvo!","success");closeModal();
+  };
+  if(f)document.getElementById("m-del").onclick=async()=>{
+    if(!confirm(`Excluir "${f.nome}"?`))return;
+    await dbRemove(`freteiros/${id}`);
+    await logAction("excluir_freteiro",`Freteiro excluído: ${f.nome}`);
+    toast("Freteiro excluído","warning");closeModal();
+  };
+  overlayClose("ov");
+}
+
+function handleFreteImport(e){
+  const file=e.target.files[0];if(!file)return;
+  if(typeof XLSX==="undefined"){toast("Biblioteca de planilha não carregou — verifique sua conexão","error");e.target.value="";return;}
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:""});
+      if(rows.length<2){toast("Planilha vazia ou sem dados","error");e.target.value="";return;}
+      const headers=rows[0].map(h=>String(h).trim());
+      const idxNome=headers.findIndex(h=>/nome|freteiro|transportadora/i.test(h));
+      const idxCubagem=headers.findIndex(h=>/cubagem/i.test(h));
+      const idxAjudante=headers.findIndex(h=>/ajudante/i.test(h));
+      if(idxNome<0){toast('Coluna "Nome" não encontrada na planilha','error');e.target.value="";return;}
+      const cidadeCols=headers.map((h,i)=>({h,i})).filter(({h,i})=>i!==idxNome&&i!==idxCubagem&&i!==idxAjudante&&h);
+      let count=0;
+      for(let r=1;r<rows.length;r++){
+        const row=rows[r];
+        const nome=String(row[idxNome]||"").trim();
+        if(!nome)continue;
+        const destinos={};
+        cidadeCols.forEach(({h,i})=>{
+          const raw=row[i];
+          if(raw===""||raw===undefined||raw===null)return;
+          const v=parseFloat(String(raw).replace(",","."));
+          if(!isNaN(v))destinos[h]=v;
+        });
+        const existing=Object.entries(freteiros).find(([,fr])=>(fr.nome||"").toLowerCase()===nome.toLowerCase());
+        const payload={
+          nome,
+          cubagem:idxCubagem>=0&&row[idxCubagem]!==""?(parseFloat(String(row[idxCubagem]).replace(",","."))||0):(existing?.[1]?.cubagem||0),
+          valorAjudante:idxAjudante>=0&&row[idxAjudante]!==""?(parseFloat(String(row[idxAjudante]).replace(",","."))||0):(existing?.[1]?.valorAjudante||0),
+          destinos:existing?{...existing[1].destinos,...destinos}:destinos,
+          obs:existing?.[1]?.obs||"",
+          createdAt:existing?.[1]?.createdAt||new Date().toISOString(),
+          updatedAt:new Date().toISOString(),
+        };
+        await dbSet(`freteiros/${existing?existing[0]:uid()}`,payload);
+        count++;
+      }
+      await logAction("importar_freteiros",`${count} freteiro(s) importado(s)/atualizados via planilha`);
+      toast(`${count} freteiro(s) importado(s) com sucesso!`,"success");
+    }catch(err){
+      console.error(err);
+      toast("Erro ao ler a planilha. Verifique o formato.","error");
+    }
+    e.target.value="";
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
@@ -2847,6 +3043,24 @@ function renderAdminPage(){
 
 // ── EVENT HANDLERS ────────────────────────────────────────────────────────────
 function attachContentEvents(){
+  // Cotação de Frete
+  document.getElementById("frete-tab-comparar")?.addEventListener("click",()=>{freteTab="comparar";render();});
+  document.getElementById("frete-tab-base")?.addEventListener("click",()=>{freteTab="base";render();});
+  document.getElementById("frete-sel-cidade")?.addEventListener("change",e=>{freteDestino=e.target.value;render();});
+  document.getElementById("frete-inp-ajudantes")?.addEventListener("change",e=>{freteAjudantes=Math.max(0,parseInt(e.target.value)||0);render();});
+  document.getElementById("frete-inp-ajudantes")?.addEventListener("keydown",e=>{if(e.key==="Enter")e.target.blur();});
+  document.getElementById("frete-btn-sort")?.addEventListener("click",()=>{freteSortDir=freteSortDir==="asc"?"desc":"asc";render();});
+  document.getElementById("frete-btn-novo")?.addEventListener("click",()=>openFreteiroModal());
+  document.querySelectorAll(".btn-edit-freteiro").forEach(b=>b.addEventListener("click",()=>openFreteiroModal(b.dataset.id)));
+  document.querySelectorAll(".btn-del-freteiro").forEach(b=>b.addEventListener("click",async()=>{
+    const f=freteiros[b.dataset.id];if(!f)return;
+    if(!confirm(`Excluir "${f.nome}"?`))return;
+    await dbRemove(`freteiros/${b.dataset.id}`);
+    await logAction("excluir_freteiro",`Freteiro excluído: ${f.nome}`);
+    toast("Freteiro excluído","warning");
+  }));
+  document.getElementById("frete-btn-importar")?.addEventListener("click",()=>document.getElementById("frete-file-import").click());
+  document.getElementById("frete-file-import")?.addEventListener("change",handleFreteImport);
   document.querySelectorAll(".btn-open-area").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();nav("area",b.dataset.id);}));
   document.querySelectorAll(".btn-add-task-area").forEach(b=>b.addEventListener("click",()=>{activeAreaId=b.dataset.id;openTaskModal({areaId:b.dataset.id,status:"a-fazer",priority:"media"});}));
   document.querySelectorAll(".btn-del-area").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();if(confirm("Excluir área e todas as suas tarefas?"))deleteArea(b.dataset.id);}));
