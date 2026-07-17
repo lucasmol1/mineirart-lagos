@@ -1,7 +1,7 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.58
-//  - Nova aba "Cotação de Frete": base de freteiros (com
-//    importação de planilha) + comparador por destino
+//  Mineirart Lagos — App v1.59
+//  - Corrige edição de blocos do organograma: falhas de
+//    salvamento agora aparecem como erro em vez de "Salvo!"
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -49,6 +49,28 @@ function fmtDate(d){if(!d)return"—";const[y,m,day]=d.split("-");return`${day}/
 function fmtTs(ts){if(!ts)return"";const d=new Date(ts);return`${d.toLocaleDateString("pt-BR")} ${d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`;}
 function timeAgo(ts){if(!ts)return"";const m=Math.floor((Date.now()-new Date(ts))/60000);if(m<1)return"agora";if(m<60)return`há ${m} min`;const h=Math.floor(m/60);if(h<24)return`há ${h}h`;const d=Math.floor(h/24);if(d<30)return`há ${d} dia${d>1?"s":""}`;const mo=Math.floor(d/30);if(mo<12)return`há ${mo} ${mo>1?"meses":"mês"}`;const y=Math.floor(mo/12);return`há ${y} ano${y>1?"s":""}`;}
 function initials(n){return(n||"?").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);}
+// Lê um arquivo de imagem, redimensiona (máx. 1000px) e comprime para webp — usado no anexo único de tarefas/eventos
+function readImageFile(file,maxW=1000,quality=0.75){
+  return new Promise((resolve,reject)=>{
+    if(!file||!file.type.startsWith("image/")){reject(new Error("Selecione um arquivo de imagem"));return;}
+    if(file.size>8*1024*1024){reject(new Error("Imagem muito grande (máx. 8MB)"));return;}
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const sc=Math.min(1,maxW/img.width);
+        const cv=document.createElement("canvas");
+        cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);
+        cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+        resolve({data:cv.toDataURL("image/webp",quality),w:cv.width});
+      };
+      img.onerror=()=>reject(new Error("Não foi possível ler a imagem"));
+      img.src=e.target.result;
+    };
+    reader.onerror=()=>reject(new Error("Não foi possível ler o arquivo"));
+    reader.readAsDataURL(file);
+  });
+}
 function linkify(text){
   if(!text)return"";
   const escaped=esc(text);
@@ -167,7 +189,7 @@ async function undoLastAction(){
 
 function dbSet(p,v){
   const isPos=/\/(x|y|w|h)$/.test(p);
-  if(!isPos&&!checkRateLimit("write",600))return Promise.resolve();
+  if(!isPos&&!checkRateLimit("write",600))return Promise.resolve({__rateLimited:true});
   return _captureAndSet(p,v);
 }
 function dbPush(p,v){return push(dbRef(p),v);}
@@ -587,7 +609,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.58</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.59</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -776,7 +798,10 @@ function renderAreaPage(){
     const col=myTasks.filter(t=>t.status===key);
     const isCollapsed=!!colCollapsed[key];
     const cards=col.length?col.map(t=>`<div class="card ${deadlineClass(t.date)||""}" data-detail="${t.id}" style="border-left-color:${st.color}">
-      <div class="card-title">${esc(t.title)}</div>
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        ${t.status!=="concluido"?`<button class="quick-complete-btn" data-qc="${t.id}" title="Marcar como concluída" style="flex-shrink:0;width:17px;height:17px;margin-top:2px;border-radius:50%;border:2px solid ${st.color}88;background:transparent;cursor:pointer;padding:0"></button>`:`<span style="flex-shrink:0;width:17px;height:17px;margin-top:2px;border-radius:50%;background:#4ae89c;display:flex;align-items:center;justify-content:center;font-size:10px;color:#0c0c0f">✓</span>`}
+        <div class="card-title" style="flex:1;min-width:0">${esc(t.title)}</div>
+      </div>
       ${t.desc?`<div class="card-desc">${esc(t.desc)}</div>`:""}
       <div class="card-meta">
         ${t.priority?`<span class="chip" style="font-size:10px;font-weight:700;text-transform:uppercase;background:${PRIORITY[t.priority].color}18;color:${PRIORITY[t.priority].color};border:1px solid ${PRIORITY[t.priority].color}30">${t.priority}</span>`:""}
@@ -3095,6 +3120,7 @@ function attachContentEvents(){
   document.getElementById("btn-toggle-members")?.addEventListener("click",()=>{areaMembersExpanded[activeAreaId]=!areaMembersExpanded[activeAreaId];render();});
   document.querySelectorAll(".btn-add-task-col").forEach(b=>b.addEventListener("click",()=>openTaskModal({areaId:activeAreaId,status:b.dataset.status,priority:"media"})));
   document.querySelectorAll(".card[data-detail]").forEach(c=>c.addEventListener("click",()=>openDetailModal(c.dataset.detail)));
+  document.querySelectorAll(".quick-complete-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();quickCompleteTask(b.dataset.qc);}));
   document.querySelectorAll(".btn-detail-alert").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();openDetailModal(b.dataset.id);}));
   document.querySelectorAll(".btn-del-notif").forEach(b=>b.addEventListener("click",async(e)=>{
     e.stopPropagation();
@@ -4109,7 +4135,7 @@ function renderMyTasksPage(){
     const ar=areas[t.areaId];
     const dl=deadlineClass(t.date);
     return`<div class="task-row btn-detail-task" data-id="${t.id}" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#13131a;border:1px solid #1e1e28;border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background .12s;${t.pinned?"border-left:3px solid #f0a848;":""}">
-      <span style="width:8px;height:8px;border-radius:50%;background:${st?.color};flex-shrink:0"></span>
+      ${t.status!=="concluido"?`<button class="quick-complete-btn" data-qc="${t.id}" title="Marcar como concluída" style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:2px solid ${st?.color||"#7a7a8a"};background:transparent;cursor:pointer;padding:0"></button>`:`<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:#4ae89c;display:flex;align-items:center;justify-content:center;font-size:9px;color:#0c0c0f">✓</span>`}
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title)}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:3px">
@@ -6133,9 +6159,15 @@ function openOrgNodeModal(nodeId, parentId=null){
       w:existingNode.w,h:existingNode.h,
       parentId:nodeId?(n.parentId||null):parentId,
       x:n.x||defaultX,y:n.y||defaultY};
-    await dbSet(`org/nodes/${nodeId||uid()}`,data);
-    await logAction("editar_org",`Bloco organograma: ${name||role}${parentLabel?" (em "+parentLabel+")":""}`);
-    toast("Salvo!","success");closeModal();
+    try{
+      const res=await dbSet(`org/nodes/${nodeId||uid()}`,data);
+      if(res&&res.__rateLimited){toast("Muitas ações seguidas — aguarde um instante e tente salvar de novo","error");return;}
+      await logAction("editar_org",`Bloco organograma: ${name||role}${parentLabel?" (em "+parentLabel+")":""}`);
+      toast("Salvo!","success");closeModal();
+    }catch(err){
+      console.error(err);
+      toast("Erro ao salvar o bloco — tente novamente","error");
+    }
   };
   overlayClose("ov");
 }
@@ -6267,6 +6299,21 @@ function showCelebrationModal(taskTitle){
   setTimeout(()=>{if(document.getElementById("m-cel-close"))closeModal();},8000);
 }
 
+// Pop-up final antes de criar uma tarefa com 2+ responsáveis: define se todos devem concluir
+// individualmente para a tarefa ser considerada definitivamente concluída (t.allUsers).
+function askCollectiveCompletion(respCount){
+  return new Promise(resolve=>{
+    openModal(`<div class="overlay" id="ov-cc"><div class="modal" style="max-width:440px"><div class="modal-header"><div class="modal-title">Antes de concluir…</div></div><div class="modal-body">
+      <div style="font-size:13px;color:#d0d0e0;line-height:1.6">Esta tarefa tem <strong style="color:#f0a848">${respCount} responsáveis</strong>. Todos eles precisam marcar como concluída para que a tarefa seja considerada <strong>definitivamente concluída</strong>?</div>
+    </div><div class="modal-footer">
+      <button class="btn-ghost" id="cc-no">Não — qualquer um conclui</button>
+      <button class="btn-primary" id="cc-yes">Sim — todos devem concluir</button>
+    </div></div></div>`);
+    document.getElementById("cc-yes").onclick=()=>resolve(true);
+    document.getElementById("cc-no").onclick=()=>resolve(false);
+  });
+}
+
 function openTaskModal(init={}){
   if(!init.id&&Object.keys(tasks).length>=LIMITS.MAX_TASKS){
     safePurgeTasks().then(ok=>{if(ok)openTaskModal(init);});return;
@@ -6340,10 +6387,10 @@ function openTaskModal(init={}){
         ${Object.entries(areas).map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join("")}
       </select>
     </div>
-    <div class="field" style="display:flex;align-items:center;gap:10px;margin-top:8px">
+    ${init.id?`<div class="field" style="display:flex;align-items:center;gap:10px;margin-top:8px">
       <input type="checkbox" id="m-allusers" style="width:16px;height:16px;accent-color:#f0a848" ${init.allUsers?"checked":""}/>
       <label for="m-allusers" style="font-size:13px;color:#a0a0b0;cursor:pointer">Tarefa coletiva — todos os usuários devem marcar como concluída</label>
-    </div>
+    </div>`:""}
     <div class="field" style="margin-top:10px;border-top:1px solid #1e1e28;padding-top:12px">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="m-recur-on" style="width:16px;height:16px;accent-color:#f0a848" ${init.recurrence?"checked":""}/>
@@ -6491,17 +6538,27 @@ function openTaskModal(init={}){
       interval:parseInt(document.getElementById("m-recur-interval")?.value||"7"),
       cond:document.getElementById("m-recur-cond")?.value||"after_complete"
     }:null;
+    const desc=document.getElementById("m-desc").value.trim();
+    const areaId=document.getElementById("m-area").value;
+    const status=document.getElementById("m-status").value;
+    const priority=document.getElementById("m-priority").value;
+    const date=document.getElementById("m-date").value;
+    // Ao criar (n\u00e3o editar) uma tarefa com 2+ respons\u00e1veis, pergunta antes de finalizar
+    // se todos precisam concluir para a tarefa ser considerada definitivamente conclu\u00edda.
+    const allUsers=isEdit
+      ?(document.getElementById("m-allusers")?.checked||false)
+      :(respsToSave.length>1?await askCollectiveCompletion(respsToSave.length):false);
     const data={
       id:init.id||uid(),title,
-      desc:document.getElementById("m-desc").value.trim(),
-      areaId:document.getElementById("m-area").value,
+      desc,
+      areaId,
       resps:respsToSave,
       fyiResps:fyiRespsToSave.length?fyiRespsToSave:null,
-      status:document.getElementById("m-status").value,
-      priority:document.getElementById("m-priority").value,
-      date:document.getElementById("m-date").value,
+      status,
+      priority,
+      date,
       pinned:init.pinned||false,
-      allUsers:document.getElementById("m-allusers")?.checked||false,
+      allUsers,
       extraAreaIds:extraAreaIds.length?extraAreaIds:null,
       recurrence:recurrence||null,
       creatorId:init.creatorId||currentUser.uid,
@@ -6850,37 +6907,17 @@ function openDetailModal(taskId){
     if(confirm("Excluir tarefa?")){await dbRemove(`tasks/${taskId}`);await logAction("excluir_tarefa","Excluida: "+t.title);closeModal();toast("Tarefa excluida","warning");}
   });
   document.querySelectorAll(".move-status").forEach(b=>b.addEventListener("click",async()=>{
-    // Conclusão individual: ativa para allUsers OU para qualquer tarefa com 2+ responsáveis
-    const isMultiResp=resps.length>1;
-    const isResponsavel=resps.includes(currentProfile.name);
-    if((t.allUsers||isMultiResp)&&isResponsavel){
-      // Ao clicar em Concluído, registra apenas a conclusão deste usuário
-      if(b.dataset.status==="concluido"){
-        closeModal();
-        await markUserCompletion(taskId);
-        return;
-      }
-    }
     const newStatus=b.dataset.status;
+    if(newStatus==="concluido"){
+      closeModal();
+      await quickCompleteTask(taskId);
+      return;
+    }
     const oldStatus=t.status;
     await dbSet(`tasks/${taskId}/status`,newStatus);
-    if(newStatus==="concluido"){await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());}
     await logAction("editar_tarefa",`Status: "${STATUS[oldStatus]?.label}" → "${STATUS[newStatus]?.label}": ${t.title}`);
-    // Notify admin1 when any user marks task complete
-    if(newStatus==="concluido"&&!isAdmin1){
-      const admin1Id=Object.entries(users).find(([,u])=>u.role==="admin1")?.[0];
-      if(admin1Id){
-        const notifKey=currentUser.uid+Date.now().toString(36);
-        await dbSet(`user_notifs/${admin1Id}/${notifKey}`,{
-          type:"task_completed",
-          msg:`✅ ${currentProfile.name} concluiu: "${t.title}"`,
-          taskId,ts:new Date().toISOString(),read:false
-        });
-      }
-    }
     closeModal();
     toast("Status atualizado","success");
-    if(newStatus==="concluido") openRepeatTaskModal(t);
   }));
   overlayClose("ov");
 }
@@ -7003,6 +7040,37 @@ async function markUserCompletion(taskId){
   await logAction("concluir_tarefa",`${currentProfile.name} marcou como concluído: ${t.title}`);
   toast(allRespsDone?"Tarefa totalmente concluída! 🎉":"Sua parte foi marcada!","success");
   if(allRespsDone) openRepeatTaskModal(t);
+}
+
+// Conclusão rápida de uma tarefa (checkbox no card / botão "Concluído" no detalhe).
+// Tarefas coletivas ou com 2+ responsáveis registram só a conclusão individual do usuário.
+async function quickCompleteTask(taskId){
+  const t=tasks[taskId]; if(!t||t.status==="concluido")return;
+  const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
+  const isMultiResp=resps.length>1;
+  const isResponsavel=resps.includes(currentProfile.name);
+  if((t.allUsers||isMultiResp)&&isResponsavel){
+    await markUserCompletion(taskId);
+    return;
+  }
+  const oldStatus=t.status;
+  await dbSet(`tasks/${taskId}/status`,"concluido");
+  await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);
+  await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());
+  await logAction("editar_tarefa",`Status: "${STATUS[oldStatus]?.label}" → "${STATUS.concluido.label}": ${t.title}`);
+  if(!isAdmin1){
+    const admin1Id=Object.entries(users).find(([,u])=>u.role==="admin1")?.[0];
+    if(admin1Id){
+      const notifKey=currentUser.uid+Date.now().toString(36);
+      await dbSet(`user_notifs/${admin1Id}/${notifKey}`,{
+        type:"task_completed",
+        msg:`✅ ${currentProfile.name} concluiu: "${t.title}"`,
+        taskId,ts:new Date().toISOString(),read:false
+      });
+    }
+  }
+  toast("Tarefa concluída!","success");
+  openRepeatTaskModal(t);
 }
 
 // ── EXPORT TASKS ─────────────────────────────────────────────────────────────

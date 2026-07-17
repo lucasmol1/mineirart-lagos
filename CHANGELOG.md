@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.60
+Corrige causa raiz do erro ao editar bloco do organograma: campos w/h ficavam `undefined` para blocos nunca redimensionados, e o Firebase rejeita esse valor no set().
+
 ## v1.59
 Corrige edição de blocos no Organograma: quando o salvamento falhava (limite de escritas ou erro), o sistema mostrava "Salvo!" mesmo sem gravar. Agora exibe erro real e mantém o modal aberto.
 
