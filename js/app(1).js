@@ -1,7 +1,7 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.60
-//  - Corrige erro real ao editar blocos do organograma: w/h
-//    undefined quebrava o set() do Firebase
+//  Mineirart Lagos — App v1.61
+//  - Anexo de 1 foto em tarefas e eventos; foto é apagada
+//    automaticamente quando a tarefa é concluída
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -609,7 +609,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.60</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.61</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -4054,7 +4054,7 @@ function openRepeatTaskModal(t){
       // Cria automaticamente sem perguntar
       const nextDate=calcNextRecurDate(t);
       const newId=uid();
-      dbSet(`tasks/${newId}`,{...t,id:newId,status:"a-fazer",pinned:false,date:nextDate,completions:null,createdAt:new Date().toISOString()});
+      dbSet(`tasks/${newId}`,{...t,id:newId,status:"a-fazer",pinned:false,date:nextDate,completions:null,image:null,createdAt:new Date().toISOString()});
       logAction("repetir_tarefa",`Recorrência automática: ${t.title} → ${nextDate?fmtDate(nextDate):"sem prazo"}`);
       const freqLabel={diaria:"diária",semanal:"semanal",quinzenal:"quinzenal",mensal:"mensal",anual:"anual",custom:`a cada ${t.recurrence.interval||7} dias`}[t.recurrence.freq]||"";
       toast(`🔁 Tarefa ${freqLabel} recriada${nextDate?" para "+fmtDate(nextDate):""}!`,"success");
@@ -4077,7 +4077,7 @@ function openRepeatTaskModal(t){
     document.getElementById("m-yes").onclick=async()=>{
       const newDate=document.getElementById("m-rdate").value;
       const newId=uid();
-      await dbSet(`tasks/${newId}`,{...t,id:newId,status:"a-fazer",pinned:false,date:newDate||null,completions:null,createdAt:new Date().toISOString()});
+      await dbSet(`tasks/${newId}`,{...t,id:newId,status:"a-fazer",pinned:false,date:newDate||null,completions:null,image:null,createdAt:new Date().toISOString()});
       await logAction("repetir_tarefa","Repetida: "+t.title+(newDate?" → "+fmtDate(newDate):""));
       toast("Tarefa repetida!","success");closeModal();
     };
@@ -5228,6 +5228,14 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
         </div>
       </div>
       <div class="field"><label>Observações</label><textarea id="m-enote" rows="3" placeholder="Detalhes, local, link…">${esc(ev.note||"")}</textarea></div>
+      <div class="field">
+        <label style="display:flex;align-items:center;justify-content:space-between">📎 Foto anexada <span style="font-size:10px;color:#7a7a8a;font-weight:400">Apenas 1 imagem</span></label>
+        <div id="ev-img-zone" style="border:1px dashed #2e2e3a;border-radius:8px;padding:12px;text-align:center;transition:border-color .2s;margin-top:6px">
+          <input type="file" id="ev-img-input" accept="image/*" style="display:none"/>
+          <div id="ev-img-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('ev-img-input').click()">📎 Clique ou arraste uma imagem aqui</div>
+          <div id="ev-img-preview" style="display:none;position:relative"></div>
+        </div>
+      </div>
       <div class="field"><label>Cor do evento <span style="color:#7a7a8a;font-size:10px">(opcional, substitui a cor da prioridade)</span></label>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="color" id="m-ecolor" value="${ev.color||"#7c6eff"}" style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px"/>
@@ -5250,6 +5258,33 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
   document.getElementById("m-edel")?.addEventListener("click",async()=>{
     if(confirm("Excluir evento?")){await dbRemove(`${isFreela?"freela_events":"cal_events"}/${eventId}`);await logAction("excluir_evento",`Evento excluído: ${ev.title}`);closeModal();toast("Evento excluído","warning");}
   });
+  let evImage=ev.image||null;
+  function renderEvImg(){
+    const empty=document.getElementById("ev-img-empty");
+    const prev=document.getElementById("ev-img-preview");
+    if(!empty||!prev)return;
+    if(evImage){
+      empty.style.display="none";
+      prev.style.display="inline-block";
+      prev.innerHTML=`<img src="${evImage.data}" style="max-width:220px;max-height:160px;border-radius:6px;border:1px solid #2e2e3a;display:block"/><button type="button" id="ev-img-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
+      document.getElementById("ev-img-remove").onclick=()=>{evImage=null;renderEvImg();};
+    } else {
+      empty.style.display="";
+      prev.style.display="none";
+      prev.innerHTML="";
+    }
+  }
+  renderEvImg();
+  async function handleEvImgFile(file){
+    if(!file)return;
+    try{ evImage=await readImageFile(file); renderEvImg(); }
+    catch(err){ toast(err.message||"Erro ao processar imagem","error"); }
+  }
+  document.getElementById("ev-img-input")?.addEventListener("change",e=>handleEvImgFile(e.target.files[0]));
+  const eImgZone=document.getElementById("ev-img-zone");
+  eImgZone?.addEventListener("dragover",e=>{e.preventDefault();eImgZone.style.borderColor="#f0a848";});
+  eImgZone?.addEventListener("dragleave",()=>{eImgZone.style.borderColor="#2e2e3a";});
+  eImgZone?.addEventListener("drop",e=>{e.preventDefault();eImgZone.style.borderColor="#2e2e3a";handleEvImgFile(e.dataTransfer.files[0]);});
   document.getElementById("m-save").onclick=async()=>{
     const title=document.getElementById("m-etitle").value.trim();
     const dateStart=document.getElementById("m-estart").value;
@@ -5263,7 +5298,7 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
     const note=document.getElementById("m-enote").value.trim()||null;
     const useColor=document.getElementById("m-ecolor-use")?.checked;
     const evColor=useColor?(document.getElementById("m-ecolor")?.value||null):null;
-    const data={title,dateStart,dateEnd,priority,person,note,color:evColor||null,areaId,creatorId:currentUser.uid,creatorName:currentProfile.name,createdAt:ev.createdAt||new Date().toISOString()};
+    const data={title,dateStart,dateEnd,priority,person,note,image:evImage||null,color:evColor||null,areaId,creatorId:currentUser.uid,creatorName:currentProfile.name,createdAt:ev.createdAt||new Date().toISOString()};
     await dbSet(`${isFreela?"freela_events":"cal_events"}/${eventId||uid()}`,data);
     await logAction(isEdit?"editar_evento":"criar_evento",`${isEdit?"Editado":"Criado"}: ${title} (${dateStart})`);
     toast(isEdit?"Evento atualizado!":"Evento criado!","success");closeModal();
@@ -5292,6 +5327,7 @@ function openCalEventDetailModal(eventId){
         ${span?`<span class="chip" style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30">${Math.round((new Date(ev.dateEnd)-new Date(ev.dateStart))/86400000)+1} dias</span>`:""}
       </div>
       ${ev.person?`<div style="margin-bottom:10px"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Responsável</div><span style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30;padding:4px 12px;border-radius:20px;font-size:12px">${esc(ev.person)}</span></div>`:""}
+      ${ev.image?`<div style="margin-bottom:12px"><img src="${ev.image.data}" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #2e2e3a;display:block"/></div>`:""}
       ${ev.note?`<div style="font-size:13px;color:#a0a0b0;line-height:1.6;background:#18181c;padding:12px;border-radius:8px;margin-bottom:12px">${esc(ev.note)}</div>`:""}
       ${ev.creatorName?`<div style="font-size:11px;color:#5a5a6a">Criado por: ${esc(ev.creatorName)}</div>`:""}
     </div>
@@ -6386,6 +6422,14 @@ function openTaskModal(init={}){
         ${Object.entries(areas).map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join("")}
       </select>
     </div>
+    <div class="field" style="margin-top:8px">
+      <label style="display:flex;align-items:center;justify-content:space-between">📎 Foto anexada <span style="font-size:10px;color:#7a7a8a;font-weight:400">Apenas 1 imagem</span></label>
+      <div id="task-img-zone" style="border:1px dashed #2e2e3a;border-radius:8px;padding:12px;text-align:center;transition:border-color .2s;margin-top:6px">
+        <input type="file" id="task-img-input" accept="image/*" style="display:none"/>
+        <div id="task-img-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('task-img-input').click()">📎 Clique ou arraste uma imagem aqui</div>
+        <div id="task-img-preview" style="display:none;position:relative"></div>
+      </div>
+    </div>
     ${init.id?`<div class="field" style="display:flex;align-items:center;gap:10px;margin-top:8px">
       <input type="checkbox" id="m-allusers" style="width:16px;height:16px;accent-color:#f0a848" ${init.allUsers?"checked":""}/>
       <label for="m-allusers" style="font-size:13px;color:#a0a0b0;cursor:pointer">Tarefa coletiva — todos os usuários devem marcar como concluída</label>
@@ -6429,6 +6473,33 @@ function openTaskModal(init={}){
 
   let selResps=[...existingResps];
   let selFyiResps=[...existingFyiResps];
+  let taskImage=init.image||null;
+  function renderTaskImg(){
+    const empty=document.getElementById("task-img-empty");
+    const prev=document.getElementById("task-img-preview");
+    if(!empty||!prev)return;
+    if(taskImage){
+      empty.style.display="none";
+      prev.style.display="inline-block";
+      prev.innerHTML=`<img src="${taskImage.data}" style="max-width:220px;max-height:160px;border-radius:6px;border:1px solid #2e2e3a;display:block"/><button type="button" id="task-img-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
+      document.getElementById("task-img-remove").onclick=()=>{taskImage=null;renderTaskImg();};
+    } else {
+      empty.style.display="";
+      prev.style.display="none";
+      prev.innerHTML="";
+    }
+  }
+  renderTaskImg();
+  async function handleTaskImgFile(file){
+    if(!file)return;
+    try{ taskImage=await readImageFile(file); renderTaskImg(); }
+    catch(err){ toast(err.message||"Erro ao processar imagem","error"); }
+  }
+  document.getElementById("task-img-input")?.addEventListener("change",e=>handleTaskImgFile(e.target.files[0]));
+  const tImgZone=document.getElementById("task-img-zone");
+  tImgZone?.addEventListener("dragover",e=>{e.preventDefault();tImgZone.style.borderColor="#f0a848";});
+  tImgZone?.addEventListener("dragleave",()=>{tImgZone.style.borderColor="#2e2e3a";});
+  tImgZone?.addEventListener("drop",e=>{e.preventDefault();tImgZone.style.borderColor="#2e2e3a";handleTaskImgFile(e.dataTransfer.files[0]);});
   function refreshFyiChips(){
     const el=document.getElementById("fyi-resp-chips");if(!el)return;
     el.innerHTML=selFyiResps.map(r=>`<span style="background:#4ac8e822;color:#4ac8e8;border:1px solid #4ac8e844;padding:4px 10px;border-radius:20px;font-size:12px;${isCreator?"cursor:pointer":""}" data-fyi-r="${esc(r)}">${isCreator?"✕ ":""}${esc(r)}</span>`).join("")||`<span style="font-size:12px;color:#5a5a6a">Nenhum FYI</span>`;
@@ -6558,6 +6629,7 @@ function openTaskModal(init={}){
       date,
       pinned:init.pinned||false,
       allUsers,
+      image:taskImage||null,
       extraAreaIds:extraAreaIds.length?extraAreaIds:null,
       recurrence:recurrence||null,
       creatorId:init.creatorId||currentUser.uid,
@@ -6648,6 +6720,7 @@ function openDetailModal(taskId){
   const areaChip=(area?'<span class="chip" style="background:'+area.color+'18;color:'+area.color+';border:1px solid '+area.color+'30;padding:4px 12px">'+esc(area.name)+'</span>':"")
     +(Array.isArray(t.extraAreaIds)?t.extraAreaIds.map(eid=>{const ea=areas[eid];return ea?'<span class="chip" style="background:'+ea.color+'18;color:'+ea.color+';border:1px solid '+ea.color+'30;padding:4px 12px">'+esc(ea.name)+'</span>':"";}).join(""):"");
   const descBlock=t.desc?'<div style="font-size:13px;color:#a0a0b0;line-height:1.6;background:#18181c;padding:12px;border-radius:8px;margin-bottom:14px">'+esc(t.desc)+'</div>':"";
+  const imageBlock=t.image?`<div style="margin-bottom:14px"><img src="${t.image.data}" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #2e2e3a;display:block"/></div>`:"";
   function personAvatar(name, color, role=""){
     const u=Object.values(users).find(u=>u.name===name);
     const c=u?.color||color||"#7c6eff";
@@ -6702,7 +6775,7 @@ function openDetailModal(taskId){
           <span class="chip" style="background:${st.color}22;color:${st.color};border:1px solid ${st.color}40;padding:4px 12px">${st.label}</span>
           ${priorityChip}${areaChip}${deadlineBadge(t.date)}
         </div>
-        ${collectiveBlock}${descBlock}${respBlock}
+        ${collectiveBlock}${descBlock}${imageBlock}${respBlock}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">${dateBlock}${createdAtBlock}</div>
         <div>
           <div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Mover para</div>
@@ -7025,7 +7098,11 @@ async function markUserCompletion(taskId){
   const newStatus=allRespsDone?"concluido":"em-andamento";
   await dbSet(`tasks/${taskId}/completions`,completions);
   await dbSet(`tasks/${taskId}/status`,newStatus);
-  if(allRespsDone){await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());}
+  if(allRespsDone){
+    await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);
+    await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());
+    if(t.image)await dbSet(`tasks/${taskId}/image`,null);
+  }
   // Notify admin1 that someone completed
   const admin1Id=Object.entries(users).find(([,u])=>u.role==="admin1")?.[0];
   if(admin1Id&&admin1Id!==uid){
@@ -7056,6 +7133,7 @@ async function quickCompleteTask(taskId){
   await dbSet(`tasks/${taskId}/status`,"concluido");
   await dbSet(`tasks/${taskId}/completed_by`,currentProfile.name);
   await dbSet(`tasks/${taskId}/completed_at`,new Date().toISOString());
+  if(t.image)await dbSet(`tasks/${taskId}/image`,null);
   await logAction("editar_tarefa",`Status: "${STATUS[oldStatus]?.label}" → "${STATUS.concluido.label}": ${t.title}`);
   if(!isAdmin1){
     const admin1Id=Object.entries(users).find(([,u])=>u.role==="admin1")?.[0];

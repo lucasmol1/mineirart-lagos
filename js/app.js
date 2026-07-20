@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.61
+//  Mineirart Lagos — App v1.62
 //  - Anexo de 1 foto em tarefas e eventos; foto é apagada
 //    automaticamente quando a tarefa é concluída
 // ════════════════════════════════════════════════════════
@@ -609,7 +609,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.61</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.62</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -3332,6 +3332,12 @@ function attachFlowEvents(){
   document.querySelectorAll(".conn-handle").forEach(el=>el.addEventListener("mousedown",e=>{e.stopPropagation();connecting={fromId:el.dataset.nodeId,side:el.dataset.side||"right"};render();}));
   document.querySelectorAll(".flow-node").forEach(el=>{
     el.addEventListener("click",e=>{if(e.target.classList.contains("conn-handle")||e.target.classList.contains("del-node"))return;const aId=el.dataset.areaId;if(aId&&areas[aId]&&!connecting&&!dragging)nav("area",aId);});
+    el.addEventListener("dblclick",e=>{
+      if(e.target.classList.contains("conn-handle")||e.target.classList.contains("del-node")||e.target.classList.contains("edit-flow-node")||e.target.classList.contains("flow-resize-handle"))return;
+      if(e.target.closest?.(".flow-root-toggle")||e.target.closest?.(".flow-add-child"))return;
+      e.stopPropagation();
+      openFlowNodeDetailModal(el.dataset.nodeId);
+    });
     el.addEventListener("mousedown",e=>{
       if(e.target.classList.contains("conn-handle")||e.target.classList.contains("del-node")||e.target.classList.contains("edit-flow-node"))return;
       if(e.target.classList.contains("flow-resize-handle"))return;
@@ -3967,6 +3973,28 @@ function openFlowNodeEditModal(nodeId){
     };
     await dbSet(`flow/nodes/${nodeId}`,updated);
     toast("Bloco atualizado!","success"); closeModal();
+  };
+  overlayClose("ov");
+}
+
+function openFlowNodeDetailModal(nodeId){
+  const n=flowData.nodes?.[nodeId];if(!n)return;
+  const label=n.label||"Bloco";
+  openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:480px"><div class="modal-header"><div class="modal-title">Detalhes do bloco</div><button class="icon-btn" id="m-x">✕</button></div><div class="modal-body">
+    <div style="margin-bottom:14px"><span style="background:#1e1e28;border:1px solid #2e2e3a;padding:4px 10px;border-radius:6px;color:#f0eff5;font-size:13px;font-weight:700">${esc(label)}</span></div>
+    <div class="field">
+      <label>Detalhes <span style="color:#7a7a8a;font-size:11px">(aparece logo abaixo do nome no fluxograma)</span></label>
+      <textarea id="m-ndetail2" rows="5" placeholder="Descreva o que ocorre neste processo, quem é responsável, documentos, prazos…">${esc(n.detail||"")}</textarea>
+    </div>
+  </div><div class="modal-footer"><button class="btn-ghost" id="m-cancel">Cancelar</button><button class="btn-primary" id="m-save">Salvar</button></div></div></div>`);
+  document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
+  document.getElementById("m-save").onclick=async()=>{
+    const before=n.detail||"";
+    const after=document.getElementById("m-ndetail2").value.trim();
+    if(before===after){closeModal();return;}
+    await dbSet(`flow/nodes/${nodeId}/detail`,after||null);
+    await logAction("editar_detalhe_fluxo",`Detalhes do bloco "${label}" alterados: "${before}" → "${after}"`);
+    closeModal(); toast("Detalhes atualizados!","success");
   };
   overlayClose("ov");
 }

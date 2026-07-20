@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.62
+Duplo clique em um bloco do Fluxograma abre seus detalhes, editáveis por qualquer usuário. Alterações ficam registradas no histórico de ações.
+
 ## v1.61
 Tarefas e eventos agora aceitam anexar 1 foto (arraste ou clique). Ao concluir uma tarefa, a foto anexada é apagada automaticamente para economizar espaço.
 
