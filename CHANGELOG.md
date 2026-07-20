@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.61
+Tarefas e eventos agora aceitam anexar 1 foto (arraste ou clique). Ao concluir uma tarefa, a foto anexada é apagada automaticamente para economizar espaço.
+
 ## v1.60
 Corrige causa raiz do erro ao editar bloco do organograma: campos w/h ficavam `undefined` para blocos nunca redimensionados, e o Firebase rejeita esse valor no set().
 
