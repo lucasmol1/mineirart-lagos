@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.63
+Acesso a uma área agora é herdado por todas as subáreas dela (ex: quem tem permissão em "Comercial" vê e é listado em "Mkt"). Corrige checagens de permissão inconsistentes em atribuição de tarefas, membros e notificações.
+
 ## v1.62
 Duplo clique em um bloco do Fluxograma abre seus detalhes, editáveis por qualquer usuário. Alterações ficam registradas no histórico de ações.
 

@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.62
+//  Mineirart Lagos — App v1.63
 //  - Anexo de 1 foto em tarefas e eventos; foto é apagada
 //    automaticamente quando a tarefa é concluída
 // ════════════════════════════════════════════════════════
@@ -395,12 +395,24 @@ function showLoginError(msg){const e=document.getElementById("login-error");e.te
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function isAdmin(){return currentProfile?.role==="admin1"||currentProfile?.role==="admin";}
 function canManageAreas(){return isAdmin()||!!currentProfile?.manageAreas;}
+// Acesso a uma área é herdado de qualquer área-mãe na cadeia: se o usuário tem
+// permissão em "Comercial", ele automaticamente tem acesso a todas as subáreas
+// dela (Mkt, etc.), não importa a profundidade.
+function hasAreaAccess(user,areaId){
+  if(!user||!areaId) return false;
+  if(user.role==="admin1"||user.role==="admin") return true;
+  const perms=new Set(user.permissions||[]);
+  let a=areas[areaId],guard=0;
+  while(a&&guard++<50){
+    if(perms.has(a.id)) return true;
+    a=a.parentId?areas[a.parentId]:null;
+  }
+  return false;
+}
 function visibleAreas(){
   const all=Object.entries(areas).map(([id,a])=>({id,...a}));
   if(isAdmin()) return all;
-  // User sees area if directly permitted OR parent area is permitted
-  const permitted=new Set(currentProfile?.permissions||[]);
-  return all.filter(a=>permitted.has(a.id)||(a.parentId&&permitted.has(a.parentId)));
+  return all.filter(a=>hasAreaAccess(currentProfile,a.id));
 }
 
 function nav(p,extra){
@@ -609,7 +621,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.62</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.63</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -6391,13 +6403,7 @@ function openTaskModal(init={}){
     if(!areaId){
       filtered=Object.values(users);
     } else {
-      filtered=Object.values(users).filter(u=>{
-        // Admins sempre aparecem
-        if(u.role==="admin1"||u.role==="admin") return true;
-        // Usuário aparece se tiver a área nas suas permissões
-        const perms=u.permissions||[];
-        return perms.includes(areaId);
-      });
+      filtered=Object.values(users).filter(u=>hasAreaAccess(u,areaId));
       // Se nenhum usuário comum tem permissão ainda, mostra todos (segurança)
       const nonAdmins=filtered.filter(u=>u.role==="user");
       if(!nonAdmins.length) filtered=Object.values(users);
@@ -6588,7 +6594,7 @@ function openTaskModal(init={}){
       const areaUsers=Object.values(users).filter(u=>u.name&&members.includes(u.name));
       if(!areaUsers.length){
         // fallback: usuários com permissão na área
-        const permUsers=Object.values(users).filter(u=>u.name&&(u.role==="admin1"||(u.permissions||[]).includes(areaId)));
+        const permUsers=Object.values(users).filter(u=>u.name&&hasAreaAccess(u,areaId));
         permUsers.forEach(u=>{if(!selResps.includes(u.name))selResps.push(u.name);});
       } else {
         areaUsers.forEach(u=>{if(!selResps.includes(u.name))selResps.push(u.name);});
@@ -6695,11 +6701,7 @@ function renderAreaMembersTab(task){
   // Coleta membros: usuários que têm pelo menos uma das áreas nas suas permissões
   const memberUids=new Set();
   Object.entries(users).forEach(([uid2,u])=>{
-    // Admins sempre aparecem
-    if(u.role==="admin1"||u.role==="admin"){memberUids.add(uid2);return;}
-    // Usuário comum: aparece se tiver qualquer área da tarefa nas permissões
-    const perms=u.permissions||[];
-    if(taskAreaIds.some(aid=>perms.includes(aid))) memberUids.add(uid2);
+    if(taskAreaIds.some(aid=>hasAreaAccess(u,aid))) memberUids.add(uid2);
   });
 
   if(!memberUids.size){
@@ -6958,8 +6960,7 @@ function openDetailModal(taskId){
       const area=areas[aId]; if(!area)return;
       Object.entries(users).forEach(([uid2,u])=>{
         if(uid2===currentUser.uid)return;
-        const hasPerm=u.role==="admin1"||u.role==="admin"||(u.permissions||[]).includes(aId);
-        if(hasPerm) toNotify.add(uid2);
+        if(hasAreaAccess(u,aId)) toNotify.add(uid2);
       });
     });
     // Notificar usuários mencionados com @
