@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.64
+Nova aba Lixeira: guarda as últimas 10 tarefas/eventos excluídos com botão de restaurar. Cobre Calendário, Cal. Prospecção e agendamentos.
+
 ## v1.63
 Acesso a uma área agora é herdado por todas as subáreas dela (ex: quem tem permissão em "Comercial" vê e é listado em "Mkt"). Corrige checagens de permissão inconsistentes em atribuição de tarefas, membros e notificações.
 
