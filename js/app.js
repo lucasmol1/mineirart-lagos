@@ -1,8 +1,9 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.64
+//  Mineirart Lagos — App v1.65
 //  - Lixeira: últimas 10 exclusões de tarefas e eventos de calendário, com restauração
-//  - Anexo de 1 foto em tarefas e eventos; foto é apagada
-//    automaticamente quando a tarefa é concluída
+//  - Anexo de 1 imagem ou PDF em tarefas e eventos, direto na tela de
+//    detalhe (sem precisar editar); anexo é apagado automaticamente
+//    quando a tarefa é concluída
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -51,10 +52,21 @@ function fmtDate(d){if(!d)return"—";const[y,m,day]=d.split("-");return`${day}/
 function fmtTs(ts){if(!ts)return"";const d=new Date(ts);return`${d.toLocaleDateString("pt-BR")} ${d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`;}
 function timeAgo(ts){if(!ts)return"";const m=Math.floor((Date.now()-new Date(ts))/60000);if(m<1)return"agora";if(m<60)return`há ${m} min`;const h=Math.floor(m/60);if(h<24)return`há ${h}h`;const d=Math.floor(h/24);if(d<30)return`há ${d} dia${d>1?"s":""}`;const mo=Math.floor(d/30);if(mo<12)return`há ${mo} ${mo>1?"meses":"mês"}`;const y=Math.floor(mo/12);return`há ${y} ano${y>1?"s":""}`;}
 function initials(n){return(n||"?").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);}
-// Lê um arquivo de imagem, redimensiona (máx. 1000px) e comprime para webp — usado no anexo único de tarefas/eventos
-function readImageFile(file,maxW=1000,quality=0.75){
+// Lê uma imagem (redimensiona a máx. 1000px e comprime para webp) ou um PDF (mantido como está, com limite
+// de tamanho menor já que não há compressão) — usado no anexo único de tarefas/eventos, para não estourar
+// o espaço gratuito do Firebase
+function readAttachmentFile(file,maxW=1000,quality=0.75){
   return new Promise((resolve,reject)=>{
-    if(!file||!file.type.startsWith("image/")){reject(new Error("Selecione um arquivo de imagem"));return;}
+    if(!file){reject(new Error("Selecione um arquivo"));return;}
+    if(file.type==="application/pdf"){
+      if(file.size>3*1024*1024){reject(new Error("PDF muito grande (máx. 3MB)"));return;}
+      const reader=new FileReader();
+      reader.onload=e=>resolve({data:e.target.result,type:"pdf",name:file.name});
+      reader.onerror=()=>reject(new Error("Não foi possível ler o arquivo"));
+      reader.readAsDataURL(file);
+      return;
+    }
+    if(!file.type.startsWith("image/")){reject(new Error("Selecione uma imagem ou um PDF"));return;}
     if(file.size>8*1024*1024){reject(new Error("Imagem muito grande (máx. 8MB)"));return;}
     const reader=new FileReader();
     reader.onload=e=>{
@@ -64,7 +76,7 @@ function readImageFile(file,maxW=1000,quality=0.75){
         const cv=document.createElement("canvas");
         cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);
         cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-        resolve({data:cv.toDataURL("image/webp",quality),w:cv.width});
+        resolve({data:cv.toDataURL("image/webp",quality),w:cv.width,type:"image"});
       };
       img.onerror=()=>reject(new Error("Não foi possível ler a imagem"));
       img.src=e.target.result;
@@ -72,6 +84,14 @@ function readImageFile(file,maxW=1000,quality=0.75){
     reader.onerror=()=>reject(new Error("Não foi possível ler o arquivo"));
     reader.readAsDataURL(file);
   });
+}
+// Gera o HTML de preview de um anexo (imagem inline ou link de PDF) reaproveitado nos modais de detalhe/edição
+function attachmentPreviewHtml(att,maxH=200){
+  if(!att)return"";
+  if(att.type==="pdf"){
+    return`<a href="${att.data}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;background:#18181c;border:1px solid #2e2e3a;border-radius:8px;padding:10px 14px;color:#f0a848;text-decoration:none;font-size:13px"><span style="font-size:20px">📄</span><span style="flex:1;word-break:break-all">${esc(att.name||"documento.pdf")}</span><span style="font-size:11px;color:#7a7a8a;white-space:nowrap">Abrir PDF ↗</span></a>`;
+  }
+  return`<img src="${att.data}" style="max-width:100%;max-height:${maxH}px;border-radius:6px;border:1px solid #2e2e3a;display:block;cursor:pointer" onclick="openImgModal(this.src)"/>`;
 }
 function linkify(text){
   if(!text)return"";
@@ -652,7 +672,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.64</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.65</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -5319,10 +5339,10 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
       </div>
       <div class="field"><label>Observações</label><textarea id="m-enote" rows="3" placeholder="Detalhes, local, link…">${esc(ev.note||"")}</textarea></div>
       <div class="field">
-        <label style="display:flex;align-items:center;justify-content:space-between">📎 Foto anexada <span style="font-size:10px;color:#7a7a8a;font-weight:400">Apenas 1 imagem</span></label>
+        <label style="display:flex;align-items:center;justify-content:space-between">📎 Anexo <span style="font-size:10px;color:#7a7a8a;font-weight:400">Imagem ou PDF · apenas 1 arquivo</span></label>
         <div id="ev-img-zone" style="border:1px dashed #2e2e3a;border-radius:8px;padding:12px;text-align:center;transition:border-color .2s;margin-top:6px">
-          <input type="file" id="ev-img-input" accept="image/*" style="display:none"/>
-          <div id="ev-img-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('ev-img-input').click()">📎 Clique ou arraste uma imagem aqui</div>
+          <input type="file" id="ev-img-input" accept="image/*,application/pdf" style="display:none"/>
+          <div id="ev-img-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('ev-img-input').click()">📎 Clique ou arraste uma imagem ou PDF aqui</div>
           <div id="ev-img-preview" style="display:none;position:relative"></div>
         </div>
       </div>
@@ -5355,8 +5375,9 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
     if(!empty||!prev)return;
     if(evImage){
       empty.style.display="none";
-      prev.style.display="inline-block";
-      prev.innerHTML=`<img src="${evImage.data}" style="max-width:220px;max-height:160px;border-radius:6px;border:1px solid #2e2e3a;display:block"/><button type="button" id="ev-img-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
+      prev.style.display=evImage.type==="pdf"?"block":"inline-block";
+      prev.style.maxWidth=evImage.type==="pdf"?"none":"220px";
+      prev.innerHTML=`${attachmentPreviewHtml(evImage,160)}<button type="button" id="ev-img-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
       document.getElementById("ev-img-remove").onclick=()=>{evImage=null;renderEvImg();};
     } else {
       empty.style.display="";
@@ -5367,8 +5388,8 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
   renderEvImg();
   async function handleEvImgFile(file){
     if(!file)return;
-    try{ evImage=await readImageFile(file); renderEvImg(); }
-    catch(err){ toast(err.message||"Erro ao processar imagem","error"); }
+    try{ evImage=await readAttachmentFile(file); renderEvImg(); }
+    catch(err){ toast(err.message||"Erro ao processar arquivo","error"); }
   }
   document.getElementById("ev-img-input")?.addEventListener("change",e=>handleEvImgFile(e.target.files[0]));
   const eImgZone=document.getElementById("ev-img-zone");
@@ -5417,8 +5438,18 @@ function openCalEventDetailModal(eventId){
         ${span?`<span class="chip" style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30">${Math.round((new Date(ev.dateEnd)-new Date(ev.dateStart))/86400000)+1} dias</span>`:""}
       </div>
       ${ev.person?`<div style="margin-bottom:10px"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Responsável</div><span style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30;padding:4px 12px;border-radius:20px;font-size:12px">${esc(ev.person)}</span></div>`:""}
-      ${ev.image?`<div style="margin-bottom:12px"><img src="${ev.image.data}" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #2e2e3a;display:block"/></div>`:""}
       ${ev.note?`<div style="font-size:13px;color:#a0a0b0;line-height:1.6;background:#18181c;padding:12px;border-radius:8px;margin-bottom:12px">${esc(ev.note)}</div>`:""}
+      <div class="field" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px">📎 Anexo</span>
+          <span style="font-size:10px;color:#7a7a8a">Imagem ou PDF · 1 arquivo</span>
+        </div>
+        <div id="dtl-eatt-zone" style="border:1px dashed #2e2e3a;border-radius:8px;padding:12px;text-align:center;transition:border-color .2s">
+          <input type="file" id="dtl-eatt-input" accept="image/*,application/pdf" style="display:none"/>
+          <div id="dtl-eatt-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('dtl-eatt-input').click()">📎 Clique ou arraste uma imagem ou PDF aqui</div>
+          <div id="dtl-eatt-preview" style="display:none;position:relative"></div>
+        </div>
+      </div>
       ${ev.creatorName?`<div style="font-size:11px;color:#5a5a6a">Criado por: ${esc(ev.creatorName)}</div>`:""}
     </div>
     <div class="modal-footer">
@@ -5431,6 +5462,48 @@ function openCalEventDetailModal(eventId){
   document.getElementById("m-del")?.addEventListener("click",async()=>{
     if(confirm("Excluir evento?")){await trashRemove(`${isFreela?"freela_events":"cal_events"}/${eventId}`,"evento",ev.title);await logAction("excluir_evento","Excluído: "+ev.title);closeModal();toast("Evento excluído","warning");}
   });
+
+  // ── Anexo (imagem ou PDF) direto no detalhe, sem precisar entrar em Editar ──
+  const evPath=`${isFreela?"freela_events":"cal_events"}/${eventId}/image`;
+  let curEvAttachment=ev.image||null;
+  function renderDetailEvAttach(){
+    const empty=document.getElementById("dtl-eatt-empty");
+    const prev=document.getElementById("dtl-eatt-preview");
+    if(!empty||!prev)return;
+    if(curEvAttachment){
+      empty.style.display="none";
+      prev.style.display=curEvAttachment.type==="pdf"?"block":"inline-block";
+      prev.style.maxWidth=curEvAttachment.type==="pdf"?"none":"260px";
+      prev.innerHTML=`${attachmentPreviewHtml(curEvAttachment,220)}<button type="button" id="dtl-eatt-remove" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
+      document.getElementById("dtl-eatt-remove").onclick=async()=>{
+        curEvAttachment=null;
+        await dbRemove(evPath);
+        renderDetailEvAttach();
+        toast("Anexo removido","success");
+      };
+    } else {
+      empty.style.display="";
+      prev.style.display="none";
+      prev.innerHTML="";
+    }
+  }
+  renderDetailEvAttach();
+  async function handleDetailEvAttachFile(file){
+    if(!file)return;
+    try{
+      const att=await readAttachmentFile(file);
+      curEvAttachment=att;
+      await dbSet(evPath,att);
+      renderDetailEvAttach();
+      toast("Anexo salvo","success");
+    }catch(err){ toast(err.message||"Erro ao processar arquivo","error"); }
+  }
+  document.getElementById("dtl-eatt-input")?.addEventListener("change",e=>handleDetailEvAttachFile(e.target.files[0]));
+  const dEAttZone=document.getElementById("dtl-eatt-zone");
+  dEAttZone?.addEventListener("dragover",e=>{e.preventDefault();dEAttZone.style.borderColor="#f0a848";});
+  dEAttZone?.addEventListener("dragleave",()=>{dEAttZone.style.borderColor="#2e2e3a";});
+  dEAttZone?.addEventListener("drop",e=>{e.preventDefault();dEAttZone.style.borderColor="#2e2e3a";handleDetailEvAttachFile(e.dataTransfer.files[0]);});
+
   overlayClose("ov");
 }
 
@@ -6507,10 +6580,10 @@ function openTaskModal(init={}){
       </select>
     </div>
     <div class="field" style="margin-top:8px">
-      <label style="display:flex;align-items:center;justify-content:space-between">📎 Foto anexada <span style="font-size:10px;color:#7a7a8a;font-weight:400">Apenas 1 imagem</span></label>
+      <label style="display:flex;align-items:center;justify-content:space-between">📎 Anexo <span style="font-size:10px;color:#7a7a8a;font-weight:400">Imagem ou PDF · apenas 1 arquivo</span></label>
       <div id="task-img-zone" style="border:1px dashed #2e2e3a;border-radius:8px;padding:12px;text-align:center;transition:border-color .2s;margin-top:6px">
-        <input type="file" id="task-img-input" accept="image/*" style="display:none"/>
-        <div id="task-img-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('task-img-input').click()">📎 Clique ou arraste uma imagem aqui</div>
+        <input type="file" id="task-img-input" accept="image/*,application/pdf" style="display:none"/>
+        <div id="task-img-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('task-img-input').click()">📎 Clique ou arraste uma imagem ou PDF aqui</div>
         <div id="task-img-preview" style="display:none;position:relative"></div>
       </div>
     </div>
@@ -6564,8 +6637,9 @@ function openTaskModal(init={}){
     if(!empty||!prev)return;
     if(taskImage){
       empty.style.display="none";
-      prev.style.display="inline-block";
-      prev.innerHTML=`<img src="${taskImage.data}" style="max-width:220px;max-height:160px;border-radius:6px;border:1px solid #2e2e3a;display:block"/><button type="button" id="task-img-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
+      prev.style.display=taskImage.type==="pdf"?"block":"inline-block";
+      prev.style.maxWidth=taskImage.type==="pdf"?"none":"220px";
+      prev.innerHTML=`${attachmentPreviewHtml(taskImage,160)}<button type="button" id="task-img-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
       document.getElementById("task-img-remove").onclick=()=>{taskImage=null;renderTaskImg();};
     } else {
       empty.style.display="";
@@ -6576,8 +6650,8 @@ function openTaskModal(init={}){
   renderTaskImg();
   async function handleTaskImgFile(file){
     if(!file)return;
-    try{ taskImage=await readImageFile(file); renderTaskImg(); }
-    catch(err){ toast(err.message||"Erro ao processar imagem","error"); }
+    try{ taskImage=await readAttachmentFile(file); renderTaskImg(); }
+    catch(err){ toast(err.message||"Erro ao processar arquivo","error"); }
   }
   document.getElementById("task-img-input")?.addEventListener("change",e=>handleTaskImgFile(e.target.files[0]));
   const tImgZone=document.getElementById("task-img-zone");
@@ -6800,7 +6874,17 @@ function openDetailModal(taskId){
   const areaChip=(area?'<span class="chip" style="background:'+area.color+'18;color:'+area.color+';border:1px solid '+area.color+'30;padding:4px 12px">'+esc(area.name)+'</span>':"")
     +(Array.isArray(t.extraAreaIds)?t.extraAreaIds.map(eid=>{const ea=areas[eid];return ea?'<span class="chip" style="background:'+ea.color+'18;color:'+ea.color+';border:1px solid '+ea.color+'30;padding:4px 12px">'+esc(ea.name)+'</span>':"";}).join(""):"");
   const descBlock=t.desc?'<div style="font-size:13px;color:#a0a0b0;line-height:1.6;background:#18181c;padding:12px;border-radius:8px;margin-bottom:14px">'+esc(t.desc)+'</div>':"";
-  const imageBlock=t.image?`<div style="margin-bottom:14px"><img src="${t.image.data}" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #2e2e3a;display:block"/></div>`:"";
+  const imageBlock=`<div class="field" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px">📎 Anexo</span>
+      <span style="font-size:10px;color:#7a7a8a">Imagem ou PDF · 1 arquivo</span>
+    </div>
+    <div id="dtl-att-zone" style="border:1px dashed #2e2e3a;border-radius:8px;padding:12px;text-align:center;transition:border-color .2s">
+      <input type="file" id="dtl-att-input" accept="image/*,application/pdf" style="display:none"/>
+      <div id="dtl-att-empty" style="font-size:12px;color:#4a4a5a;cursor:pointer;padding:8px 0" onclick="document.getElementById('dtl-att-input').click()">📎 Clique ou arraste uma imagem ou PDF aqui</div>
+      <div id="dtl-att-preview" style="display:none;position:relative"></div>
+    </div>
+  </div>`;
   function personAvatar(name, color, role=""){
     const u=Object.values(users).find(u=>u.name===name);
     const c=u?.color||color||"#7c6eff";
@@ -6890,6 +6974,46 @@ function openDetailModal(taskId){
     </div>
   </div></div>`);
   document.getElementById("m-edit").onclick=()=>{closeModal();openTaskModal({...t});};
+
+  // ── Anexo (imagem ou PDF) direto no detalhe, sem precisar entrar em Editar ──
+  let curAttachment=t.image||null;
+  function renderDetailAttach(){
+    const empty=document.getElementById("dtl-att-empty");
+    const prev=document.getElementById("dtl-att-preview");
+    if(!empty||!prev)return;
+    if(curAttachment){
+      empty.style.display="none";
+      prev.style.display=curAttachment.type==="pdf"?"block":"inline-block";
+      prev.style.maxWidth=curAttachment.type==="pdf"?"none":"260px";
+      prev.innerHTML=`${attachmentPreviewHtml(curAttachment,220)}<button type="button" id="dtl-att-remove" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#ff6b6b;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0">✕</button>`;
+      document.getElementById("dtl-att-remove").onclick=async()=>{
+        curAttachment=null;
+        await dbRemove(`tasks/${taskId}/image`);
+        renderDetailAttach();
+        toast("Anexo removido","success");
+      };
+    } else {
+      empty.style.display="";
+      prev.style.display="none";
+      prev.innerHTML="";
+    }
+  }
+  renderDetailAttach();
+  async function handleDetailAttachFile(file){
+    if(!file)return;
+    try{
+      const att=await readAttachmentFile(file);
+      curAttachment=att;
+      await dbSet(`tasks/${taskId}/image`,att);
+      renderDetailAttach();
+      toast("Anexo salvo","success");
+    }catch(err){ toast(err.message||"Erro ao processar arquivo","error"); }
+  }
+  document.getElementById("dtl-att-input")?.addEventListener("change",e=>handleDetailAttachFile(e.target.files[0]));
+  const dAttZone=document.getElementById("dtl-att-zone");
+  dAttZone?.addEventListener("dragover",e=>{e.preventDefault();dAttZone.style.borderColor="#f0a848";});
+  dAttZone?.addEventListener("dragleave",()=>{dAttZone.style.borderColor="#2e2e3a";});
+  dAttZone?.addEventListener("drop",e=>{e.preventDefault();dAttZone.style.borderColor="#2e2e3a";handleDetailAttachFile(e.dataTransfer.files[0]);});
 
   // ── Handlers das abas Detalhes / Membros ──
   document.getElementById("dtab-detail")?.addEventListener("click",()=>{

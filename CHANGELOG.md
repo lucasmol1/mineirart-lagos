@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.65
+Anexo em tarefas/eventos agora aceita PDF (além de imagem) e pode ser feito direto na tela de Detalhe, sem precisar clicar em Editar. Continua limitado a 1 arquivo, com limite de tamanho, para preservar o espaço gratuito.
+
 ## v1.64
 Nova aba Lixeira: guarda as últimas 10 tarefas/eventos excluídos com botão de restaurar. Cobre Calendário, Cal. Prospecção e agendamentos.
 

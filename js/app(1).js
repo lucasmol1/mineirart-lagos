@@ -1,5 +1,6 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.63
+//  Mineirart Lagos — App v1.64
+//  - Lixeira: últimas 10 exclusões de tarefas e eventos de calendário, com restauração
 //  - Anexo de 1 foto em tarefas e eventos; foto é apagada
 //    automaticamente quando a tarefa é concluída
 // ════════════════════════════════════════════════════════
@@ -27,6 +28,7 @@ const LIMITS = {
   AUDIT_PURGE_KEEP:    300,  // preserva as 300 mais recentes
   TASK_PURGE_TARGET:   400, // após purga, mantém esse número
   MAX_ORG_NODES:        60,  // max blocos no organograma
+  TRASH_KEEP:           10,  // últimas exclusões guardadas na lixeira
   MAX_PROSP_LEADS:     200,
 };
 
@@ -145,6 +147,7 @@ let areaMembersExpanded={};
 let orgExpanded={};
 let freteiros={}; // base de freteiros/transportadoras
 let freteTab="comparar", freteDestino="", freteAjudantes=0, freteSortDir="asc"; // estado da UI de Cotação de Frete
+let trashItems={}; // lixeira: últimas exclusões de tarefas e eventos de calendário
 
 // ── DB HELPERS ────────────────────────────────────────────────────────────────
 const dbRef=p=>ref(db,p);
@@ -216,6 +219,32 @@ function dbListen(p,cb){
       toast("Erro de permissão no Firebase — verifique as Security Rules","error");
     }
   });
+}
+
+// ── LIXEIRA (tarefas e eventos de calendário) ────────────────────────────────
+// Guarda o objeto completo antes de remover, para permitir restauração posterior.
+async function trashRemove(path,tipo,label){
+  const snap=await get(dbRef(path));
+  const data=snap.val();
+  if(data===null){await dbRemove(path);return;}
+  const tid=uid();
+  await dbSet(`trash/${tid}`,{tipo,label:label||"(sem título)",path,data,deletedAt:new Date().toISOString(),deletedBy:currentUser?.uid||"",deletedByName:currentProfile?.name||""});
+  // Mantém apenas os LIMITS.TRASH_KEEP itens mais recentes
+  const entries=Object.entries(trashItems).sort((a,b)=>new Date(a[1].deletedAt)-new Date(b[1].deletedAt));
+  const totalAfter=entries.length+1;
+  if(totalAfter>LIMITS.TRASH_KEEP){
+    const excess=entries.slice(0,totalAfter-LIMITS.TRASH_KEEP);
+    for(const[id] of excess) await dbRemove(`trash/${id}`);
+  }
+  await dbRemove(path);
+}
+async function restoreFromTrash(trashId){
+  const entry=trashItems[trashId];
+  if(!entry){toast("Item não encontrado na lixeira","error");return;}
+  await dbSet(entry.path,entry.data);
+  await dbRemove(`trash/${trashId}`);
+  await logAction("restaurar_item",`Restaurado: ${entry.label}`);
+  toast(`"${entry.label}" restaurado`,"success");
 }
 
 // ── AUDIT ─────────────────────────────────────────────────────────────────────
@@ -329,6 +358,7 @@ function initListeners(){
   dbListen("prosp_events",v=>{prospEvents=v||{}; render();});
   dbListen("prosp_leads",v=>{prospLeads=v||{}; render();});
   dbListen("freteiros",   v=>{freteiros=v||{};    render();});
+  dbListen("trash",       v=>{trashItems=v||{};   render();});
   if(currentUser) onValue(dbRef(`personal_notes/${currentUser.uid}`),s=>{personalNotes=s.val()||{};render();});
   checkReady();
 }
@@ -547,6 +577,7 @@ function renderSidebar(){
     ${(isAdmin()||currentProfile?.manageAreas)?ni("admin","⚙️","Administração",pendingCount>0?`<span class="nav-alert-count">${pendingCount}</span>`:""):""}
     ${(isAdmin1||currentProfile?.viewPerformance)?ni("performance","📊","Performance"):""}
     ${ni("historico","🕵️","Histórico")}
+    ${ni("lixeira","🗑️","Lixeira",Object.keys(trashItems).length>0?`<span class="nav-alert-count">${Object.keys(trashItems).length}</span>`:"")}
     <div class="side-label">ÁREAS</div>
     ${areaTreeHtml}`;
 
@@ -621,7 +652,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.63</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.64</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -761,7 +792,7 @@ document.addEventListener("keydown",e=>{
 function renderContent(){
   const mc=document.getElementById("main-content");if(!mc)return;
   if(!window._myNotifs)window._myNotifs={};
-  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,prospeccao:renderProspLeadsPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,performance:renderPerformancePage,frete:renderFretePage,};
+  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,prospeccao:renderProspLeadsPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,lixeira:renderLixeiraPage,performance:renderPerformancePage,frete:renderFretePage,};
   if(page==="performance"&&!isAdmin1&&!currentProfile?.viewPerformance){navigate("dashboard");return;}
   if(page==="performance"&&mc.querySelector("#perf-iframe"))return;
   try{
@@ -1562,6 +1593,22 @@ function renderHistoricoPage(){
   return`<div class="page-header"><div><div class="page-title">Histórico de Ações</div><div class="page-sub">👑 Visível apenas para o Super Admin · Últimos ${LIMITS.AUDIT_PURGE_KEEP} registros</div></div></div>
     ${logs.length===0?`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">📋</div><div class="empty-title">Nenhuma ação registrada</div></div>`
     :`<div style="display:flex;flex-direction:column;gap:8px">${logs.map(l=>`<div class="alert-card"><div style="font-size:20px;width:32px;text-align:center;flex-shrink:0">${icons[l.action]||"📋"}</div><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(l.detail)}</div><div style="font-size:11px;color:#7a7a8a;margin-top:3px">👤 ${esc(l.userName)} · ${esc(l.userEmail)}</div></div><div style="font-size:11px;color:#5a5a6a;text-align:right;flex-shrink:0;min-width:120px">${fmtTs(l.ts)}</div></div>`).join("")}</div>`}`;
+}
+
+// ── LIXEIRA ───────────────────────────────────────────────────────────────────
+function renderLixeiraPage(){
+  const items=Object.entries(trashItems).map(([id,it])=>({id,...it})).sort((a,b)=>new Date(b.deletedAt)-new Date(a.deletedAt));
+  const icons={tarefa:"✏️",evento:"📅"};
+  return`<div class="page-header"><div><div class="page-title">🗑️ Lixeira</div><div class="page-sub">Últimas ${LIMITS.TRASH_KEEP} exclusões de tarefas e eventos de calendário · clique em um item para restaurá-lo</div></div></div>
+    ${items.length===0?`<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">🗑️</div><div class="empty-title">Lixeira vazia</div><div class="empty-sub">Tarefas e eventos excluídos aparecem aqui e podem ser restaurados</div></div>`
+    :`<div style="display:flex;flex-direction:column;gap:8px">${items.map(it=>`<div class="alert-card lixeira-item" data-tid="${it.id}" style="cursor:pointer" title="Clique para restaurar">
+        <div style="font-size:20px;width:32px;text-align:center;flex-shrink:0">${icons[it.tipo]||"🗑️"}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${esc(it.label||"(sem título)")}</div>
+          <div style="font-size:11px;color:#7a7a8a;margin-top:3px">👤 Excluído por ${esc(it.deletedByName||"?")} · ${fmtTs(it.deletedAt)}</div>
+        </div>
+        <button class="btn-small btn-restore-trash" data-tid="${it.id}" style="background:#4ae89c18;color:#4ae89c;border:1px solid #4ae89c44;flex-shrink:0">↩ Restaurar</button>
+      </div>`).join("")}</div>`}`;
 }
 
 // ── COTAÇÃO DE FRETE ────────────────────────────────────────────────────────────
@@ -3080,6 +3127,9 @@ function renderAdminPage(){
 
 // ── EVENT HANDLERS ────────────────────────────────────────────────────────────
 function attachContentEvents(){
+  // Lixeira
+  document.querySelectorAll(".lixeira-item").forEach(el=>el.addEventListener("click",()=>restoreFromTrash(el.dataset.tid)));
+  document.querySelectorAll(".btn-restore-trash").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();restoreFromTrash(b.dataset.tid);}));
   // Cotação de Frete
   document.getElementById("frete-tab-comparar")?.addEventListener("click",()=>{freteTab="comparar";render();});
   document.getElementById("frete-tab-base")?.addEventListener("click",()=>{freteTab="base";render();});
@@ -4606,7 +4656,7 @@ function openFreelaEventModal(eventId){
   </div></div>`);
   document.getElementById("m-x").onclick=document.getElementById("m-x2").onclick=closeModal;
   document.getElementById("m-del-freela").onclick=async()=>{
-    if(confirm("Excluir este agendamento?")){await dbRemove(`freela_events/${eventId}`);closeModal();toast("Excluído","warning");}
+    if(confirm("Excluir este agendamento?")){await trashRemove(`freela_events/${eventId}`,"evento",ev.title);closeModal();toast("Excluído","warning");}
   };
 }
 
@@ -4888,7 +4938,7 @@ function openProspEventModal(eventId, prefillDate=null){
   </div></div>`);
   document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
   document.getElementById("m-pdel")?.addEventListener("click",async()=>{
-    if(confirm("Excluir evento?")){await dbRemove(`prosp_events/${eventId}`);closeModal();toast("Evento excluído","warning");}
+    if(confirm("Excluir evento?")){await trashRemove(`prosp_events/${eventId}`,"evento",ev.title);closeModal();toast("Evento excluído","warning");}
   });
   document.getElementById("m-psave").onclick=async()=>{
     const title=document.getElementById("m-ptitle").value.trim();
@@ -5296,7 +5346,7 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
   </div></div>`);
   document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
   document.getElementById("m-edel")?.addEventListener("click",async()=>{
-    if(confirm("Excluir evento?")){await dbRemove(`${isFreela?"freela_events":"cal_events"}/${eventId}`);await logAction("excluir_evento",`Evento excluído: ${ev.title}`);closeModal();toast("Evento excluído","warning");}
+    if(confirm("Excluir evento?")){await trashRemove(`${isFreela?"freela_events":"cal_events"}/${eventId}`,"evento",ev.title);await logAction("excluir_evento",`Evento excluído: ${ev.title}`);closeModal();toast("Evento excluído","warning");}
   });
   let evImage=ev.image||null;
   function renderEvImg(){
@@ -5379,7 +5429,7 @@ function openCalEventDetailModal(eventId){
   document.getElementById("m-x").onclick=document.getElementById("m-x2").onclick=closeModal;
   document.getElementById("m-edit")?.addEventListener("click",()=>{closeModal();openCalEventModal(eventId,null,isFreela);});
   document.getElementById("m-del")?.addEventListener("click",async()=>{
-    if(confirm("Excluir evento?")){await dbRemove(`${isFreela?"freela_events":"cal_events"}/${eventId}`);await logAction("excluir_evento","Excluído: "+ev.title);closeModal();toast("Evento excluído","warning");}
+    if(confirm("Excluir evento?")){await trashRemove(`${isFreela?"freela_events":"cal_events"}/${eventId}`,"evento",ev.title);await logAction("excluir_evento","Excluído: "+ev.title);closeModal();toast("Evento excluído","warning");}
   });
   overlayClose("ov");
 }
@@ -7005,7 +7055,7 @@ function openDetailModal(taskId){
   document.getElementById("m-del")?.addEventListener("click",async()=>{
     if(t.pinned){toast("Desfixe a tarefa antes de excluir","error");return;}
     if(!canDelete){toast("Apenas o criador ou admin pode excluir","error");return;}
-    if(confirm("Excluir tarefa?")){await dbRemove(`tasks/${taskId}`);await logAction("excluir_tarefa","Excluida: "+t.title);closeModal();toast("Tarefa excluida","warning");}
+    if(confirm("Excluir tarefa?")){await trashRemove(`tasks/${taskId}`,"tarefa",t.title);await logAction("excluir_tarefa","Excluida: "+t.title);closeModal();toast("Tarefa excluida","warning");}
   });
   document.querySelectorAll(".move-status").forEach(b=>b.addEventListener("click",async()=>{
     const newStatus=b.dataset.status;
