@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.65
+//  Mineirart Lagos — App v1.66
 //  - Lixeira: últimas 10 exclusões de tarefas e eventos de calendário, com restauração
 //  - Anexo de 1 imagem ou PDF em tarefas e eventos, direto na tela de
 //    detalhe (sem precisar editar); anexo é apagado automaticamente
@@ -672,7 +672,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.65</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.66</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -4346,7 +4346,7 @@ function renderCalPage(){
       const isFirst=ds===e.dateStart, isLast=ds===(e.dateEnd||e.dateStart);
       const span=e.dateEnd&&e.dateEnd!==e.dateStart;
       const evColor=e.color||(e.priority&&CAL_PRIORITY[e.priority]?.color)||"#7c6eff";
-      eventMap[ds].push({type:"event",id:eid,title:e.title,color:evColor,priority:e.priority,isFirst,isLast,span,person:e.person||"",note:e.note||""});
+      eventMap[ds].push({type:"event",id:eid,title:e.title,color:evColor,priority:e.priority,isFirst,isLast,span,person:e.person||"",note:e.note||"",time:e.time||null});
     }
   });
 
@@ -4361,8 +4361,13 @@ function renderCalPage(){
     const isPast=isCurrentMonth&&cellDate<today;
     const evs=eventMap[ds]||[];
     const taskEvs=evs.filter(e=>e.type==="task");
-    const calEvs=evs.filter(e=>e.type==="event");
-    const calChips=calEvs.map(e=>`<div class="cal-event-chip ${e.span&&!e.isFirst?"chip-cont":""} ${e.span&&!e.isLast?"chip-start":""}" data-eid="${e.id}" style="background:${e.color}22;border-left:3px solid ${e.color};color:${e.color};font-size:11px;padding:2px 5px;border-radius:3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:100%">${e.isFirst||!e.span?"🗓 "+esc(e.title.slice(0,14)):(e.span?"…"+esc(e.title.slice(0,10)):"")}</div>`).join("");
+    const calEvs=evs.filter(e=>e.type==="event").sort((a,b)=>{
+      if(a.time&&b.time)return a.time<b.time?-1:a.time>b.time?1:0;
+      if(a.time)return -1;
+      if(b.time)return 1;
+      return 0;
+    });
+    const calChips=calEvs.map(e=>`<div class="cal-event-chip ${e.span&&!e.isFirst?"chip-cont":""} ${e.span&&!e.isLast?"chip-start":""}" data-eid="${e.id}" style="background:${e.color}22;border-left:3px solid ${e.color};color:${e.color};font-size:11px;padding:2px 5px;border-radius:3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:100%">${e.isFirst||!e.span?(e.time?esc(e.time)+" ":"🗓 ")+esc(e.title.slice(0,14)):(e.span?"…"+esc(e.title.slice(0,10)):"")}</div>`).join("");
     // Single task: show title inline; multiple tasks: show dots + count
     const taskBlock=taskEvs.length===1
       ?`<div class="cal-task-chip" data-date="${ds}" data-tid="${taskEvs[0].id}" style="display:flex;align-items:center;gap:3px;margin-top:3px;padding:2px 4px;border-radius:3px;cursor:pointer;background:${taskEvs[0].color}12;border-left:2px solid ${taskEvs[0].color}">
@@ -5323,6 +5328,7 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
         <div class="field"><label>Data início *</label><input type="date" id="m-estart" value="${ev.dateStart||prefillDate||""}"/></div>
         <div class="field"><label>Data fim <span style="color:#7a7a8a;font-size:10px">(opcional, para multi-dia)</span></label><input type="date" id="m-eend" value="${ev.dateEnd||""}"/></div>
       </div>
+      <div class="field"><label>Horário <span style="color:#7a7a8a;font-size:10px">(opcional, define a ordem no dia)</span></label><input type="time" id="m-etime" value="${ev.time||""}" style="max-width:140px"/></div>
       <div class="field-row">
         <div class="field"><label>Prioridade</label>
           <select id="m-eprio" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
@@ -5405,11 +5411,12 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
     if(!areaId){toast("Selecione uma área para o evento","error");return;}
     if(!person){toast("Selecione um responsável pelo evento","error");return;}
     const dateEnd=document.getElementById("m-eend").value||null;
+    const time=document.getElementById("m-etime").value||null;
     const priority=document.getElementById("m-eprio").value||null;
     const note=document.getElementById("m-enote").value.trim()||null;
     const useColor=document.getElementById("m-ecolor-use")?.checked;
     const evColor=useColor?(document.getElementById("m-ecolor")?.value||null):null;
-    const data={title,dateStart,dateEnd,priority,person,note,image:evImage||null,color:evColor||null,areaId,creatorId:currentUser.uid,creatorName:currentProfile.name,createdAt:ev.createdAt||new Date().toISOString()};
+    const data={title,dateStart,dateEnd,time,priority,person,note,image:evImage||null,color:evColor||null,areaId,creatorId:currentUser.uid,creatorName:currentProfile.name,createdAt:ev.createdAt||new Date().toISOString()};
     await dbSet(`${isFreela?"freela_events":"cal_events"}/${eventId||uid()}`,data);
     await logAction(isEdit?"editar_evento":"criar_evento",`${isEdit?"Editado":"Criado"}: ${title} (${dateStart})`);
     toast(isEdit?"Evento atualizado!":"Evento criado!","success");closeModal();
@@ -5435,6 +5442,7 @@ function openCalEventDetailModal(eventId){
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
         ${prio?`<span class="chip" style="background:${prio.color}18;color:${prio.color};border:1px solid ${prio.color}30">${prio.label}</span>`:""}
         <span class="chip" style="background:#1e1e28;color:#a0a0b0">${span?fmtDate(ev.dateStart)+" → "+fmtDate(ev.dateEnd):fmtDate(ev.dateStart)}</span>
+        ${ev.time?`<span class="chip" style="background:#f0a84818;color:#f0a848;border:1px solid #f0a84830">🕐 ${esc(ev.time)}</span>`:""}
         ${span?`<span class="chip" style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30">${Math.round((new Date(ev.dateEnd)-new Date(ev.dateStart))/86400000)+1} dias</span>`:""}
       </div>
       ${ev.person?`<div style="margin-bottom:10px"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Responsável</div><span style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30;padding:4px 12px;border-radius:20px;font-size:12px">${esc(ev.person)}</span></div>`:""}
@@ -5530,7 +5538,13 @@ function openCalDayModal(dateStr){
       const start=e.dateStart, end=e.dateEnd||e.dateStart;
       return dateStr>=start&&dateStr<=end;
     })
-    .map(([id,e])=>({id,...e}));
+    .map(([id,e])=>({id,...e}))
+    .sort((a,b)=>{
+      if(a.time&&b.time)return a.time<b.time?-1:a.time>b.time?1:0;
+      if(a.time)return -1;
+      if(b.time)return 1;
+      return 0;
+    });
 
   const totalItems=taskEvs.length+calEvs.length;
 
@@ -5588,6 +5602,7 @@ function openCalDayModal(dateStr){
           transition:all .13s;
         ">
           <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:6px">
+            ${e.time?`<span style="font-size:12px;font-weight:700;color:#f0a848;background:#f0a84818;padding:3px 10px;border-radius:20px;flex-shrink:0">🕐 ${esc(e.time)}</span>`:""}
             <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:#f0eff5;flex:1;line-height:1.3">${esc(e.title)}</div>
             ${prio?`<span style="font-size:11px;font-weight:700;color:${color};background:${color}18;padding:3px 10px;border-radius:20px;flex-shrink:0">${prio.label}</span>`:""}
           </div>

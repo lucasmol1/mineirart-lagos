@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.66
+Eventos do calendário agora aceitam horário opcional. Quando definido, o horário ordena os eventos no bloco do dia e na visão mensal.
+
 ## v1.65
 Anexo em tarefas/eventos agora aceita PDF (além de imagem) e pode ser feito direto na tela de Detalhe, sem precisar clicar em Editar. Continua limitado a 1 arquivo, com limite de tamanho, para preservar o espaço gratuito.
 
