@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.67
+Corrige quadro de Performance que ficava em branco: um erro de JavaScript ao carregar dados do Firebase impedia a renderização dos dados reais.
+
 ## v1.66
 Eventos do calendário agora aceitam horário opcional. Quando definido, o horário ordena os eventos no bloco do dia e na visão mensal.
 
