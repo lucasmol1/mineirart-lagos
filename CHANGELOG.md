@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.68
+Eventos do calendário agora aceitam múltiplas áreas ("Também aparece em"), como já ocorria com tarefas. Todas as áreas atreladas a uma tarefa/evento passam a enxergar o item nos filtros, contadores e listagens.
+
 ## v1.67
 Corrige quadro de Performance que ficava em branco: um erro de JavaScript ao carregar dados do Firebase impedia a renderização dos dados reais.
 

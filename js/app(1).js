@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.66
+//  Mineirart Lagos — App v1.67
 //  - Lixeira: últimas 10 exclusões de tarefas e eventos de calendário, com restauração
 //  - Anexo de 1 imagem ou PDF em tarefas e eventos, direto na tela de
 //    detalhe (sem precisar editar); anexo é apagado automaticamente
@@ -672,7 +672,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.66</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.67</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -3009,7 +3009,6 @@ function resetarDados(){
       DB.users.push(u); saveDB();
     } else { u.role=s.role; u.nome=s.nome; saveDB(); }
     SESSION=u;
-    document.getElementById('nav-users').style.display='none';
     initMonthSelector(); renderAll();
   }
 
