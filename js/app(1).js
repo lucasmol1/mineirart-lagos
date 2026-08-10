@@ -1,9 +1,8 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.67
-//  - Lixeira: últimas 10 exclusões de tarefas e eventos de calendário, com restauração
-//  - Anexo de 1 imagem ou PDF em tarefas e eventos, direto na tela de
-//    detalhe (sem precisar editar); anexo é apagado automaticamente
-//    quando a tarefa é concluída
+//  Mineirart Lagos — App v1.68
+//  - Eventos do calendário passam a aceitar múltiplas áreas ("Também
+//    aparece em"), igual às tarefas; todas as áreas atreladas enxergam
+//    o item nos filtros, contadores e listagens
 // ════════════════════════════════════════════════════════
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -464,6 +463,13 @@ function visibleAreas(){
   if(isAdmin()) return all;
   return all.filter(a=>hasAreaAccess(currentProfile,a.id));
 }
+// Uma tarefa/evento pode estar atrelado a mais de uma área (área principal + extraAreaIds).
+// Todas as áreas atreladas devem enxergar o item — por isso toda checagem de
+// visibilidade/filtro deve considerar taskAreaIds/eventAreaIds, não apenas areaId.
+function taskAreaIds(t){return[t.areaId,...(Array.isArray(t.extraAreaIds)?t.extraAreaIds:[])].filter(Boolean);}
+function eventAreaIds(e){return[e.areaId,...(Array.isArray(e.extraAreaIds)?e.extraAreaIds:[])].filter(Boolean);}
+function taskInAreas(t,ids){return taskAreaIds(t).some(id=>ids.includes(id));}
+function eventInAreas(e,ids){return eventAreaIds(e).some(id=>ids.includes(id));}
 
 function nav(p,extra){
   // Resetar filtro de área do calendário ao sair
@@ -545,7 +551,7 @@ function render(){
 function renderSidebar(){
   const sn=document.getElementById("sidenav"),sb=document.getElementById("sidebar-bottom");if(!sn||!sb)return;
   const myAreas=visibleAreas().map(a=>a.id);
-  const urgentCount=Object.values(tasks).filter(t=>myAreas.includes(t.areaId)&&t.date&&t.status!=="concluido"&&deadlineClass(t.date)).length;
+  const urgentCount=Object.values(tasks).filter(t=>taskInAreas(t,myAreas)&&t.date&&t.status!=="concluido"&&deadlineClass(t.date)).length;
   const pendingCount=Object.values(pendingUsers).filter(p=>p.status==="pending").length;
   function ni(p,icon,label,extra=""){return`<div class="nav-item ${page===p?"active":""}" data-nav="${p}"><span style="font-size:14px;margin-right:8px">${icon}</span><span style="flex:1">${label}</span>${extra}${page===p?'<span class="active-bar"></span>':""}</div>`;}
   // ── Build area tree HTML ──────────────────────────────────────────────────
@@ -557,7 +563,7 @@ function renderSidebar(){
     // show if user has access to this area or any descendant
     const hasAccess=vis.includes(a.id)||kids.some(k=>vis.includes(k.id));
     if(!hasAccess)return"";
-    const tc=Object.values(tasks).filter(t=>t.areaId===a.id&&t.status!=="concluido").length;
+    const tc=Object.values(tasks).filter(t=>taskAreaIds(t).includes(a.id)&&t.status!=="concluido").length;
     const isExp=expandedAreas.has(a.id);
     const isCur=page==="area"&&activeAreaId===a.id;
     const indent=depth>0?`padding-left:${10+depth*14}px`:"";
@@ -672,7 +678,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.67</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.68</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -712,7 +718,7 @@ function renderTopbar(){
       const results=[];
       // Search tasks
       Object.entries(tasks).forEach(([id,t])=>{
-        if(!myAreaIds.includes(t.areaId)&&!(Array.isArray(t.extraAreaIds)&&t.extraAreaIds.some(eid=>myAreaIds.includes(eid))))return;
+        if(!taskInAreas(t,myAreaIds))return;
         const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
         const area=areas[t.areaId];
         const match=(t.title||"").toLowerCase().includes(q)
@@ -826,12 +832,12 @@ function renderContent(){
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function renderDashboard(){
-  const myAreas=visibleAreas(),myTasks=Object.values(tasks).filter(t=>myAreas.map(a=>a.id).includes(t.areaId));
+  const myAreas=visibleAreas(),myAreaIdsDash=myAreas.map(a=>a.id),myTasks=Object.values(tasks).filter(t=>taskInAreas(t,myAreaIdsDash));
   const stats=[["Total",myTasks.length,"#f0a848"],["Em andamento",myTasks.filter(t=>t.status==="em-andamento").length,"#4a9ee8"],["Concluídos",myTasks.filter(t=>t.status==="concluido").length,"#4ae89c"],["Bloqueados",myTasks.filter(t=>t.status==="bloqueado").length,"#ff6b6b"]];
   const cards=myAreas.length===0
     ?`<div class="empty-state"><div style="font-size:48px;margin-bottom:12px">⬡</div><div class="empty-title">Nenhuma área disponível</div><div class="empty-sub">${isAdmin()?"Crie a primeira área pelo menu lateral":"Aguarde o administrador liberar seu acesso"}</div></div>`
     :`<div class="areas-grid">${myAreas.map(a=>{
-        const at=Object.values(tasks).filter(t=>t.areaId===a.id);
+        const at=Object.values(tasks).filter(t=>taskAreaIds(t).includes(a.id));
         const chips=Object.entries(STATUS).map(([k,v])=>{const c=at.filter(t=>t.status===k).length;return c>0?`<span class="chip" style="background:${v.color}18;color:${v.color};border:1px solid ${v.color}30">${c} ${v.label}</span>`:""}).join("");
         return`<div class="area-card" style="border-top:3px solid ${a.color}">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -852,7 +858,7 @@ function renderDashboard(){
 // ── AREA PAGE ─────────────────────────────────────────────────────────────────
 function renderAreaPage(){
   const area=areas[activeAreaId];if(!area)return`<div class="empty-state"><div class="empty-title">Área não encontrada</div></div>`;
-  const myTasks=Object.entries(tasks).filter(([,t])=>t.areaId===activeAreaId).map(([id,t])=>({id,...t}));
+  const myTasks=Object.entries(tasks).filter(([,t])=>taskAreaIds(t).includes(activeAreaId)).map(([id,t])=>({id,...t}));
   // Estado de colapso das colunas — persiste na sessão por área
   if(!areaCalCollapsed[activeAreaId]) areaCalCollapsed[activeAreaId]={};
   const colCollapsed=areaCalCollapsed[activeAreaId];
@@ -1468,7 +1474,7 @@ function openAreaFYIModal(noteId, areaId, readOnly=false){
 
 function renderAlertsPage(){
   const myAreas=visibleAreas().map(a=>a.id);
-  const urgent=Object.entries(tasks).map(([id,t])=>({id,...t})).filter(t=>myAreas.includes(t.areaId)&&t.date&&t.status!=="concluido"&&deadlineClass(t.date)).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const urgent=Object.entries(tasks).map(([id,t])=>({id,...t})).filter(t=>taskInAreas(t,myAreas)&&t.date&&t.status!=="concluido"&&deadlineClass(t.date)).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const cc={"warn-now":"#ff2020","warn-1":"#e85030","warn-2":"#f09030","warn-3":"#e8c84a"};
   const cl={"warn-now":"\u26a0\ufe0f Menos de 3h","warn-1":"\ud83d\udd34 Amanh\u00e3","warn-2":"\ud83d\udfe0 Em 2 dias","warn-3":"\ud83d\udfe1 Em 3 dias"};
   const bm={"warn-now":"wnow","warn-1":"w1","warn-2":"w2","warn-3":"w3"};
@@ -4224,7 +4230,7 @@ function renderMyTasksPage(){
   // Tarefas das minhas áreas (visibilidade geral da área)
   const areaVisible=Object.entries(tasks)
     .map(([id,t])=>({id,...t}))
-    .filter(t=>myAreas.includes(t.areaId)&&t.creatorId!==currentUser?.uid)
+    .filter(t=>taskInAreas(t,myAreas)&&t.creatorId!==currentUser?.uid)
     .filter(t=>{
       const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
       return!resps.some(r=>r===myName);
@@ -4324,7 +4330,7 @@ function renderCalPage(){
   const activeAreaIds=calAreaFilter.length?calAreaFilter.filter(id=>myMemberAreaIds.includes(id)):myMemberAreaIds;
   Object.entries(tasks).forEach(([tid,t])=>{
     if(!t.date)return;
-    if(!activeAreaIds.includes(t.areaId))return;
+    if(!taskInAreas(t,activeAreaIds))return;
     if(!eventMap[t.date])eventMap[t.date]=[];
     const resps=Array.isArray(t.resps)?t.resps:(t.resp?[t.resp]:[]);
     eventMap[t.date].push({type:"task",id:tid,title:t.title,color:STATUS[t.status]?.color||"#7c6eff",status:t.status,area:areas[t.areaId]?.name||"",resps});
@@ -4335,8 +4341,8 @@ function renderCalPage(){
     if(!e.dateStart)return;
     // Filtrar por área: chip ativo → usa chip; sem chip → restringe às áreas de membro
     if(calAreaFilter.length){
-      if(!e.areaId||!calAreaFilter.includes(e.areaId))return;
-    } else if(e.areaId&&!myMemberAreaIds.includes(e.areaId))return;
+      if(!eventInAreas(e,calAreaFilter))return;
+    } else if(eventAreaIds(e).length&&!eventInAreas(e,myMemberAreaIds))return;
     const start=new Date(e.dateStart+"T00:00:00");
     const end=e.dateEnd?new Date(e.dateEnd+"T00:00:00"):start;
     for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
@@ -4392,15 +4398,15 @@ function renderCalPage(){
   const nowMs=today.getTime();
   Object.entries({...calEvents,...freelaEvents}).forEach(([eid,e])=>{
     if(!e.dateStart)return;
-    if(calAreaFilter.length){if(!e.areaId||!calAreaFilter.includes(e.areaId))return;}
-    else if(e.areaId&&!myMemberAreaIds.includes(e.areaId))return;
+    if(calAreaFilter.length){if(!eventInAreas(e,calAreaFilter))return;}
+    else if(eventAreaIds(e).length&&!eventInAreas(e,myMemberAreaIds))return;
     const ms=new Date(e.dateStart+"T00:00:00").getTime();
     const diffDays=Math.round((ms-nowMs)/86400000);
     if(diffDays>=0&&diffDays<=3)upcoming.push({...e,id:eid,diffDays});
   });
   Object.entries(tasks).forEach(([tid,t])=>{
     if(!t.date||t.status==="concluido")return;
-    if(!activeAreaIds.includes(t.areaId))return;
+    if(!taskInAreas(t,activeAreaIds))return;
     const ms=new Date(t.date+"T23:59:59").getTime();
     const diffDays=Math.round((ms-nowMs)/86400000);
     if(diffDays>=0&&diffDays<=3)upcoming.push({id:tid,title:t.title,color:STATUS[t.status]?.color||"#7c6eff",diffDays,type:"task",area:areas[t.areaId]?.name||""});
@@ -5323,6 +5329,14 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
           ${rootAreas.map(([id,a])=>`<option value="${id}" ${ev.areaId===id?"selected":""}>${esc(a.name)}</option>`).join("")}
         </select>
       </div>
+      <div class="field">
+        <label>Também aparece em <span style="color:#7a7a8a;font-size:11px">(opcional — o evento será visível nessas áreas também)</span></label>
+        <div id="extra-eareas-chips" style="display:flex;gap:6px;flex-wrap:wrap;min-height:24px;margin-bottom:6px"></div>
+        <select id="m-extra-earea-sel" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:7px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
+          <option value="">+ Adicionar outra área…</option>
+          ${rootAreas.map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join("")}
+        </select>
+      </div>
       <div class="field-row">
         <div class="field"><label>Data início *</label><input type="date" id="m-estart" value="${ev.dateStart||prefillDate||""}"/></div>
         <div class="field"><label>Data fim <span style="color:#7a7a8a;font-size:10px">(opcional, para multi-dia)</span></label><input type="date" id="m-eend" value="${ev.dateEnd||""}"/></div>
@@ -5373,6 +5387,22 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
   document.getElementById("m-edel")?.addEventListener("click",async()=>{
     if(confirm("Excluir evento?")){await trashRemove(`${isFreela?"freela_events":"cal_events"}/${eventId}`,"evento",ev.title);await logAction("excluir_evento",`Evento excluído: ${ev.title}`);closeModal();toast("Evento excluído","warning");}
   });
+  let extraEAreaIds=Array.isArray(ev.extraAreaIds)?[...ev.extraAreaIds]:[];
+  function refreshExtraEAreaChips(){
+    const el=document.getElementById("extra-eareas-chips");if(!el)return;
+    el.innerHTML=extraEAreaIds.map(aid=>{
+      const a=areas[aid];if(!a)return"";
+      return`<span style="background:${a.color}18;color:${a.color};border:1px solid ${a.color}44;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer" data-eeid="${aid}">✕ ${esc(a.name)}</span>`;
+    }).join("")||`<span style="font-size:12px;color:#5a5a6a">Nenhuma área extra</span>`;
+    el.querySelectorAll("[data-eeid]").forEach(ch=>ch.addEventListener("click",()=>{extraEAreaIds=extraEAreaIds.filter(id=>id!==ch.dataset.eeid);refreshExtraEAreaChips();}));
+  }
+  refreshExtraEAreaChips();
+  document.getElementById("m-extra-earea-sel")?.addEventListener("change",e=>{
+    const val=e.target.value;
+    const mainArea=document.getElementById("m-earea")?.value;
+    if(val&&val!==mainArea&&!extraEAreaIds.includes(val)){extraEAreaIds.push(val);refreshExtraEAreaChips();}
+    e.target.value="";
+  });
   let evImage=ev.image||null;
   function renderEvImg(){
     const empty=document.getElementById("ev-img-empty");
@@ -5415,7 +5445,7 @@ function openCalEventModal(eventId, prefillDate, isFreela=false){
     const note=document.getElementById("m-enote").value.trim()||null;
     const useColor=document.getElementById("m-ecolor-use")?.checked;
     const evColor=useColor?(document.getElementById("m-ecolor")?.value||null):null;
-    const data={title,dateStart,dateEnd,time,priority,person,note,image:evImage||null,color:evColor||null,areaId,creatorId:currentUser.uid,creatorName:currentProfile.name,createdAt:ev.createdAt||new Date().toISOString()};
+    const data={title,dateStart,dateEnd,time,priority,person,note,image:evImage||null,color:evColor||null,areaId,extraAreaIds:extraEAreaIds.filter(id=>id!==areaId).length?extraEAreaIds.filter(id=>id!==areaId):null,creatorId:currentUser.uid,creatorName:currentProfile.name,createdAt:ev.createdAt||new Date().toISOString()};
     await dbSet(`${isFreela?"freela_events":"cal_events"}/${eventId||uid()}`,data);
     await logAction(isEdit?"editar_evento":"criar_evento",`${isEdit?"Editado":"Criado"}: ${title} (${dateStart})`);
     toast(isEdit?"Evento atualizado!":"Evento criado!","success");closeModal();
@@ -5444,6 +5474,7 @@ function openCalEventDetailModal(eventId){
         ${ev.time?`<span class="chip" style="background:#f0a84818;color:#f0a848;border:1px solid #f0a84830">🕐 ${esc(ev.time)}</span>`:""}
         ${span?`<span class="chip" style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30">${Math.round((new Date(ev.dateEnd)-new Date(ev.dateStart))/86400000)+1} dias</span>`:""}
       </div>
+      ${eventAreaIds(ev).length?`<div style="margin-bottom:10px"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Área${eventAreaIds(ev).length>1?"s":""}</div><div style="display:flex;gap:6px;flex-wrap:wrap">${eventAreaIds(ev).map(aid=>{const a=areas[aid];return a?`<span style="background:${a.color}18;color:${a.color};border:1px solid ${a.color}30;padding:4px 12px;border-radius:20px;font-size:12px">${esc(a.name)}</span>`:"";}).join("")}</div></div>`:""}
       ${ev.person?`<div style="margin-bottom:10px"><div style="font-size:10px;color:#7a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Responsável</div><span style="background:#7c6eff18;color:#9d93ff;border:1px solid #7c6eff30;padding:4px 12px;border-radius:20px;font-size:12px">${esc(ev.person)}</span></div>`:""}
       ${ev.note?`<div style="font-size:13px;color:#a0a0b0;line-height:1.6;background:#18181c;padding:12px;border-radius:8px;margin-bottom:12px">${esc(ev.note)}</div>`:""}
       <div class="field" style="margin-bottom:12px">
@@ -5526,7 +5557,7 @@ function openCalDayModal(dateStr){
   // Tarefas do dia
   const myAreaIds=visibleAreas().map(a=>a.id);
   const taskEvs=Object.entries(tasks)
-    .filter(([,t])=>t.date===dateStr&&myAreaIds.includes(t.areaId))
+    .filter(([,t])=>t.date===dateStr&&taskInAreas(t,myAreaIds))
     .map(([id,t])=>({id,...t}))
     .sort((a,b)=>{const order={"a-fazer":0,"em-andamento":1,"bloqueado":2,"concluido":3};return(order[a.status]||0)-(order[b.status]||0);});
 
@@ -5680,7 +5711,7 @@ async function checkOverdueCalEvents(){
     if(!e.dateStart)continue;
     const evDate=new Date(e.dateStart+"T00:00:00");
     if(evDate>=today)continue; // ainda não passou
-    if(e.areaId&&!myMbAreaIds.includes(e.areaId))continue; // não pertence ao usuário
+    if(eventAreaIds(e).length&&!eventInAreas(e,myMbAreaIds))continue; // não pertence ao usuário
     if(localStorage.getItem(`dismissed_calevent_${eid}`))continue; // descartado definitivamente pelo usuário
     const lsKey=`overdue_calevent_${eid}`;
     const last=localStorage.getItem(lsKey);
@@ -7143,8 +7174,7 @@ function openDetailModal(taskId){
     // Criador
     if(t.creatorId&&t.creatorId!==currentUser.uid) toNotify.add(t.creatorId);
     // Membros das áreas da tarefa (areaId principal + extraAreaIds)
-    const taskAreaIds=[t.areaId,...(Array.isArray(t.extraAreaIds)?t.extraAreaIds:[])].filter(Boolean);
-    taskAreaIds.forEach(aId=>{
+    taskAreaIds(t).forEach(aId=>{
       const area=areas[aId]; if(!area)return;
       Object.entries(users).forEach(([uid2,u])=>{
         if(uid2===currentUser.uid)return;
@@ -7371,7 +7401,7 @@ async function quickCompleteTask(taskId){
 function exportAreaTasks(areaId){
   const area=areas[areaId]; if(!area)return;
   const areaTaskList=Object.entries(tasks)
-    .filter(([,t])=>t.areaId===areaId)
+    .filter(([,t])=>taskAreaIds(t).includes(areaId))
     .map(([id,t])=>({id,...t}))
     .sort((a,b)=>new Date(a.createdAt||0)-new Date(b.createdAt||0));
   if(!areaTaskList.length){toast("Nenhuma tarefa nesta área","error");return;}

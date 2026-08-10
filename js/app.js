@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.68
+//  Mineirart Lagos — App v1.69
 //  - Eventos do calendário passam a aceitar múltiplas áreas ("Também
 //    aparece em"), igual às tarefas; todas as áreas atreladas enxergam
 //    o item nos filtros, contadores e listagens
@@ -159,6 +159,7 @@ let fyiNotes={};
 let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
 let freelaEvents={}, prospEvents={}, prospLeads={};
 let prospLeadsFilter="todos";
+let prospLeadsRegiaoFilter=null;
 let prospLeadsCalYear=new Date().getFullYear(), prospLeadsCalMonth=new Date().getMonth();
 let prospLeadsCalSelectedDay=null;
 let areaCalCollapsed={};
@@ -678,7 +679,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.68</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.69</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -5001,6 +5002,7 @@ const LEAD_TIPO={
   formatura:{label:"Formatura",color:"#f0a848"},
   outro:{label:"Outro",color:"#7a7a8a"}
 };
+const REGIOES_SUGESTOES=["Maricá","Saquarema","Araruama","Iguaba Grande","São Pedro da Aldeia","Cabo Frio","Búzios","Arraial do Cabo","Rio das Ostras","Casimiro de Abreu","Silva Jardim","Niterói","Rio de Janeiro"];
 function fmtMoeda(v){if(!v&&v!==0)return"—";return"R$ "+Number(v).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});}
 
 function renderProspLeadsPage(){
@@ -5089,6 +5091,25 @@ function renderProspLeadsPage(){
     calSideHtml=`<div style="font-size:11px;color:#5a5a6a;padding:16px 8px;text-align:center;background:#1a1a2e;border:1px solid #2e2e3a;border-radius:10px">Selecione um dia com ponto colorido para ver os leads</div>`;
   }
 
+  // Painel lateral de regiões — quantidade de eventos futuros por região
+  const regiaoCounts={};
+  activeLeads.forEach(l=>{
+    if(!l.dataEvento||l.dataEvento<todayStr)return;
+    const r=(l.regiao||"").trim()||"Sem região";
+    regiaoCounts[r]=(regiaoCounts[r]||0)+1;
+  });
+  const regiaoEntries=Object.entries(regiaoCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"pt-BR"));
+  const regionSideHtml=`<div style="background:#1a1a2e;border:1px solid #2e2e3a;border-radius:10px;padding:12px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:700;color:#c0c0d0;margin-bottom:8px">📍 Regiões — eventos a vir</div>
+    ${regiaoEntries.length===0?`<div style="font-size:11px;color:#5a5a6a">Nenhum evento futuro</div>`:regiaoEntries.map(([r,c])=>{
+      const active=prospLeadsRegiaoFilter===r;
+      return`<div class="pl-regiao-row" data-regiao="${esc(r)}" style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:${active?"#f0a848":"#c0c0d0"};background:${active?"#f0a84818":"transparent"};margin-bottom:2px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r)}</span><span style="color:#7a7a8a;font-weight:700;flex-shrink:0">(${c})</span>
+      </div>`;
+    }).join("")}
+    ${prospLeadsRegiaoFilter?`<div style="margin-top:6px;text-align:right"><button class="btn-small" id="pl-regiao-clear" style="border:1px solid #2e2e3a;color:#7a7a8a;font-size:10px;padding:3px 8px">Limpar filtro</button></div>`:""}
+  </div>`;
+
   // Chips de filtro
   const allStatuses=[{k:"todos",label:"Todos",color:"#7a7a8a"},...Object.entries(LEAD_STATUS).map(([k,v])=>({k,...v}))];
   const filterChips=allStatuses.map(s=>{
@@ -5099,6 +5120,7 @@ function renderProspLeadsPage(){
 
   // Lista de leads filtrada e ordenada por follow-up ASC
   let filteredLeads=prospLeadsFilter==="todos"?[...allLeads]:allLeads.filter(l=>l.status===prospLeadsFilter);
+  if(prospLeadsRegiaoFilter)filteredLeads=filteredLeads.filter(l=>((l.regiao||"").trim()||"Sem região")===prospLeadsRegiaoFilter);
   filteredLeads.sort((a,b)=>{
     if(!a.dataFollowUp&&!b.dataFollowUp)return 0;
     if(!a.dataFollowUp)return 1;
@@ -5131,6 +5153,7 @@ function renderProspLeadsPage(){
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center">
               <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${tp.color}22;color:${tp.color};border:1px solid ${tp.color}33">${tp.label}</span>
               <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${st.color}22;color:${st.color};border:1px solid ${st.color}33">${st.label}</span>
+              ${l.regiao?`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#4ac8e822;color:#4ac8e8;border:1px solid #4ac8e833">📍 ${esc(l.regiao)}</span>`:""}
               ${urgencyBadge(fu)}
             </div>
           </div>
@@ -5173,7 +5196,7 @@ function renderProspLeadsPage(){
         <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#7c6eff;margin-right:3px;vertical-align:middle"></span>Futuro</span>
       </div>
     </div>
-    <div>${calSideHtml}</div>
+    <div>${regionSideHtml}${calSideHtml}</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" id="pl-filters">${filterChips}</div>
   <div id="pl-leads-list">${leadsHtml}</div>`;
@@ -5207,6 +5230,14 @@ function attachProspLeadsEvents(){
   document.getElementById("prosp-alert-banner")?.addEventListener("click",()=>{
     prospLeadsFilter="todos"; render();
   });
+  document.querySelectorAll(".pl-regiao-row[data-regiao]").forEach(el=>{
+    el.addEventListener("click",()=>{
+      const r=el.dataset.regiao;
+      prospLeadsRegiaoFilter=prospLeadsRegiaoFilter===r?null:r;
+      render();
+    });
+  });
+  document.getElementById("pl-regiao-clear")?.addEventListener("click",()=>{prospLeadsRegiaoFilter=null;render();});
   document.querySelectorAll(".pl-edit-lead[data-lid]").forEach(btn=>{
     btn.addEventListener("click",e=>{e.stopPropagation();openProspLeadModal(btn.dataset.lid);});
   });
@@ -5256,6 +5287,10 @@ function openProspLeadModal(leadId){
           </select>
         </div>
       </div>
+      <div class="field"><label>Região</label>
+        <input id="m-lregiao" list="m-lregiao-list" value="${esc(lead.regiao||"")}" placeholder="Ex: Maricá, Saquarema, Búzios…"/>
+        <datalist id="m-lregiao-list">${REGIOES_SUGESTOES.map(r=>`<option value="${esc(r)}"/>`).join("")}</datalist>
+      </div>
       <div class="field-row">
         <div class="field"><label>Data do evento *</label><input type="date" id="m-levento" value="${lead.dataEvento||""}"/></div>
         <div class="field"><label>Data do follow-up</label><input type="date" id="m-lfollow" value="${lead.dataFollowUp||""}"/></div>
@@ -5295,6 +5330,7 @@ function openProspLeadModal(leadId){
     const data={
       nomeCliente,
       tipoEvento:document.getElementById("m-ltipo").value,
+      regiao:document.getElementById("m-lregiao").value.trim()||null,
       dataEvento,
       dataFollowUp:document.getElementById("m-lfollow").value||null,
       status:document.getElementById("m-lstatus").value||"novo",

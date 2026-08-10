@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.69
+Leads do Calendário de Prospecção agora têm campo "Região". Nova coluna lateral mostra a quantidade de eventos futuros por região, com filtro ao clicar.
+
 ## v1.68
 Eventos do calendário agora aceitam múltiplas áreas ("Também aparece em"), como já ocorria com tarefas. Todas as áreas atreladas a uma tarefa/evento passam a enxergar o item nos filtros, contadores e listagens.
 
