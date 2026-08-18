@@ -1,5 +1,5 @@
 ﻿// ════════════════════════════════════════════════════════
-//  Mineirart Lagos — App v1.69
+//  Mineirart Lagos — App v1.70
 //  - Eventos do calendário passam a aceitar múltiplas áreas ("Também
 //    aparece em"), igual às tarefas; todas as áreas atreladas enxergam
 //    o item nos filtros, contadores e listagens
@@ -29,7 +29,6 @@ const LIMITS = {
   TASK_PURGE_TARGET:   400, // após purga, mantém esse número
   MAX_ORG_NODES:        60,  // max blocos no organograma
   TRASH_KEEP:           10,  // últimas exclusões guardadas na lixeira
-  MAX_PROSP_LEADS:     200,
 };
 
 // ── SECURITY — Rate limiting (prevent abuse / accidental overuse) ─────────────
@@ -157,11 +156,7 @@ let areaNotesListeners={};
 let alertsSent={}, calAlertsSent={};
 let fyiNotes={};
 let flowZoom=1, flowPan={x:0,y:0}, flowPanning=false, flowPanStart={x:0,y:0};
-let freelaEvents={}, prospEvents={}, prospLeads={};
-let prospLeadsFilter="todos";
-let prospLeadsRegiaoFilter=null;
-let prospLeadsCalYear=new Date().getFullYear(), prospLeadsCalMonth=new Date().getMonth();
-let prospLeadsCalSelectedDay=null;
+let freelaEvents={}, prospEvents={};
 let areaCalCollapsed={};
 let areaMembersExpanded={};
 let orgExpanded={};
@@ -376,7 +371,6 @@ function initListeners(){
   dbListen("cal_events",  v=>{calEvents=v||{}; checkReady(); render(); checkCalAlerts();});
   dbListen("freela_events",v=>{freelaEvents=v||{}; render();});
   dbListen("prosp_events",v=>{prospEvents=v||{}; render();});
-  dbListen("prosp_leads",v=>{prospLeads=v||{}; render();});
   dbListen("freteiros",   v=>{freteiros=v||{};    render();});
   dbListen("trash",       v=>{trashItems=v||{};   render();});
   if(currentUser) onValue(dbRef(`personal_notes/${currentUser.uid}`),s=>{personalNotes=s.val()||{};render();});
@@ -596,7 +590,6 @@ function renderSidebar(){
     ${ni("fluxo","⟆","Fluxograma")}
     ${ni("calendario","📅","Calendário")}
     ${ni("prospecção","🎯","Cal. Prospecção")}
-    ${isAdmin1?ni("prospeccao","📅","Prospecção"):""}
     ${ni("organograma","🏢","Organograma")}
     ${ni("frete","🚚","Cotação de Frete")}
     ${ni("fyi","💡","FYI")}
@@ -668,7 +661,7 @@ function renderSidebar(){
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 function renderTopbar(){
   const tb=document.getElementById("topbar");if(!tb)return;
-  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",prospeccao:"Prospecção & Follow-up",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",atualizacoes:"Atualizações",admin:"Administração",historico:"Histórico de Ações",performance:"Performance",};
+  const titles={dashboard:"Dashboard",fluxo:"Fluxograma",organograma:"Organograma",calendario:"Calendário",freela:"Calendário","prospecção":"Cal. Prospecção",fyi:"FYI","minhas-tarefas":"Minhas Tarefas","notas-pessoais":"Rascunhos Pessoais",alertas:"Alertas",atualizacoes:"Atualizações",admin:"Administração",historico:"Histórico de Ações",performance:"Performance",};
   const label=page==="area"?(areas[activeAreaId]?.name||"Área"):(titles[page]||"");
   tb.innerHTML=`<button id="hamburger-btn" aria-label="Menu">☰</button>
     <div class="topbar-title">${esc(label)}</div>
@@ -679,7 +672,7 @@ function renderTopbar(){
       <div id="search-results" style="display:none;position:absolute;top:38px;left:0;right:0;background:#16161e;border:1px solid #2e2e3a;border-radius:10px;max-height:360px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
     </div>
     <div style="position:relative">
-      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.69</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
+      <div class="topbar-user" id="user-btn"><div class="user-avatar">${initials(currentProfile.name)}</div><span class="topbar-user-name">${esc(currentProfile.name)}</span><span style="font-size:10px;color:#f0a848;margin-left:5px;font-weight:700">v1.70</span><span style="font-size:11px;color:#7a7a8a;margin-left:2px">▾</span></div>
       ${dropdownOpen?`<div class="user-dropdown"><div style="padding:8px 12px;font-size:11px;color:#5a5a6a">${esc(currentProfile.email)}</div><div style="padding:2px 12px 8px;font-size:10px;color:#7a7a8a">${{"admin1":"👑 Super Admin","admin":"Admin","user":"Usuário"}[currentProfile.role]||""}</div><hr class="divider"/><div class="user-dropdown-item" id="dd-profile">Meu perfil</div><div class="user-dropdown-item danger" id="dd-logout">Sair</div></div>`:""}
     </div>
     </div>`;
@@ -819,7 +812,7 @@ document.addEventListener("keydown",e=>{
 function renderContent(){
   const mc=document.getElementById("main-content");if(!mc)return;
   if(!window._myNotifs)window._myNotifs={};
-  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,prospeccao:renderProspLeadsPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,lixeira:renderLixeiraPage,performance:renderPerformancePage,frete:renderFretePage,};
+  const map={dashboard:renderDashboard,area:renderAreaPage,fluxo:renderFlowPage,organograma:renderOrgPage,calendario:renderCalPage,freela:renderCalPage,"prospecção":renderProspPage,"minhas-tarefas":renderMyTasksPage,"notas-pessoais":renderPersonalNotesPage,fyi:renderFYIPage,alertas:renderAlertsPage,atualizacoes:renderAtualizacoesPage,admin:renderAdminPage,historico:renderHistoricoPage,lixeira:renderLixeiraPage,performance:renderPerformancePage,frete:renderFretePage,};
   if(page==="performance"&&!isAdmin1&&!currentProfile?.viewPerformance){navigate("dashboard");return;}
   if(page==="performance"&&mc.querySelector("#perf-iframe"))return;
   try{
@@ -3091,7 +3084,6 @@ function renderAdminPage(){
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Blocos fluxograma (máx ${LIMITS.MAX_FLOW_NODES})</div>${usageBar(Object.keys(flowData.nodes||{}).length,LIMITS.MAX_FLOW_NODES,"#f0a832")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Usuários (máx 100 simultâneos)</div>${usageBar(userList.length,100,"#4ae89c")}</div>
         <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Histórico (auto-purga em ${LIMITS.MAX_AUDIT_LOGS})</div>${usageBar(Object.keys(auditLog).length,LIMITS.MAX_AUDIT_LOGS,"#a84ae8")}</div>
-        <div><div style="font-size:11px;color:#7a7a8a;margin-bottom:3px">Leads Prospecção (máx ${LIMITS.MAX_PROSP_LEADS})</div>${usageBar(Object.keys(prospLeads).length,LIMITS.MAX_PROSP_LEADS,"#f0a832")}</div>
       </div>
       <div style="margin-top:12px;padding:10px 14px;background:rgba(74,200,232,0.07);border:1px solid #4ac8e844;border-radius:8px;font-size:12px;color:#4ac8e8">
         🛡️ Tarefas protegidas por data (hoje ou futura): <strong>${Object.values(tasks).filter(t=>taskHasFutureDate(t)).length}</strong>
@@ -3101,7 +3093,6 @@ function renderAdminPage(){
         <div>📋 <strong style="color:#f0a848">Tarefas:</strong> ao atingir ${LIMITS.MAX_TASKS}, purga automaticamente as mais antigas não fixadas, mantendo ${LIMITS.TASK_PURGE_TARGET}.</div>
         <div>📜 <strong style="color:#a84ae8">Histórico de ações:</strong> ao atingir ${LIMITS.MAX_AUDIT_LOGS}, purga automaticamente os mais antigos, mantendo ${LIMITS.AUDIT_PURGE_KEEP}.</div>
         <div>🚫 <strong style="color:#7a7a8a">Notas, Áreas, Blocos de fluxograma:</strong> bloqueiam a criação de novos itens com mensagem de erro ao atingir o limite.</div>
-        <div>🚫 <strong style="color:#f0a832">Leads Prospecção:</strong> bloqueiam a criação ao atingir ${LIMITS.MAX_PROSP_LEADS}. Feche ou exclua leads antigos para liberar espaço.</div>
       </div>
     </div>
 
@@ -3281,7 +3272,6 @@ function attachContentEvents(){
   attachCalEvents();
   attachFreelaEvents();
   if(page==="prospecção") attachProspEvents();
-  if(page==="prospeccao") attachProspLeadsEvents();
   document.querySelectorAll(".btn-ghost-link").forEach(b=>b.addEventListener("click",()=>openGhostLinkModal(b.dataset.uid,b.dataset.name)));
   document.querySelectorAll(".btn-approve-user").forEach(b=>b.addEventListener("click",async()=>{const p=pendingUsers[b.dataset.id];if(!p)return;await dbSet(`users/${b.dataset.id}`,{name:p.name,email:p.email,role:"user",permissions:[],createdAt:new Date().toISOString()});await dbSet(`pending_users/${b.dataset.id}/status`,"approved");await logAction("aprovar_usuario",`Aprovado: ${p.name}`);toast(`${p.name} aprovado!`,"success");}));
   document.querySelectorAll(".btn-reject-user").forEach(b=>b.addEventListener("click",async()=>{const p=pendingUsers[b.dataset.id];if(!p)return;await dbSet(`pending_users/${b.dataset.id}/status`,"rejected");await logAction("rejeitar_usuario",`Rejeitado: ${p.name}`);toast(`${p.name} rejeitado`,"warning");}));
@@ -4982,368 +4972,6 @@ function openProspEventModal(eventId, prefillDate=null){
       createdAt:ev.createdAt||new Date().toISOString()};
     await dbSet(`prosp_events/${eventId||uid()}`,data);
     toast(isEdit?"Evento atualizado!":"Evento criado!","success");closeModal();
-  };
-  overlayClose("ov");
-}
-
-// ── PROSPECÇÃO & FOLLOW-UP COMERCIAL ─────────────────────────────────────────
-const LEAD_STATUS={
-  novo:{label:"Novo",color:"#4ac8e8"},
-  contato_feito:{label:"Contato feito",color:"#7c6eff"},
-  proposta_enviada:{label:"Proposta enviada",color:"#f0a832"},
-  negociando:{label:"Negociando",color:"#f0a848"},
-  fechado:{label:"Fechado",color:"#4ae89c"},
-  perdido:{label:"Perdido",color:"#5a5a6a"}
-};
-const LEAD_TIPO={
-  casamento:{label:"Casamento",color:"#e84ab8"},
-  corporativo:{label:"Corporativo",color:"#4a7ee8"},
-  aniversario:{label:"Aniversário",color:"#f0a832"},
-  formatura:{label:"Formatura",color:"#f0a848"},
-  outro:{label:"Outro",color:"#7a7a8a"}
-};
-const REGIOES_SUGESTOES=["Maricá","Saquarema","Araruama","Iguaba Grande","São Pedro da Aldeia","Cabo Frio","Búzios","Arraial do Cabo","Rio das Ostras","Casimiro de Abreu","Silva Jardim","Niterói","Rio de Janeiro"];
-function fmtMoeda(v){if(!v&&v!==0)return"—";return"R$ "+Number(v).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});}
-
-function renderProspLeadsPage(){
-  const today=new Date(); today.setHours(0,0,0,0);
-  const todayStr=today.toISOString().slice(0,10);
-  const allLeads=Object.entries(prospLeads).map(([id,l])=>({id,...l}));
-  const activeLeads=allLeads.filter(l=>l.status!=="fechado"&&l.status!=="perdido");
-
-  // Stats
-  const totalAtivos=activeLeads.length;
-  const vencidos=activeLeads.filter(l=>l.dataFollowUp&&l.dataFollowUp<todayStr).length;
-  const proxSete=activeLeads.filter(l=>{
-    if(!l.dataFollowUp)return false;
-    const diff=(new Date(l.dataFollowUp+"T00:00:00")-today)/86400000;
-    return diff>=0&&diff<=7;
-  }).length;
-  const totalValor=activeLeads.reduce((s,l)=>s+(Number(l.valor)||0),0);
-
-  // Banner de alertas
-  const alertLeads=activeLeads.filter(l=>l.dataFollowUp&&l.dataFollowUp<=todayStr);
-  const bannerHtml=alertLeads.length
-    ?`<div id="prosp-alert-banner" style="background:#ff6b6b18;border:1px solid #ff6b6b44;border-radius:10px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;cursor:pointer">
-        <span style="font-size:18px">⚠️</span>
-        <span style="font-size:13px;color:#ff6b6b;font-weight:600">${alertLeads.length} lead${alertLeads.length>1?"s":""} com follow-up vencido ou para hoje</span>
-        <span style="font-size:11px;color:#5a5a6a;margin-left:auto">Clique para filtrar</span>
-      </div>`
-    :"";
-
-  // Stats cards
-  const statsHtml=`<div class="stats-row" style="margin-bottom:18px">
-    <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#f0a848;line-height:1">${totalAtivos}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Leads ativos</div></div>
-    <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#ff6b6b;line-height:1">${vencidos}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Follow-up vencido</div></div>
-    <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#f0a832;line-height:1">${proxSete}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Próx. 7 dias</div></div>
-    <div class="stat-card"><div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#7c6eff;line-height:1;word-break:break-all">${fmtMoeda(totalValor)}</div><div style="font-size:11px;color:#7a7a8a;margin-top:4px">Pipeline estimado</div></div>
-  </div>`;
-
-  // Mini calendário de follow-ups
-  const yr=prospLeadsCalYear, mo=prospLeadsCalMonth;
-  const firstDay=new Date(yr,mo,1);
-  const lastDay=new Date(yr,mo+1,0);
-  const startWd=(firstDay.getDay()+6)%7;
-  const totalCells=Math.ceil((startWd+lastDay.getDate())/7)*7;
-  const monthNames=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  const dayNamesShort=["S","T","Q","Q","S","S","D"];
-  const fuMap={};
-  activeLeads.forEach(l=>{
-    if(!l.dataFollowUp)return;
-    if(!fuMap[l.dataFollowUp])fuMap[l.dataFollowUp]=[];
-    fuMap[l.dataFollowUp].push(l);
-  });
-  function dotColor(ds){
-    if(!(fuMap[ds]||[]).length)return null;
-    if(ds<todayStr)return"#ff6b6b";
-    if(ds===todayStr)return"#f0a832";
-    return"#7c6eff";
-  }
-  let calCells="";
-  for(let i=0;i<totalCells;i++){
-    const dayNum=i-startWd+1;
-    const isCurMo=dayNum>=1&&dayNum<=lastDay.getDate();
-    const cellDate=new Date(yr,mo,dayNum);
-    const ds=isCurMo?cellDate.toISOString().slice(0,10):"";
-    const isToday=isCurMo&&cellDate.getTime()===today.getTime();
-    const isSel=ds&&ds===prospLeadsCalSelectedDay;
-    const dc=ds?dotColor(ds):null;
-    calCells+=`<div class="pl-cal-cell" data-ds="${ds}" style="width:30px;height:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;cursor:${ds?"pointer":"default"};background:${isSel?"#7c6eff22":isToday?"#7c6eff11":"transparent"};border:${isSel?"1px solid #7c6eff44":isToday?"1px solid #7c6eff22":"1px solid transparent"}">
-      <span style="font-size:11px;color:${!isCurMo?"#2e2e3a":isToday?"#7c6eff":"#c0c0d0"};font-weight:${isToday?"700":"400"}">${isCurMo?dayNum:""}</span>
-      <span style="width:5px;height:5px;border-radius:50%;background:${dc||"transparent"};margin-top:1px;flex-shrink:0"></span>
-    </div>`;
-  }
-
-  // Painel lateral do dia selecionado
-  let calSideHtml="";
-  if(prospLeadsCalSelectedDay&&fuMap[prospLeadsCalSelectedDay]){
-    calSideHtml=`<div style="background:#1a1a2e;border:1px solid #2e2e3a;border-radius:10px;padding:12px">
-      <div style="font-size:12px;font-weight:700;color:#c0c0d0;margin-bottom:8px">${fmtDate(prospLeadsCalSelectedDay)}</div>
-      ${fuMap[prospLeadsCalSelectedDay].map(l=>{
-        const st=LEAD_STATUS[l.status]||LEAD_STATUS.novo;
-        return`<div class="pl-day-lead" data-lid="${l.id}" style="padding:6px 0;border-bottom:1px solid #1e1e28;cursor:pointer">
-          <div style="font-size:12px;color:#d0d0e0;font-weight:600">${esc(l.nomeCliente||"")}</div>
-          <span style="font-size:10px;padding:2px 5px;border-radius:4px;background:${st.color}22;color:${st.color};border:1px solid ${st.color}33">${st.label}</span>
-        </div>`;
-      }).join("")}
-    </div>`;
-  } else {
-    calSideHtml=`<div style="font-size:11px;color:#5a5a6a;padding:16px 8px;text-align:center;background:#1a1a2e;border:1px solid #2e2e3a;border-radius:10px">Selecione um dia com ponto colorido para ver os leads</div>`;
-  }
-
-  // Painel lateral de regiões — quantidade de eventos futuros por região
-  const regiaoCounts={};
-  activeLeads.forEach(l=>{
-    if(!l.dataEvento||l.dataEvento<todayStr)return;
-    const r=(l.regiao||"").trim()||"Sem região";
-    regiaoCounts[r]=(regiaoCounts[r]||0)+1;
-  });
-  const regiaoEntries=Object.entries(regiaoCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"pt-BR"));
-  const regionSideHtml=`<div style="background:#1a1a2e;border:1px solid #2e2e3a;border-radius:10px;padding:12px;margin-bottom:12px">
-    <div style="font-size:12px;font-weight:700;color:#c0c0d0;margin-bottom:8px">📍 Regiões — eventos a vir</div>
-    ${regiaoEntries.length===0?`<div style="font-size:11px;color:#5a5a6a">Nenhum evento futuro</div>`:regiaoEntries.map(([r,c])=>{
-      const active=prospLeadsRegiaoFilter===r;
-      return`<div class="pl-regiao-row" data-regiao="${esc(r)}" style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:${active?"#f0a848":"#c0c0d0"};background:${active?"#f0a84818":"transparent"};margin-bottom:2px">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r)}</span><span style="color:#7a7a8a;font-weight:700;flex-shrink:0">(${c})</span>
-      </div>`;
-    }).join("")}
-    ${prospLeadsRegiaoFilter?`<div style="margin-top:6px;text-align:right"><button class="btn-small" id="pl-regiao-clear" style="border:1px solid #2e2e3a;color:#7a7a8a;font-size:10px;padding:3px 8px">Limpar filtro</button></div>`:""}
-  </div>`;
-
-  // Chips de filtro
-  const allStatuses=[{k:"todos",label:"Todos",color:"#7a7a8a"},...Object.entries(LEAD_STATUS).map(([k,v])=>({k,...v}))];
-  const filterChips=allStatuses.map(s=>{
-    const count=s.k==="todos"?allLeads.length:allLeads.filter(l=>l.status===s.k).length;
-    const active=prospLeadsFilter===s.k;
-    return`<button class="pl-filter-chip" data-status="${s.k}" style="padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ${active?s.color:s.color+"44"};background:${active?s.color+"22":"transparent"};color:${active?s.color:"#7a7a8a"};font-family:inherit;transition:all .12s">${s.label} (${count})</button>`;
-  }).join("");
-
-  // Lista de leads filtrada e ordenada por follow-up ASC
-  let filteredLeads=prospLeadsFilter==="todos"?[...allLeads]:allLeads.filter(l=>l.status===prospLeadsFilter);
-  if(prospLeadsRegiaoFilter)filteredLeads=filteredLeads.filter(l=>((l.regiao||"").trim()||"Sem região")===prospLeadsRegiaoFilter);
-  filteredLeads.sort((a,b)=>{
-    if(!a.dataFollowUp&&!b.dataFollowUp)return 0;
-    if(!a.dataFollowUp)return 1;
-    if(!b.dataFollowUp)return -1;
-    return a.dataFollowUp.localeCompare(b.dataFollowUp);
-  });
-
-  function urgencyBadge(fuDate){
-    if(!fuDate)return"";
-    if(fuDate<todayStr)return`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#ff6b6b22;color:#ff6b6b;border:1px solid #ff6b6b33">🔴 Vencido</span>`;
-    if(fuDate===todayStr)return`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#f0a83222;color:#f0a832;border:1px solid #f0a83233">🟠 Hoje</span>`;
-    const diff=Math.round((new Date(fuDate+"T00:00:00")-today)/86400000);
-    const c=diff<=3?"#f0a832":diff<=7?"#f0a848":"#7c6eff";
-    return`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${c}22;color:${c};border:1px solid ${c}33">🟡 ${diff} dia${diff!==1?"s":""}</span>`;
-  }
-
-  const leadsHtml=filteredLeads.length===0
-    ?`<div class="empty-state"><div style="font-size:36px">🎯</div><div class="empty-title">Nenhum lead encontrado</div><div class="empty-sub">Clique em "+ Novo Lead" para adicionar o primeiro lead</div></div>`
-    :filteredLeads.map(l=>{
-      const st=LEAD_STATUS[l.status]||LEAD_STATUS.novo;
-      const tp=LEAD_TIPO[l.tipoEvento]||LEAD_TIPO.outro;
-      const fu=l.dataFollowUp;
-      const isVencido=fu&&fu<todayStr;
-      const isHoje=fu&&fu===todayStr;
-      const leftBorder=isVencido?"#ff6b6b":isHoje?"#f0a832":"#2e2e3a";
-      return`<div style="background:#1a1a2e;border:1px solid #2e2e3a;border-left:3px solid ${leftBorder};border-radius:10px;padding:14px 16px;margin-bottom:10px">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:700;color:#f0eff5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.nomeCliente||"—")}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center">
-              <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${tp.color}22;color:${tp.color};border:1px solid ${tp.color}33">${tp.label}</span>
-              <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${st.color}22;color:${st.color};border:1px solid ${st.color}33">${st.label}</span>
-              ${l.regiao?`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#4ac8e822;color:#4ac8e8;border:1px solid #4ac8e833">📍 ${esc(l.regiao)}</span>`:""}
-              ${urgencyBadge(fu)}
-            </div>
-          </div>
-          <div style="display:flex;gap:4px;flex-shrink:0">
-            <button class="icon-btn pl-edit-lead" data-lid="${l.id}" title="Editar lead">✏</button>
-            ${l.status!=="fechado"?`<button class="icon-btn pl-close-lead" data-lid="${l.id}" title="Marcar como fechado" style="color:#4ae89c">✅</button>`:""}
-            <button class="icon-btn pl-del-lead" data-lid="${l.id}" title="Excluir lead" style="color:#ff6b6b">🗑</button>
-          </div>
-        </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#7a7a8a;margin-top:8px">
-          ${l.dataEvento?`<span>📅 Evento: <b style="color:#c0c0d0">${fmtDate(l.dataEvento)}</b></span>`:""}
-          ${fu?`<span>🔔 Follow-up: <b style="color:#c0c0d0">${fmtDate(fu)}</b></span>`:""}
-          ${l.valor?`<span>💰 <b style="color:#f0a848">${fmtMoeda(l.valor)}</b></span>`:""}
-          ${l.responsavel?`<span>👤 ${esc(l.responsavel)}</span>`:""}
-        </div>
-        ${l.observacoes?`<div style="font-size:11px;color:#5a5a6a;border-top:1px solid #1e1e28;padding-top:6px;margin-top:6px">${esc(l.observacoes.slice(0,120))}${l.observacoes.length>120?"…":""}</div>`:""}
-      </div>`;
-    }).join("");
-
-  return`<div class="page-header">
-    <div><div class="page-title">📅 Prospecção & Follow-up</div><div class="page-sub">Gestão de leads e oportunidades comerciais</div></div>
-    ${isAdmin1?`<button class="btn-primary" id="btn-new-lead">+ Novo Lead</button>`:""}
-  </div>
-  ${bannerHtml}
-  ${statsHtml}
-  <div style="display:grid;grid-template-columns:1fr 240px;gap:20px;align-items:start;margin-bottom:20px">
-    <div style="background:#1a1a2e;border:1px solid #2e2e3a;border-radius:12px;padding:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <button class="btn-small" id="pl-prev" style="border:1px solid #2e2e3a;color:#f0eff5">‹ Ant.</button>
-        <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#c0c0d0">${monthNames[mo]} ${yr}</div>
-        <button class="btn-small" id="pl-next" style="border:1px solid #2e2e3a;color:#f0eff5">Próx. ›</button>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(7,30px);gap:2px;justify-content:center">
-        ${dayNamesShort.map(d=>`<div style="width:30px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#5a5a6a;font-weight:600">${d}</div>`).join("")}
-        ${calCells}
-      </div>
-      <div style="display:flex;gap:12px;margin-top:10px;font-size:10px;color:#5a5a6a;flex-wrap:wrap">
-        <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff6b6b;margin-right:3px;vertical-align:middle"></span>Vencido</span>
-        <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f0a832;margin-right:3px;vertical-align:middle"></span>Hoje</span>
-        <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#7c6eff;margin-right:3px;vertical-align:middle"></span>Futuro</span>
-      </div>
-    </div>
-    <div>${regionSideHtml}${calSideHtml}</div>
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" id="pl-filters">${filterChips}</div>
-  <div id="pl-leads-list">${leadsHtml}</div>`;
-}
-
-function attachProspLeadsEvents(){
-  document.getElementById("pl-prev")?.addEventListener("click",()=>{
-    prospLeadsCalMonth--;
-    if(prospLeadsCalMonth<0){prospLeadsCalMonth=11;prospLeadsCalYear--;}
-    prospLeadsCalSelectedDay=null; render();
-  });
-  document.getElementById("pl-next")?.addEventListener("click",()=>{
-    prospLeadsCalMonth++;
-    if(prospLeadsCalMonth>11){prospLeadsCalMonth=0;prospLeadsCalYear++;}
-    prospLeadsCalSelectedDay=null; render();
-  });
-  document.querySelectorAll(".pl-cal-cell[data-ds]").forEach(el=>{
-    el.addEventListener("click",()=>{
-      const ds=el.dataset.ds; if(!ds)return;
-      prospLeadsCalSelectedDay=prospLeadsCalSelectedDay===ds?null:ds;
-      render();
-    });
-  });
-  document.querySelectorAll(".pl-day-lead[data-lid]").forEach(el=>{
-    el.addEventListener("click",()=>openProspLeadModal(el.dataset.lid));
-  });
-  document.getElementById("btn-new-lead")?.addEventListener("click",()=>openProspLeadModal(null));
-  document.querySelectorAll(".pl-filter-chip[data-status]").forEach(btn=>{
-    btn.addEventListener("click",()=>{prospLeadsFilter=btn.dataset.status;render();});
-  });
-  document.getElementById("prosp-alert-banner")?.addEventListener("click",()=>{
-    prospLeadsFilter="todos"; render();
-  });
-  document.querySelectorAll(".pl-regiao-row[data-regiao]").forEach(el=>{
-    el.addEventListener("click",()=>{
-      const r=el.dataset.regiao;
-      prospLeadsRegiaoFilter=prospLeadsRegiaoFilter===r?null:r;
-      render();
-    });
-  });
-  document.getElementById("pl-regiao-clear")?.addEventListener("click",()=>{prospLeadsRegiaoFilter=null;render();});
-  document.querySelectorAll(".pl-edit-lead[data-lid]").forEach(btn=>{
-    btn.addEventListener("click",e=>{e.stopPropagation();openProspLeadModal(btn.dataset.lid);});
-  });
-  document.querySelectorAll(".pl-close-lead[data-lid]").forEach(btn=>{
-    btn.addEventListener("click",async e=>{
-      e.stopPropagation();
-      const lid=btn.dataset.lid;
-      const lead=prospLeads[lid]; if(!lead)return;
-      if(!confirm(`Marcar "${lead.nomeCliente}" como fechado?`))return;
-      await dbSet(`prosp_leads/${lid}/status`,"fechado");
-      await dbSet(`prosp_leads/${lid}/atualizadoEm`,Date.now());
-      await logAction("lead_fechado",`Lead fechado: "${lead.nomeCliente}" — ${(LEAD_TIPO[lead.tipoEvento]||LEAD_TIPO.outro).label} — ${fmtMoeda(lead.valor)}`);
-      toast("Lead fechado! 🎉","success");
-    });
-  });
-  document.querySelectorAll(".pl-del-lead[data-lid]").forEach(btn=>{
-    btn.addEventListener("click",async e=>{
-      e.stopPropagation();
-      const lid=btn.dataset.lid;
-      const lead=prospLeads[lid]; if(!lead)return;
-      if(!confirm(`Excluir lead "${lead.nomeCliente}"?`))return;
-      await dbRemove(`prosp_leads/${lid}`);
-      await logAction("excluir_lead",`Lead excluído: "${lead.nomeCliente}"`);
-      toast("Lead excluído","warning");
-    });
-  });
-}
-
-function openProspLeadModal(leadId){
-  const lead=leadId?(prospLeads[leadId]||{}):{};
-  const isEdit=!!leadId;
-  const userNames=Object.values(users).filter(u=>u.name).map(u=>u.name);
-  openModal(`<div class="overlay" id="ov"><div class="modal" style="max-width:520px">
-    <div class="modal-header"><div class="modal-title">${isEdit?"Editar":"Novo"} Lead</div><button class="icon-btn" id="m-x">✕</button></div>
-    <div class="modal-body">
-      <div class="field"><label>Nome do cliente *</label><input id="m-lnome" value="${esc(lead.nomeCliente||"")}" placeholder="Nome completo…" autofocus/></div>
-      <div class="field-row">
-        <div class="field"><label>Tipo de evento</label>
-          <select id="m-ltipo" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
-            ${Object.entries(LEAD_TIPO).map(([k,v])=>`<option value="${k}" ${(lead.tipoEvento||"casamento")===k?"selected":""}>${v.label}</option>`).join("")}
-          </select>
-        </div>
-        <div class="field"><label>Canal de entrada</label>
-          <select id="m-lcanal" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
-            <option value="">—</option>
-            ${[["whatsapp","WhatsApp"],["instagram","Instagram"],["indicacao","Indicação"],["site","Site"],["outro","Outro"]].map(([k,l])=>`<option value="${k}" ${(lead.canal||"")===k?"selected":""}>${l}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-      <div class="field"><label>Região</label>
-        <input id="m-lregiao" list="m-lregiao-list" value="${esc(lead.regiao||"")}" placeholder="Ex: Maricá, Saquarema, Búzios…"/>
-        <datalist id="m-lregiao-list">${REGIOES_SUGESTOES.map(r=>`<option value="${esc(r)}"/>`).join("")}</datalist>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Data do evento *</label><input type="date" id="m-levento" value="${lead.dataEvento||""}"/></div>
-        <div class="field"><label>Data do follow-up</label><input type="date" id="m-lfollow" value="${lead.dataFollowUp||""}"/></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Status</label>
-          <select id="m-lstatus" style="width:100%;background:#1a1a22;border:1px solid #2e2e3a;border-radius:7px;padding:8px 10px;color:#f0eff5;font-family:inherit;font-size:13px;outline:none">
-            ${Object.entries(LEAD_STATUS).map(([k,v])=>`<option value="${k}" ${(lead.status||"novo")===k?"selected":""}>${v.label}</option>`).join("")}
-          </select>
-        </div>
-        <div class="field"><label>Valor estimado (R$)</label><input type="number" id="m-lvalor" value="${lead.valor||""}" placeholder="0" min="0"/></div>
-      </div>
-      <div class="field"><label>Responsável</label>
-        <input id="m-lresp" list="m-lresp-list" value="${esc(lead.responsavel||currentProfile?.name||"")}" placeholder="Nome do responsável…"/>
-        <datalist id="m-lresp-list">${userNames.map(n=>`<option value="${esc(n)}"/>`).join("")}</datalist>
-      </div>
-      <div class="field"><label>Observações</label><textarea id="m-lobs" rows="3" placeholder="Detalhes do evento, orçamento, observações…">${esc(lead.observacoes||"")}</textarea></div>
-    </div>
-    <div class="modal-footer">
-      ${isEdit?`<button class="btn-danger" id="m-ldel">Excluir</button>`:""}
-      <button class="btn-ghost" id="m-cancel">Cancelar</button>
-      <button class="btn-primary" id="m-lsave">Salvar</button>
-    </div>
-  </div></div>`);
-  document.getElementById("m-x").onclick=document.getElementById("m-cancel").onclick=closeModal;
-  document.getElementById("m-ldel")?.addEventListener("click",async()=>{
-    if(!confirm("Excluir este lead?"))return;
-    await dbRemove(`prosp_leads/${leadId}`);
-    await logAction("excluir_lead",`Lead excluído: "${lead.nomeCliente}"`);
-    closeModal(); toast("Lead excluído","warning");
-  });
-  document.getElementById("m-lsave").onclick=async()=>{
-    const nomeCliente=document.getElementById("m-lnome").value.trim();
-    const dataEvento=document.getElementById("m-levento").value;
-    if(!nomeCliente||!dataEvento){toast("Nome do cliente e data do evento são obrigatórios","error");return;}
-    if(!isEdit&&Object.keys(prospLeads).length>=LIMITS.MAX_PROSP_LEADS){toast(`Limite de ${LIMITS.MAX_PROSP_LEADS} leads atingido`,"error");return;}
-    const data={
-      nomeCliente,
-      tipoEvento:document.getElementById("m-ltipo").value,
-      regiao:document.getElementById("m-lregiao").value.trim()||null,
-      dataEvento,
-      dataFollowUp:document.getElementById("m-lfollow").value||null,
-      status:document.getElementById("m-lstatus").value||"novo",
-      valor:Number(document.getElementById("m-lvalor").value)||null,
-      responsavel:document.getElementById("m-lresp").value.trim()||null,
-      canal:document.getElementById("m-lcanal").value||null,
-      observacoes:document.getElementById("m-lobs").value.trim()||null,
-      criadoEm:lead.criadoEm||Date.now(),
-      atualizadoEm:Date.now()
-    };
-    await dbSet(`prosp_leads/${leadId||uid()}`,data);
-    await logAction(isEdit?"editar_lead":"criar_lead",`Lead ${isEdit?"atualizado":"criado"}: "${nomeCliente}"`);
-    toast(isEdit?"Lead atualizado!":"Lead criado!","success"); closeModal();
   };
   overlayClose("ov");
 }

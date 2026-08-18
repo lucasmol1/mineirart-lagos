@@ -4,6 +4,9 @@ Formato: uma entrada por versão, máx 2 linhas.
 
 ---
 
+## v1.70
+Remove a aba "Prospecção" (Prospecção & Follow-up, leads/CRM). A aba "Cal. Prospecção" (calendário) foi mantida.
+
 ## v1.69
 Leads do Calendário de Prospecção agora têm campo "Região". Nova coluna lateral mostra a quantidade de eventos futuros por região, com filtro ao clicar.
 
